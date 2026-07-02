@@ -1,6 +1,7 @@
 project-blueprint.md
 docs/
 node_modules/
+dist/
 CHANGELOG.md
 TODO.md
 

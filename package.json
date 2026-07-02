@@ -5,14 +5,28 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "node dev-server.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "dev:legacy": "node dev-server.mjs",
     "lint": "eslint js",
     "lint:fix": "eslint js --fix"
   },
   "license": "UNLICENSED",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^10.6.0",
-    "globals": "^17.7.0"
+    "globals": "^17.7.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3"
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.1"
   }
 }

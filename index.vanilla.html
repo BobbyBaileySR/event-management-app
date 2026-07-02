@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Adaptavist Event Management System — staff-only operational UI for events, attendees, email, and analytics">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://*.gstatic.com https://event.scriptrunnerconnect.com; img-src 'self' data: https:; frame-src https://accounts.google.com;">
+    <title>Adaptavist | Event Management System</title>
+
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Pinned + SRI-verified. Update integrity hash if the version changes. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous" defer></script>
+</head>
+<body>
+    <div id="banner-host"></div>
+
+    <div id="login-view" aria-label="Sign in"></div>
+
+    <div id="app-layout" class="hidden">
+        <aside id="sidebar" class="sidebar" aria-label="Sidebar"></aside>
+        <main id="main-content" class="main-content" aria-live="polite"></main>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
