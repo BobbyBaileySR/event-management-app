@@ -6,7 +6,6 @@ alwaysApply: false
 
 # Frontend patterns
 
-- Vanilla HTML/CSS/JS with ES modules — no React/Vue unless explicitly requested
 - One view per file in `js/views/` — export `mount()` and `unmount()`
 - Data via `js/services/dataService.js`; HTTP via `js/api/client.js` (`X-EMS-Route` for logical paths)
 - Auth via `js/services/authService.js` → `auth/exchange` when live
