@@ -1,0 +1,17 @@
+---
+description: Ask the user when requirements are unclear — never assume
+alwaysApply: true
+---
+
+# Clarify before acting
+
+If the user's request is **not 100% clear**, stop and **ask questions** before writing code or editing files.
+
+- Do not guess intent, scope, file targets, or behaviour.
+- Do not silently pick an interpretation when multiple valid options exist.
+- Prefer one or two focused questions over building the wrong thing.
+- Only proceed once you are confident you understand what they want.
+
+This applies to features, refactors, renames, deletions, and documentation changes.
+
+When the user **skips or defers** optional work you proposed, park it in **`TODO.md`** (see `.cursor/rules/ems-todo-discipline.mdc`) — do not drop it silently.

@@ -1,0 +1,24 @@
+---
+description: Frontend module patterns for JS, CSS, and HTML
+globs: js/**,css/**,index.html
+alwaysApply: false
+---
+
+# Frontend patterns
+
+- Vanilla HTML/CSS/JS with ES modules — no React/Vue unless explicitly requested
+- One view per file in `js/views/` — export `mount()` and `unmount()`
+- Data via `js/services/dataService.js`; HTTP via `js/api/client.js` (`X-EMS-Route` for logical paths)
+- Auth via `js/services/authService.js` → `auth/exchange` when live
+- Router: `js/router.js`; event context via `selectedEventId` in `js/state/appState.js`
+- Keep `USE_MOCK_API` path until backend endpoint exists for that feature
+- Render dynamic/remote data with `js/utils/dom.js` `el({ text })` or `textContent` — never `innerHTML` (XSS). `htmlToElement()` is for trusted static markup only. See `frontend-security.mdc`.
+
+## When changing features
+
+- Update `docs/ui-routes.md` if routes or views change
+- Align with `docs/product-flows.md` or flag stakeholder review
+- Minimal diffs — no drive-by refactors
+- Do not edit `project-blueprint.md` unless the user asks
+
+Before finishing: event-centric nav, no bypass auth, brand tokens used.

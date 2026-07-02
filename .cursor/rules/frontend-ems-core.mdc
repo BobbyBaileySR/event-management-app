@@ -1,0 +1,23 @@
+---
+description: Adaptavist EMS frontend — product model and required docs
+alwaysApply: true
+---
+
+# Adaptavist EMS (Frontend)
+
+Staff-only Event Management System UI over HubSpot via ScriptRunner Connect.
+
+- **Event** is the primary object; **Email** is a sub-feature under an event.
+- HubSpot is system of record; browser never holds HubSpot credentials.
+
+## Read before coding
+
+1. `project-blueprint.md` — Sections 1–3, 9
+2. `AGENTS.md`
+3. `TODO.md` — parked/deferred items (update when skipping work — see `ems-todo-discipline.mdc`)
+4. `docs/product-flows.md` — user intent
+5. `docs/ui-routes.md` — routes/views
+6. `docs/api-contract.md` — when touching `dataService.js`
+7. `docs/hubspot-schema.md` — field names; never invent properties
+
+`AGENTS_ANNEX.md` supersedes conflicting guidance if present.

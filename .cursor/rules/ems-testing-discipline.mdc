@@ -1,0 +1,22 @@
+---
+description: Ship tests with new frontend functionality; park deferrals in TODO
+alwaysApply: true
+---
+
+# Testing discipline (Frontend)
+
+The frontend has **no automated test runner yet** (CI is lint-only). Setting one up is parked as `FE-TEST-001` (Vitest or Jest + jsdom). Until it exists, XSS and data-mapping safety rely on review — treat that as a gap, not a steady state.
+
+## When you add or change behaviour
+
+- **Once a test runner exists, every new view or `dataService` method ships with tests in the same change** (`FE-TEST-005`):
+  - **Pure logic** — `utils/normalizeApi.js`, `router.js`, `state/appState.js`, `config/eventModules.js`, `services/dataService.js` mock/live switch.
+  - **XSS render safety** — mount the view with hostile data (`<img onerror>`, `"><script>`) and assert it renders as **text, not markup**. This enforces the "XSS = session compromise" rule in code, not just review.
+- New API consumption updates **both** `dataService.js` and `docs/api-contract.md` (see `frontend-ems-core.mdc`), and gets a mapping test.
+
+## When testing is skipped or deferred
+
+- **Do not silently ship untested new functionality.** If the user defers test work, park it in **[TODO.md](../../TODO.md)** under **Testing** (`FE-TEST-*`) with status `parked` or `planned` — see `ems-todo-discipline.mdc`.
+- Cross-folder test work (contract tests, E2E) also gets a matching row in [../Backend/TODO.md](../../Backend/TODO.md) (`X-004`, `X-005`).
+
+Standing item **X-005** tracks this discipline. Frontend test CI is **Phase 1 Process step 9** (`FE-TEST-004`).

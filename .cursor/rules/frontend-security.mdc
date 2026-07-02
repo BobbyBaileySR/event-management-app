@@ -1,0 +1,30 @@
+---
+description: Frontend security rules — non-negotiable
+alwaysApply: true
+---
+
+# Frontend security — never violate
+
+- No HubSpot tokens, signing secrets, or private keys in frontend code
+- No auth bypass or mock login in production paths
+- No direct HubSpot API calls from the browser — all data via ScriptRunner
+- No inventing HubSpot property names — use `docs/hubspot-schema.md` or TODO
+- Email navigation must stay under event context — not a top-level email app
+- Brand colours from `css/tokens.css` only (#FF6633, #0B0573, #000A27, #170AF0, #ECF1FF)
+- Edit only under `Frontend/` — do not modify `Backend/scripts/` from here
+- Blueprint Section 3 is non-negotiable — defer features that cannot be secured
+
+## XSS prevention (top risk once real data renders)
+
+The session token lives in memory (`appState.js`). Any XSS can read it while the page is open, so **an injection is a session compromise** — treat XSS as a first-class security issue, not a polish item.
+
+- Render all dynamic text (HubSpot data, user input, API responses, URL/hash values) with `textContent` or `el({ text })` — **never** `innerHTML`, `insertAdjacentHTML`, `outerHTML`, or `document.write` with dynamic content.
+- `dom.js` `htmlToElement()` is for **trusted static markup only** — never pass remote, user, or HubSpot-derived strings to it.
+- Build attributes with `setAttribute` / `el()`; never interpolate dynamic values into an HTML string. Never put untrusted data in `href`/`src`/`on*`/`style`.
+- Do not loosen the CSP in `index.html` (no `*`, no broad `https:` in `script-src`/`connect-src`, no `unsafe-eval`). Pin CDN scripts with SRI or self-host.
+
+Deploy via Git only. Register OAuth origins for every hosting URL.
+
+## Deferred security work
+
+Optional hardening the user skips (CSP `img-src`, self-hosting CDN assets, CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`.

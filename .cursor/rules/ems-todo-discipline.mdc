@@ -1,0 +1,27 @@
+---
+description: Park skipped or deferred work in Frontend/TODO.md
+alwaysApply: true
+---
+
+# TODO parking discipline (Frontend)
+
+When you or the user **skip**, **defer**, or **decide not to implement now** any improvement — especially optional security hardening, CI/tooling, phase-gated features, or assessment recommendations — **add an entry to [TODO.md](../../TODO.md)** in this folder.
+
+## When to park
+
+- User says "skip", "later", "leave it", "not now", or chooses an optional item you offered
+- You recommend something and the user does not ask you to implement it
+- Work is blocked on Backend Parameters, ScriptRunner deploy, HubSpot access, or hosting
+- A known trade-off is accepted (document why in Notes)
+
+## Rules
+
+1. **Do not silently drop deferred work** — park it with status `parked` or `planned`.
+2. **Cross-folder items** — add under **Cross-cutting** (or the best section) with **Also affects:** `../Backend/` and a matching entry in [../Backend/TODO.md](../../Backend/TODO.md) when both sides need action.
+3. **When completed** — move to **Done (archive)** with date, update [CHANGELOG.md](../../CHANGELOG.md), and remove duplicate cross-folder rows.
+4. **Do not duplicate the full product roadmap** — phase order stays in [project-blueprint.md](../project-blueprint.md); `TODO.md` is for explicit deferrals and optional follow-ups.
+5. **Do not remove parked items** without user confirmation unless they asked you to complete that item.
+
+## Entry format
+
+Add a row to the relevant table: **ID** (next `FE-*` or `X-*`), **Item**, **Status**, **Phase**, **Also affects**, **Notes**.

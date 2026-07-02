@@ -1,0 +1,212 @@
+#login-view {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(160deg, var(--color-denim) 0%, var(--color-black) 100%);
+}
+
+.login-card {
+    background: var(--color-white);
+    padding: 40px;
+    border-radius: var(--radius-lg);
+    text-align: center;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: var(--shadow-login);
+    border-top: 6px solid var(--color-orange);
+}
+
+.login-card__subtitle {
+    color: var(--color-muted);
+    margin: 8px 0 24px;
+}
+
+.login-card__notice {
+    margin-top: 20px;
+    padding: 12px 16px;
+    background: var(--color-ice);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    text-align: left;
+}
+
+.login-card__error {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+}
+
+.google-signin-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 320px;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-white);
+    color: var(--color-black);
+    font-weight: 600;
+    font-size: 0.95rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+
+.google-signin-btn:hover:not(:disabled) {
+    background: var(--color-ice);
+    box-shadow: var(--shadow-card);
+}
+
+.google-signin-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#app-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    background: var(--color-denim);
+    color: var(--color-white);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 24px;
+    background: var(--color-black);
+    border-bottom: 3px solid var(--color-orange);
+}
+
+.sidebar-header h2 {
+    color: var(--color-white);
+    font-size: 1.15rem;
+}
+
+.sidebar-header__user {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: rgba(236, 241, 255, 0.75);
+    word-break: break-all;
+}
+
+.nav-items {
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.nav-item {
+    display: block;
+    padding: 12px 24px;
+    color: rgba(236, 241, 255, 0.85);
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    background: var(--color-orange-muted);
+    color: var(--color-orange);
+    border-right: 3px solid var(--color-orange);
+}
+
+.sidebar-footer {
+    padding: 20px 24px;
+    border-top: 1px solid rgba(236, 241, 255, 0.15);
+}
+
+.sidebar-footer p {
+    font-size: 0.75rem;
+    color: rgba(236, 241, 255, 0.6);
+    margin-bottom: 12px;
+}
+
+.main-content {
+    flex: 1;
+    padding: 28px 32px;
+    overflow-y: auto;
+    background: var(--color-ice);
+    min-width: 0;
+}
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.top-bar__meta {
+    font-size: 0.85rem;
+    color: var(--color-muted);
+    margin-top: 4px;
+}
+
+.poc-banner {
+    background: var(--color-denim);
+    color: var(--color-ice);
+    padding: 10px 32px;
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.poc-banner strong {
+    color: var(--color-gold);
+}
+
+@media (max-width: 900px) {
+    #app-layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    .nav-items {
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 8px;
+    }
+
+    .nav-item {
+        white-space: nowrap;
+        border-right: none;
+        border-bottom: 3px solid transparent;
+        border-radius: var(--radius-sm);
+    }
+
+    .nav-item.active {
+        border-right: none;
+        border-bottom-color: var(--color-orange);
+    }
+
+    .main-content {
+        padding: 20px 16px;
+    }
+}

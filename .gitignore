@@ -1,0 +1,13 @@
+project-blueprint.md
+docs/
+node_modules/
+CHANGELOG.md
+TODO.md
+
+# Internal security briefings (not for GitHub Pages)
+docs/security-briefing-stakeholders.md
+docs/security-briefing-technical.md
+
+# Local overrides (optional)
+js/config.local.js
+dev-server.config.js

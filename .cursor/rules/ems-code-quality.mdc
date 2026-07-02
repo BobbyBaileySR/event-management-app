@@ -1,0 +1,27 @@
+---
+description: Modular, scalable, readable code — clarity over dogma
+alwaysApply: true
+---
+
+# Code quality — readability first
+
+Write code that is **modular and scalable**: small focused files, clear boundaries, easy to extend without rewriting.
+
+**Readability beats cleverness.** Prefer structure that a teammate can scan quickly — even if it means an extra file, explicit step, or slightly more verbose layout versus a "textbook" one-liner.
+
+## Structure
+
+- One clear responsibility per file or function.
+- Top-to-bottom flow: entry → helpers → types.
+- Name files and functions after what they do, not how they work internally.
+- Group related UI/API logic in dedicated modules (`views/`, `services/`, `Utils/`).
+
+## Comments
+
+- Avoid **death by comments** — do not narrate obvious code.
+- Comment **why** (business rules, security, non-obvious HubSpot quirks), not **what** the next line does.
+- If structure needs a paragraph of comments to explain, refactor for clarity instead.
+
+## When in doubt
+
+Choose the option that is easier to read and change six months from now.
