@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adaptavist | Event Email Manager</title>
+    <style>
+        /* ---------------------------------------------------------
+           OFFICIAL ADAPTAVIST COLOR PALETTE
+           --------------------------------------------------------- */
+        :root {
+            --adaptavist-orange: #FF6633;
+            --adaptavist-denim: #0B0573;
+            --adaptavist-black: #000A27;
+            --adaptavist-link-blue: #170AF0;
+            --adaptavist-ice: #ECF1FF;
+            --adaptavist-white: #FFFFFF;
+            --adaptavist-cobalt: #4775FF;
+            --adaptavist-gold: #FFCB00;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--adaptavist-ice);
+            color: var(--adaptavist-black);
+            line-height: 1.6;
+        }
+
+        /* ---------------------------------------------------------
+           LAYOUT & NAVIGATION
+           --------------------------------------------------------- */
+        .navbar {
+            background-color: var(--adaptavist-denim);
+            color: var(--adaptavist-white);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .navbar h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            color: var(--adaptavist-orange);
+            font-size: 2.2rem;
+            margin-bottom: 24px;
+        }
+
+        h3 {
+            color: var(--adaptavist-black);
+            margin-bottom: 16px;
+            font-size: 1.2rem;
+        }
+
+        /* ---------------------------------------------------------
+           COMPONENTS & CARDS
+           --------------------------------------------------------- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 24px;
+        }
+
+        .card {
+            background-color: var(--adaptavist-white);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(11, 5, 115, 0.05); /* Slight denim shadow */
+        }
+
+        .cta-button {
+            background-color: var(--adaptavist-link-blue);
+            color: var(--adaptavist-white);
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            text-align: center;
+        }
+
+        .cta-button:hover {
+            opacity: 0.9;
+        }
+
+        .cta-button:disabled {
+            background-color: #A0AABF;
+            cursor: not-allowed;
+        }
+
+        select, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 1rem;
+            color: var(--adaptavist-black);
+        }
+
+        /* ---------------------------------------------------------
+           DATA TABLE
+           --------------------------------------------------------- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--adaptavist-ice);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--adaptavist-denim);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        /* Status Badges using Secondary Palette */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--adaptavist-black);
+        }
+        .badge-gold { background-color: var(--adaptavist-gold); } /* E.g., Registered */
+        .badge-cobalt { background-color: var(--adaptavist-cobalt); color: white; } /* E.g., Email Sent */
+
+    </style>
+</head>
+<body>
+
+    <header class="navbar">
+        <h2>Adaptavist Event Manager</h2>
+        <div style="font-size: 0.9rem;">Logged in as: Events Team</div>
+    </header>
+
+    <main class="container">
+        <h1>Atlassian Summit 2026 - London</h1>
+
+        <div class="dashboard-grid">
+            
+            <div class="card">
+                <h3>Attendee Roster</h3>
+                <p style="font-size: 0.9rem; margin-bottom: 20px; color: #475569;">Select attendees to target for your next email blast.</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" checked disabled></th>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="checkbox" checked></td>
+                            <td>Jane Doe</td>
+                            <td>Acme Corp</td>
+                            <td><span class="badge badge-gold">Registered</span></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox" checked></td>
+                            <td>John Smith</td>
+                            <td>TechFlow</td>
+                            <td><span class="badge badge-gold">Registered</span></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox"></td>
+                            <td>Sarah Connor</td>
+                            <td>Cyberdyne</td>
+                            <td><span class="badge badge-cobalt">Ticket Sent</span></td>
+                        </tr>
+                        <tr>
+                            <td><input type="checkbox" checked></td>
+                            <td>David Miller</td>
+                            <td>Initech</td>
+                            <td><span class="badge badge-gold">Registered</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card" style="height: fit-content;">
+                <h3>Email Command Center</h3>
+                
+                <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-top: 15px; margin-bottom: 5px;">1. Select HubSpot Template</label>
+                <select id="template-select">
+                    <option value="">-- Choose a template --</option>
+                    <option value="1">48-Hour Event Reminder</option>
+                    <option value="2">QR Code Ticket Delivery</option>
+                    <option value="3">Post-Event Survey</option>
+                </select>
+
+                <label style="font-weight: 600; font-size: 0.9rem; display: block; margin-top: 10px; margin-bottom: 5px;">2. Target Audience Filter</label>
+                <select id="audience-select">
+                    <option value="all">Selected Attendees (3)</option>
+                    <option value="unregistered">Only 'Registered' Status</option>
+                </select>
+
+                <div style="margin-top: 30px;">
+                    <button class="cta-button" id="send-btn" onclick="simulateEmailSend()">Send Email Blast (3)</button>
+                </div>
+
+                <div id="feedback-msg" style="margin-top: 15px; text-align: center; font-weight: 600; font-size: 0.9rem; display: none;"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Simple script to make the PoC feel real when presenting to the team
+        function simulateEmailSend() {
+            const template = document.getElementById('template-select').value;
+            const btn = document.getElementById('send-btn');
+            const msg = document.getElementById('feedback-msg');
+
+            if (!template) {
+                alert("Please select a HubSpot template first.");
+                return;
+            }
+
+            // Simulate the API Call
+            btn.disabled = true;
+            btn.innerText = "Transmitting to HubSpot...";
+            msg.style.display = "none";
+
+            setTimeout(() => {
+                btn.innerText = "Send Email Blast (3)";
+                btn.disabled = false;
+                
+                msg.innerText = "✅ 3 Emails successfully queued in HubSpot!";
+                msg.style.color = "var(--adaptavist-link-blue)";
+                msg.style.display = "block";
+                
+                // Update table badges to show the simulation worked
+                const badges = document.querySelectorAll('.badge-gold');
+                badges.forEach(badge => {
+                    badge.className = "badge badge-cobalt";
+                    badge.innerText = "Processing...";
+                });
+
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
