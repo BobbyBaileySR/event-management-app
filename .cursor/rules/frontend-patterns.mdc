@@ -1,17 +1,18 @@
 ---
-description: Frontend module patterns for JS, CSS, and HTML
-globs: js/**,css/**,index.html
+description: Frontend module patterns for React, CSS, and HTML
+globs: src/**,css/**,index.html
 alwaysApply: false
 ---
 
 # Frontend patterns
 
-- One view per file in `js/views/` — export `mount()` and `unmount()`
-- Data via `js/services/dataService.js`; HTTP via `js/api/client.js` (`X-EMS-Route` for logical paths)
-- Auth via `js/services/authService.js` → `auth/exchange` when live
-- Router: `js/router.js`; event context via `selectedEventId` in `js/state/appState.js`
+- One view per file in `src/views/` — export a React component (no `mount()`/`unmount()`)
+- Data via `src/services/dataService.ts`; HTTP via `src/api/client.ts` (`X-EMS-Route` for logical paths)
+- Auth via `src/services/authService.ts` → `auth/exchange` when live
+- Routing: `react-router` hash routes in `src/App.tsx`; event context from URL params via `useActiveRoute()`
+- Session: `src/state/appState.tsx` + `useSession()`; data fetching: `useDataService()` hook
 - Keep `USE_MOCK_API` path until backend endpoint exists for that feature
-- Render dynamic/remote data with `js/utils/dom.js` `el({ text })` or `textContent` — never `innerHTML` (XSS). `htmlToElement()` is for trusted static markup only. See `frontend-security.mdc`.
+- Render dynamic/remote data with JSX `{value}` — never `dangerouslySetInnerHTML` (XSS). See `frontend-security.mdc`.
 
 ## When changing features
 
@@ -20,4 +21,4 @@ alwaysApply: false
 - Minimal diffs — no drive-by refactors
 - Do not edit `project-blueprint.md` unless the user asks
 
-Before finishing: event-centric nav, no bypass auth, brand tokens used.
+Before finishing: event-centric nav, no bypass auth, brand tokens used, new view ships with Vitest specs.

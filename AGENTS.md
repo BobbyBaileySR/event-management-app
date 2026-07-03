@@ -14,7 +14,7 @@ This guide supplements [project-blueprint.md](project-blueprint.md). Read the bl
 | [TODO.md](TODO.md) | Park skipped/deferred work; check before proposing optional hardening again |
 | [docs/product-flows.md](docs/product-flows.md) | User intent — what the events team needs (stakeholder-facing) |
 | [docs/ui-routes.md](docs/ui-routes.md) | Routing, views, mock vs live |
-| [docs/api-contract.md](docs/api-contract.md) | API shapes consumed by `dataService.js` |
+| [docs/api-contract.md](docs/api-contract.md) | API shapes consumed by `dataService.ts` |
 | [docs/hubspot-schema.md](docs/hubspot-schema.md) | Field names — never invent properties |
 | [docs/rbac.md](docs/rbac.md) | UI gating for write actions |
 | [docs/setup.md](docs/setup.md) | Local dev, OAuth origins |
@@ -43,49 +43,45 @@ Backend work: use [../Backend/AGENTS.md](../Backend/AGENTS.md) instead.
 
 ```
 Frontend/
-├── index.html              # Shell: CSS, GIS script, module entry
-├── css/
-│   ├── tokens.css          # Brand variables — source of truth for colors
-│   ├── base.css
-│   ├── layout.css
-│   └── components.css
-├── js/
-│   ├── app.js              # Bootstrap, auth gating, route → view mounting
-│   ├── config.js           # GOOGLE_CLIENT_ID, API_BASE_URL, USE_MOCK_API
-│   ├── router.js           # Hash routing
-│   ├── api/client.js       # fetch + Bearer token
-│   ├── state/appState.js   # Session, selectedEventId
-│   ├── data/mockData.js    # PoC mock — replace with live API per phase
-│   ├── services/
-│   │   ├── authService.js
-│   │   └── dataService.js  # Mock/live switch
-│   ├── views/              # One file per major screen
-│   ├── components/         # sidebar, toast, modal
-│   └── utils/dom.js
-└── docs/                   # Shared project documentation
+├── index.html              # Vite entry (GIS script)
+├── vite.config.ts          # Dev proxy + build-only CSP
+├── src/
+│   ├── main.tsx            # Bootstrap
+│   ├── App.tsx             # Auth gate, layout, hash routes
+│   ├── config.ts           # GOOGLE_CLIENT_ID, API_BASE_URL, mock flags
+│   ├── router/             # Route helpers + useActiveRoute()
+│   ├── state/              # Session context (appState.tsx)
+│   ├── services/           # authService.ts, dataService.ts
+│   ├── api/                # client.ts (Bearer + X-EMS-Route)
+│   ├── data/               # mockData.ts
+│   ├── hooks/              # useDataService()
+│   ├── components/         # Sidebar, Toast, ConfirmModal, shared UI
+│   └── views/              # One React component per screen
+├── css/                    # tokens.css + global styles
+└── docs/
 ```
 
 ### Adding a new view
 
-1. Create `js/views/{name}View.js` exporting `mount(container, options)` and `unmount()`.
-2. Register in `js/app.js` switch / router.
+1. Create `src/views/{Name}View.tsx` exporting a React component.
+2. Register in `src/views/ViewRouter.tsx`.
 3. Update [docs/ui-routes.md](docs/ui-routes.md).
-4. Add service methods in `dataService.js` matching [docs/api-contract.md](docs/api-contract.md).
+4. Add service methods in `dataService.ts` matching [docs/api-contract.md](docs/api-contract.md).
+5. Add Vitest specs (render + XSS guard) in the same change.
 
 ---
 
 ## Routing
 
-- **Current:** `#/{route}/{eventId?}` via [js/router.js](js/router.js)
-- **Target EMS routes:** see [docs/ui-routes.md](docs/ui-routes.md)
-- Use `navigate(routeName, eventId)` — sets `selectedEventId` in app state
-- Event-scoped modules require `eventId`; show empty state if missing
+- **Hash routes** via `react-router` in [src/App.tsx](src/App.tsx): `#/events`, `#/events/:eventId`, `#/events/:eventId/:module`
+- Logical route names via [src/router/navigation.ts](src/router/navigation.ts) (`useActiveRoute()`, `eventPath()`)
+- Event-scoped modules require `eventId`; show `EmptyState` if missing
 
 ---
 
 ## Configuration
 
-[js/config.js](js/config.js):
+[src/config.ts](src/config.ts):
 
 | Key | Notes |
 | :--- | :--- |
@@ -121,18 +117,17 @@ Product name: **Adaptavist EMS**. Sidebar may show "Event Console".
 ## Security rules
 
 - **No bypass login** in production builds.
-- Session token in **memory** via `appState.js` — avoid `localStorage` for tokens.
-- Google Sign-In: programmatic `renderButton` in `authService.js` (dynamic mount).
-- CSP in [index.html](index.html) — keep tight; never widen to `*` or broad `https:` in `script-src`/`connect-src`. Pin CDN scripts with SRI or self-host.
+- Session token in **memory** via `src/state/appState.tsx` — avoid `localStorage` for tokens.
+- Google Sign-In: programmatic `renderButton` in `authService.ts` (useEffect mount).
+- Production CSP injected at build time in `vite.config.ts` — keep tight; never widen `script-src`/`connect-src`. Chart.js is npm-bundled (no CDN).
 - Never log or display HubSpot credentials.
 
 ### XSS — treat as session compromise
 
-Because the session token lives in memory, an XSS can steal it. This becomes the top risk in Phase 1+ when HubSpot data is rendered.
+Because the session token lives in memory, an XSS can steal it.
 
-- Render **all** dynamic data (HubSpot fields, user input, API responses, URL/hash values) via `textContent` or `el({ text })` — never `innerHTML` / `insertAdjacentHTML` / `document.write`.
-- `dom.js` `htmlToElement()` accepts **trusted static markup only** — never remote or user-derived strings.
-- Never interpolate untrusted values into HTML strings or into `href`/`src`/`on*`/`style` attributes; use `setAttribute` / `el()`.
+- Render **all** dynamic data via JSX `{value}` — never `dangerouslySetInnerHTML`, `innerHTML`, or `document.write`.
+- Never interpolate untrusted values into HTML strings or into `href`/`src`/`on*`/`style` attributes.
 
 ---
 
@@ -140,20 +135,20 @@ Because the session token lives in memory, an XSS can steal it. This becomes the
 
 All HubSpot data flows through ScriptRunner — never call HubSpot from frontend.
 
-```javascript
-// js/services/dataService.js pattern
-import { CONFIG } from '../config.js';
-import { apiRequest } from '../api/client.js';
+```typescript
+// src/services/dataService.ts pattern — use useDataService() in components
+import { CONFIG } from '../config';
+import { apiRequest } from '../api/client';
 
-export async function fetchEvents() {
+export async function fetchEvents(options: DataServiceOptions = {}) {
   if (CONFIG.USE_MOCK_API) {
     return { events: MOCK_EVENTS };
   }
-  return apiRequest('/events');
+  return apiRequest('/events', {}, requestOptions(options.token));
 }
 ```
 
-When adding endpoints, update **both** `dataService.js` and [docs/api-contract.md](docs/api-contract.md).
+When adding endpoints, update **both** `dataService.ts` and [docs/api-contract.md](docs/api-contract.md).
 
 ---
 
@@ -182,8 +177,9 @@ Mock auth validates `@adaptavist.com` client-side only — **not production secu
 
 ```bash
 cd Frontend
-python3 -m http.server 8765
-# Open http://localhost:8765 (HTTP not HTTPS)
+npm test          # Vitest unit + render tests
+npm run dev       # Vite dev server on http://localhost:8765
+npm run build     # Production bundle → dist/
 ```
 
 ---
@@ -195,9 +191,9 @@ python3 -m http.server 8765
 - [ ] Brand tokens used — no ad-hoc hex colors
 - [ ] No secrets in code
 - [ ] No auth bypass
-- [ ] No XSS — dynamic/remote data rendered via `textContent` / `el({ text })`, never `innerHTML`; CSP not widened
-- [ ] `dataService.js` updated for new API consumption
-- [ ] Tests ship with new views/services once a runner exists (unit + XSS render); deferrals parked in [TODO.md](TODO.md) under Testing — see `.cursor/rules/ems-testing-discipline.mdc`
+- [ ] No XSS — dynamic data via JSX `{value}`, never `dangerouslySetInnerHTML`; CSP not widened
+- [ ] `dataService.ts` updated for new API consumption
+- [ ] Vitest specs ship with new views/services (render + XSS guard)
 - [ ] Changelog updated in [CHANGELOG.md](CHANGELOG.md)
 
 ---

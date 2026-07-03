@@ -16,15 +16,14 @@ alwaysApply: true
 
 ## XSS prevention (top risk once real data renders)
 
-The session token lives in memory (`appState.js`). Any XSS can read it while the page is open, so **an injection is a session compromise** — treat XSS as a first-class security issue, not a polish item.
+The session token lives in memory (`src/state/appState.tsx`). Any XSS can read it while the page is open, so **an injection is a session compromise** — treat XSS as a first-class security issue, not a polish item.
 
-- Render all dynamic text (HubSpot data, user input, API responses, URL/hash values) with `textContent` or `el({ text })` — **never** `innerHTML`, `insertAdjacentHTML`, `outerHTML`, or `document.write` with dynamic content.
-- `dom.js` `htmlToElement()` is for **trusted static markup only** — never pass remote, user, or HubSpot-derived strings to it.
-- Build attributes with `setAttribute` / `el()`; never interpolate dynamic values into an HTML string. Never put untrusted data in `href`/`src`/`on*`/`style`.
-- Do not loosen the CSP in `index.html` (no `*`, no broad `https:` in `script-src`/`connect-src`, no `unsafe-eval`). Pin CDN scripts with SRI or self-host.
+- Render all dynamic text (HubSpot data, user input, API responses, URL/hash values) with JSX `{text}` — **never** `dangerouslySetInnerHTML`, `innerHTML`, `insertAdjacentHTML`, `outerHTML`, or `document.write` with dynamic content.
+- Build attributes with React props / `setAttribute`; never interpolate dynamic values into an HTML string. Never put untrusted data in `href`/`src`/`on*`/`style`.
+- Do not loosen the production CSP (no `*`, no broad `https:` in `script-src`/`connect-src`, no `unsafe-eval`). Chart.js is self-hosted via npm in the Vite bundle.
 
 Deploy via Git only. Register OAuth origins for every hosting URL.
 
 ## Deferred security work
 
-Optional hardening the user skips (CSP `img-src`, self-hosting CDN assets, CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`.
+Optional hardening the user skips (CSP `img-src`, CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`.
