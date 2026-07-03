@@ -1,0 +1,7 @@
+.view {
+	/* inherits global view spacing from layout.css */
+}
+
+.detailPanel {
+	margin-top: 16px;
+}

@@ -1,0 +1,15 @@
+.view {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.title {
+	margin: 0;
+}
+
+.meta {
+	font-size: 0.9rem;
+	color: var(--color-muted);
+	margin: 0;
+}

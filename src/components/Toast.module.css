@@ -1,0 +1,29 @@
+.toast {
+	position: fixed;
+	bottom: 24px;
+	right: 24px;
+	max-width: 360px;
+	padding: 12px 18px;
+	border-radius: var(--radius-md);
+	color: var(--color-white);
+	font-size: 0.9rem;
+	box-shadow: var(--shadow-card);
+	opacity: 0;
+	transform: translateY(12px);
+	transition: opacity 0.2s, transform 0.2s;
+	pointer-events: none;
+	z-index: 1000;
+}
+
+.show {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.success {
+	background: var(--color-denim);
+}
+
+.error {
+	background: var(--color-danger);
+}
