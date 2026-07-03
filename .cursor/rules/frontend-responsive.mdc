@@ -1,0 +1,38 @@
+---
+description: Responsive UI — mobile, tablet, and desktop for all views and components
+globs: src/**,css/**
+alwaysApply: false
+---
+
+# Responsive UI (mobile, tablet, desktop)
+
+Every new or changed screen must work on **phone, tablet, and desktop/laptop** — not desktop-only layouts.
+
+Staff may check events on-site from phones; treat responsive layout as a **shipping requirement**, not polish.
+
+## Design defaults
+
+- **Mobile-first CSS** — base styles for narrow viewports; add `@media (min-width: …)` for larger layouts when needed.
+- **Fluid width** — prefer `%`, `fr`, `minmax()`, and `min-width: 0` on flex/grid children; avoid fixed widths that break on small screens.
+- **Existing breakpoint** — align with the app shell: **`900px`** (`Sidebar`, `AppLayout`, global layout in `css/layout.css`). Reuse unless a view has a clear reason for another breakpoint.
+- **Touch targets** — interactive controls at least **44×44px** (padding counts); adequate spacing between tap targets.
+- **Readable text** — no tiny fixed font sizes; body copy should remain legible without horizontal zoom.
+
+## Layout patterns
+
+- **Shell** — sidebar collapses / stacks below `900px` (see `Sidebar.module.css`, `AppLayout.module.css`); new chrome should follow the same pattern.
+- **Tables** — on narrow viewports: horizontal scroll wrapper, card/stack alternative, or hide non-essential columns — never overflow the viewport silently.
+- **Forms & modals** — full-width fields on mobile; modals fit the viewport (`max-width: min(…, 100vw - …)`).
+- **Data viz** — charts (`ConversionChart`, etc.) must resize; use responsive container height/width, not fixed desktop-only dimensions.
+
+## Before finishing UI work
+
+1. Mentally check **~375px** (phone), **~768px** (tablet), and **≥1024px** (desktop).
+2. No horizontal page scroll from layout bugs (intentional table scroll inside a container is OK).
+3. Primary actions remain reachable without hover-only interactions (touch has no hover).
+
+## Tests
+
+Vitest/jsdom does not replace device testing. For new views, at least assert layout **renders without error** at a narrow container when practical; full responsive QA is manual or future E2E.
+
+Do not ship desktop-only grids or side-by-side panels that break below `900px` without a mobile layout plan.

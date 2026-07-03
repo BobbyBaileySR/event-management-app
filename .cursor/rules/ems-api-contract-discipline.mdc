@@ -1,0 +1,26 @@
+---
+description: Keep api-contract.md and rbac.md in sync with every API change
+alwaysApply: true
+---
+
+# API contract + RBAC sync (Foundation step 8)
+
+When you **add, change, or remove** a logical route (`X-EMS-Route`), handler, `dataService` method, or UI action gated by role:
+
+## Same change must include
+
+1. **`docs/api-contract.md`** — method, path, request/response shapes, error codes, auth header.
+2. **`docs/rbac.md`** — which roles may call the route; note admin-only vs read-only.
+3. **Backend** — matching rule in `scripts/Utils/RouteGuard.ts` (secure default: deny if missing).
+4. **Frontend** — `src/services/dataService.ts` (and `docs/ui-routes.md` if a new view consumes it).
+
+## Checklist before finishing
+
+- [ ] Contract row exists and matches handler JSON
+- [ ] RBAC matrix matches `RouteGuard` allowed roles
+- [ ] No invented HubSpot property names — use `docs/hubspot-schema.md`
+- [ ] New/changed backend handler has tests in `Backend/node/tests/` (see `ems-testing-discipline.mdc`)
+
+Provisional Slice 1 routes already documented — extend those sections; do not add handlers without docs.
+
+Cross-folder: mirror discipline in `../Backend/.cursor/rules/ems-api-contract-discipline.mdc`.

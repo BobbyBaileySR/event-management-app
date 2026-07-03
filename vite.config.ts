@@ -15,7 +15,8 @@ const PRODUCTION_CSP = [
 	"script-src 'self' https://accounts.google.com",
 	"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 	"connect-src 'self' https://accounts.google.com https://www.googleapis.com https://*.gstatic.com https://event.scriptrunnerconnect.com",
-	"img-src 'self' data: https:",
+	// HubSpot CDN hosts (e.g. cdn2.hubspot.net) — add here when Slice 1 renders real asset URLs.
+	"img-src 'self' data: https://*.googleusercontent.com https://*.gstatic.com https://accounts.google.com",
 	'frame-src https://accounts.google.com',
 ].join('; ');
 

@@ -17,7 +17,8 @@ Staff-only Event Management System UI over HubSpot via ScriptRunner Connect.
 3. `TODO.md` — parked/deferred items (update when skipping work — see `ems-todo-discipline.mdc`)
 4. `docs/product-flows.md` — user intent
 5. `docs/ui-routes.md` — routes/views
-6. `docs/api-contract.md` — when touching `dataService.js`
-7. `docs/hubspot-schema.md` — field names; never invent properties
+6. `docs/api-contract.md` — when touching `dataService.ts` or API consumption
+7. `docs/rbac.md` — when adding routes or role-gated UI (sync with contract — see `ems-api-contract-discipline.mdc`)
+8. `docs/hubspot-schema.md` — field names; never invent properties
 
 `AGENTS_ANNEX.md` supersedes conflicting guidance if present.

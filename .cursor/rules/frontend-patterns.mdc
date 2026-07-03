@@ -21,4 +21,4 @@ alwaysApply: false
 - Minimal diffs — no drive-by refactors
 - Do not edit `project-blueprint.md` unless the user asks
 
-Before finishing: event-centric nav, no bypass auth, brand tokens used, new view ships with Vitest specs.
+Before finishing: event-centric nav, no bypass auth, brand tokens used, **responsive on mobile/tablet/desktop** (see `frontend-responsive.mdc`), new view ships with Vitest specs.

@@ -1,0 +1,26 @@
+/**
+ * Dusty blush celebration theme — :root[data-theme="celebration"].
+ * Palette from reference: #EBB0B0 (mid), #F2C1C1 (light), #DDA0A0 (dusty).
+ * Cosmetic only; default Adaptavist tokens remain in tokens.css.
+ */
+:root[data-theme='celebration'] {
+	/* Primary actions — dusty rose dark enough for white label text */
+	--color-orange: #c48888;
+	--color-orange-hover: #b07878;
+	--color-orange-muted: rgba(235, 176, 176, 0.24);
+
+	/* Shell — deeper dusty mauve (sidebar), still in the bottle-pink family */
+	--color-denim: #be8282;
+	--color-denim-light: #b08888;
+	--color-black: #4a3838;
+
+	--color-ice: #fcf4f4;
+	--color-link: #a65c5c;
+	--color-border: #ebd0d0;
+
+	/* Charts — stay on-palette instead of cobalt + orange */
+	--color-cobalt: #dda0a0;
+
+	--shadow-card: 0 4px 6px -1px rgba(158, 115, 115, 0.1);
+	--shadow-login: 0 20px 40px rgba(74, 56, 56, 0.25);
+}

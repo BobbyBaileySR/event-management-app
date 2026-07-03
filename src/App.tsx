@@ -4,6 +4,7 @@ import { SessionProvider, useSession } from './state/appState';
 import { ConfirmProvider } from './components/ConfirmModal';
 import { ToastProvider } from './components/Toast';
 import { AppLayout } from './components/AppLayout';
+import { CelebrationThemeEffect } from './components/CelebrationThemeEffect';
 import { LoginView } from './views/LoginView';
 import { ViewRouter } from './views/ViewRouter';
 import { APP_DOCUMENT_TITLE } from './utils/branding';
@@ -37,6 +38,7 @@ function AuthGate() {
 
 	return (
 		<HashRouter>
+			<CelebrationThemeEffect />
 			<Routes>
 				<Route element={<AppLayout />}>
 					<Route path="/events" element={<ViewRouter />} />

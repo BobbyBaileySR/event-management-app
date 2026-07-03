@@ -26,4 +26,4 @@ Deploy via Git only. Register OAuth origins for every hosting URL.
 
 ## Deferred security work
 
-Optional hardening the user skips (CSP `img-src`, CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`.
+Optional hardening the user skips (CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`. CSP `img-src` is tightened in `vite.config.ts` (`FE-SEC-004`); add HubSpot CDN hosts when Slice 1 renders real images.

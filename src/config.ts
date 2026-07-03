@@ -11,6 +11,10 @@ export interface EmsConfig {
 	ALLOWED_EMAIL_DOMAIN: string;
 	EMAIL_SEND_CONFIRM_THRESHOLD: number;
 	MOCK_API_DELAY_MS: number;
+	/** Staff email that receives the soft blush in-app theme (client-side cosmetic only). */
+	CELEBRATION_THEME_EMAIL: string;
+	/** One-time toast after sign-in when the celebration theme applies; leave empty to skip. */
+	CELEBRATION_TOAST_MESSAGE: string;
 }
 
 export const CONFIG: EmsConfig = {
@@ -38,4 +42,7 @@ export const CONFIG: EmsConfig = {
 
 	/** Simulated network delay for mock API (ms). */
 	MOCK_API_DELAY_MS: 350,
+
+	CELEBRATION_THEME_EMAIL: 'kjohnston@adaptavist.com',
+	CELEBRATION_TOAST_MESSAGE: '',
 };

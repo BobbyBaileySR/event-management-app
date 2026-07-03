@@ -12,7 +12,7 @@ The frontend has **no automated test runner yet** (CI is lint-only). Setting one
 - **Once a test runner exists, every new view or `dataService` method ships with tests in the same change** (`FE-TEST-005`):
   - **Pure logic** — `utils/normalizeApi.js`, `router.js`, `state/appState.js`, `config/eventModules.js`, `services/dataService.js` mock/live switch.
   - **XSS render safety** — mount the view with hostile data (`<img onerror>`, `"><script>`) and assert it renders as **text, not markup**. This enforces the "XSS = session compromise" rule in code, not just review.
-- New API consumption updates **both** `dataService.js` and `docs/api-contract.md` (see `frontend-ems-core.mdc`), and gets a mapping test.
+- New API consumption updates **both** `dataService.ts` and `docs/api-contract.md` (see `frontend-ems-core.mdc` + `ems-api-contract-discipline.mdc`), and gets a mapping test.
 
 ## When testing is skipped or deferred
 
