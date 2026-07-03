@@ -1,15 +1,16 @@
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SessionProvider, useSession } from './state/appState';
+import { ConfirmProvider } from './components/ConfirmModal';
 import { ToastProvider } from './components/Toast';
 import { AppLayout } from './components/AppLayout';
 import { LoginView } from './views/LoginView';
-import { RoutePlaceholder } from './views/RoutePlaceholder';
+import { ViewRouter } from './views/ViewRouter';
 import { APP_DOCUMENT_TITLE } from './utils/branding';
 
 /**
- * R1 shell: session-gated app with hash routing and the event-scoped layout.
- * Views are placeholders until R3. See docs/react-migration-plan.md.
+ * R1 shell + R3 view ports: session-gated app with hash routing and the event-scoped layout.
+ * See docs/react-migration-plan.md (R3a–R3f).
  */
 export function App() {
 	useEffect(() => {
@@ -19,7 +20,9 @@ export function App() {
 	return (
 		<SessionProvider>
 			<ToastProvider>
-				<AuthGate />
+				<ConfirmProvider>
+					<AuthGate />
+				</ConfirmProvider>
 			</ToastProvider>
 		</SessionProvider>
 	);
@@ -36,9 +39,9 @@ function AuthGate() {
 		<HashRouter>
 			<Routes>
 				<Route element={<AppLayout />}>
-					<Route path="/events" element={<RoutePlaceholder />} />
-					<Route path="/events/:eventId" element={<RoutePlaceholder />} />
-					<Route path="/events/:eventId/:module" element={<RoutePlaceholder />} />
+					<Route path="/events" element={<ViewRouter />} />
+					<Route path="/events/:eventId" element={<ViewRouter />} />
+					<Route path="/events/:eventId/:module" element={<ViewRouter />} />
 					<Route path="*" element={<Navigate to="/events" replace />} />
 				</Route>
 			</Routes>

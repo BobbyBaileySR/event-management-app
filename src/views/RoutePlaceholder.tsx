@@ -9,8 +9,8 @@ const ROUTE_LABELS: Record<string, string> = {
 };
 
 /**
- * Temporary R1 stand-in proving routing + params work. Each real view
- * (Events, Event Hub, Attendees, Email, Analytics, ...) replaces this in R3.
+ * Fallback when ViewRouter receives an unknown logical route name.
+ * All standard EMS modules are wired in R3 — this should rarely render.
  */
 export function RoutePlaceholder() {
 	const { name, eventId } = useActiveRoute();

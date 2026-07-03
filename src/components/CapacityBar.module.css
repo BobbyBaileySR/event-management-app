@@ -1,0 +1,24 @@
+.bar {
+	margin-bottom: 16px;
+}
+
+.labels {
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 8px;
+	font-size: 0.9rem;
+	color: var(--color-muted);
+}
+
+.track {
+	height: 8px;
+	background: var(--color-ice);
+	border-radius: 999px;
+	overflow: hidden;
+}
+
+.fill {
+	height: 100%;
+	background: var(--color-orange);
+	border-radius: 999px;
+}

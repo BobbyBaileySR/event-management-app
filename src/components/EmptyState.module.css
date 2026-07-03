@@ -1,0 +1,12 @@
+.section {
+	/* view section wrapper */
+}
+
+.card {
+	text-align: center;
+}
+
+.card p {
+	margin-bottom: 16px;
+	color: var(--color-muted);
+}
