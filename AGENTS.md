@@ -29,13 +29,30 @@ Backend work: use [../Backend/AGENTS.md](../Backend/AGENTS.md) instead.
 
 ---
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `BobbyBaileySR/event-management-app`; backend tasks filed here or parked in `../Backend/TODO.md`. External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) — defaults, no overrides. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Multi-context — `CONTEXT-MAP.md` at repo root points to Frontend and Backend glossaries; ADRs in `docs/decisions/`. See `docs/agents/domain.md`.
+
+---
+
 ## Product principles
 
 1. **Event is the primary object** — users navigate into an event, then use sub-modules.
 2. **Email is a sub-feature** — lives under `/events/{id}/email`, not a standalone product.
 3. **Read-first** — UI displays HubSpot data; write actions only when backend phase allows (see [docs/decisions/001-read-first-hubspot.md](docs/decisions/001-read-first-hubspot.md)).
 4. **$0 hosting** — GitHub Pages default; Cloudflare Access deferred to Phase 6 (see [docs/decisions/002-zero-budget-hosting.md](docs/decisions/002-zero-budget-hosting.md)).
-4. **Security** — no bypass login; session via Google → `/auth/exchange`; no HubSpot tokens in frontend.
+5. **Security** — no bypass login; session via Google → `/auth/exchange`; no HubSpot tokens in frontend.
+6. **Responsive UI** — every view and component must work on **mobile, tablet, and desktop** (see `.cursor/rules/frontend-responsive.mdc`).
 
 ---
 
@@ -189,6 +206,7 @@ npm run build     # Production bundle → dist/
 - [ ] Event-centric UX — email nested under event context
 - [ ] [docs/ui-routes.md](docs/ui-routes.md) updated if routes changed
 - [ ] Brand tokens used — no ad-hoc hex colors
+- [ ] Responsive layout — usable on mobile, tablet, and desktop (not desktop-only)
 - [ ] No secrets in code
 - [ ] No auth bypass
 - [ ] No XSS — dynamic data via JSX `{value}`, never `dangerouslySetInnerHTML`; CSP not widened
@@ -202,5 +220,7 @@ npm run build     # Production bundle → dist/
 
 | Date | Change |
 | :--- | :--- |
+| 2026-07-03 | Configured Matt Pocock engineering skills — `docs/agents/` (issue tracker, triage labels, domain docs), `CONTEXT-MAP.md`, and `## Agent skills` section in AGENTS.md. |
+| 2026-07-03 | Added `.cursor/rules/frontend-responsive.mdc` — mobile/tablet/desktop required for all UI work; AGENTS product principle + checklist updated. |
 | 2026-07-02 | Added `.cursor/rules/ems-testing-discipline.mdc` and a checklist item: new views/services ship with tests once a runner exists; deferrals parked in `TODO.md` Testing section (`FE-TEST-*`). |
 | 2026-07-02 | Added internal security briefings (`docs/security-briefing-stakeholders.md`, `docs/security-briefing-technical.md`) for stakeholder and technical audiences; gitignored. |
