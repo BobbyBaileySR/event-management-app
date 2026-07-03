@@ -46,7 +46,7 @@ export function normalizeEvent(raw: Record<string, unknown> | null | undefined):
 	const endDateIso = typeof raw.endDate === 'string' ? raw.endDate : undefined;
 
 	return {
-		id: String(raw.id ?? ''),
+		id: '',
 		name: String(raw.name ?? ''),
 		date: typeof raw.date === 'string' ? raw.date : formatEventDate(startDate),
 		dateIso: typeof raw.dateIso === 'string' ? raw.dateIso : toDateIso(startDate),
