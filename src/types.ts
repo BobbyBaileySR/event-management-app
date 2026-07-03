@@ -6,3 +6,126 @@ export interface Session {
 	role: EmsRole | string;
 	expiresAt: string;
 }
+
+export type EventStatus = 'active' | 'draft' | 'cancelled' | 'completed';
+export type AttendeeStatus = 'Registered' | 'Checked In' | 'Cancelled';
+export type EventType = 'In-person' | 'Virtual' | 'Hybrid';
+
+/** UI display shape for events (mock data and normalized live responses). */
+export interface Event {
+	id: string;
+	name: string;
+	date: string;
+	dateIso: string;
+	endDate?: string;
+	location: string;
+	status: EventStatus | string;
+	attendeeCount: number;
+	capacity: number;
+	type: EventType | string;
+	owner: string;
+	registrationClose: string;
+	hubspotId: string;
+	description: string;
+}
+
+export interface Attendee {
+	id: string;
+	name: string;
+	email: string;
+	company: string;
+	status: AttendeeStatus | string;
+	ticketType: string;
+	registeredAt: string;
+	source: string;
+}
+
+export interface EmailTemplate {
+	id: string;
+	name: string;
+	description: string;
+	category: string;
+}
+
+export interface AuditEntry {
+	id: string;
+	eventId: string;
+	actorEmail: string;
+	action: string;
+	templateName: string;
+	recipientCount: number;
+	timestamp: string;
+	outcome: string;
+}
+
+export interface AnalyticsConversion {
+	checkedIn: number;
+	registered: number;
+	cancelled: number;
+}
+
+export interface CampaignMetrics {
+	sent: number;
+	opened: number;
+	clicked: number;
+	bounced: number;
+}
+
+export interface ScheduledEmail {
+	id: string;
+	templateName: string;
+	segment: string;
+	scheduledAt: string;
+	recipientCount: number;
+	status: string;
+}
+
+export interface AgendaSession {
+	id: string;
+	time: string;
+	title: string;
+	speaker: string;
+	location: string;
+	track: string;
+}
+
+export interface ActivityItem {
+	id: string;
+	timestamp: string;
+	summary: string;
+	actor: string;
+}
+
+export interface EventsResponse {
+	events: Event[];
+	page?: number;
+	pageSize?: number;
+	total?: number;
+}
+
+export interface EventResponse {
+	event: Event | null;
+}
+
+export interface AttendeesResponse {
+	attendees: Attendee[];
+	page?: number;
+	pageSize?: number;
+	total?: number;
+}
+
+export interface EmailPreviewPayload {
+	eventId: string;
+	templateId: string;
+	contactIds: string[];
+	segment?: string;
+	scheduledAt?: string;
+}
+
+export interface EmailSendPayload {
+	eventId: string;
+	templateId: string;
+	contactIds: string[];
+	scheduledAt?: string;
+	idempotencyKey: string;
+}
