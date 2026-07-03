@@ -1,0 +1,11 @@
+.banner {
+	background: var(--color-denim);
+	color: var(--color-ice);
+	padding: 10px 32px;
+	font-size: 0.8rem;
+	text-align: center;
+}
+
+.banner strong {
+	color: var(--color-gold);
+}

@@ -1,4 +1,6 @@
-import { defineConfig, type Plugin } from 'vite';
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -66,6 +68,12 @@ export default defineConfig(async () => {
 		build: {
 			outDir: 'dist',
 			sourcemap: true,
+		},
+		test: {
+			environment: 'jsdom',
+			globals: true,
+			css: true,
+			setupFiles: './src/test/setup.ts',
 		},
 	};
 });
