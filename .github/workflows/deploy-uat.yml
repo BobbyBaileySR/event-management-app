@@ -32,7 +32,7 @@ jobs:
       - name: Deploy to UAT GitHub Pages repo
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.UAT_PAGES_DEPLOY_TOKEN }}
+          personal_token: ${{ secrets.UAT_PAGES_DEPLOY_TOKEN }}
           external_repository: BobbyBaileySR/event-management-app-uat
           publish_branch: gh-pages
           publish_dir: ./dist
