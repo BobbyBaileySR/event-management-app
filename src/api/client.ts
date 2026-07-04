@@ -17,6 +17,19 @@ export interface ApiRequestConfig {
 	skipMock?: boolean;
 }
 
+/** Split logical path from query — X-EMS-Route must be path-only; query belongs on the listener URL. */
+export function splitApiPath(path: string): { route: string; query: string } {
+	const normalized = path.replace(/^\/+/, '');
+	const queryIndex = normalized.indexOf('?');
+	if (queryIndex === -1) {
+		return { route: normalized, query: '' };
+	}
+	return {
+		route: normalized.slice(0, queryIndex),
+		query: normalized.slice(queryIndex + 1),
+	};
+}
+
 /**
  * Single fetch entry point to the ScriptRunner listener. Logical routes travel in the
  * X-EMS-Route header (the listener URL path is flat). Ported from js/api/client.js;
@@ -45,9 +58,11 @@ export async function apiRequest<T = unknown>(
 		throw new ApiError('API_BASE_URL is not configured', 500);
 	}
 
-	headers.set('X-EMS-Route', path.replace(/^\/+/, ''));
+	const { route, query } = splitApiPath(path);
+	headers.set('X-EMS-Route', route);
 
-	const response = await fetch(CONFIG.API_BASE_URL, { ...options, headers });
+	const requestUrl = query ? `${CONFIG.API_BASE_URL}?${query}` : CONFIG.API_BASE_URL;
+	const response = await fetch(requestUrl, { ...options, headers });
 
 	if (!response.ok) {
 		let message = `Request failed (${response.status})`;

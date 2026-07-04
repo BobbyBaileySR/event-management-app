@@ -1,8 +1,8 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { MODULE_ROUTE_IDS } from '../config/eventModules';
 
 export interface ActiveRoute {
-	/** Logical route name: 'events', 'event-hub', or a module id (attendees, email, ...). */
+	/** Logical route name: 'events', 'catalog', 'event-hub', or a module id (attendees, email, ...). */
 	name: string;
 	eventId: string | null;
 }
@@ -15,11 +15,20 @@ export function eventPath(eventId: string, moduleId?: string | null): string {
 	return `/events/${eventId}/${moduleId}`;
 }
 
+export function catalogPath(): string {
+	return '/catalog';
+}
+
 /** Derive the active logical route from URL params (URL is the source of truth). */
 export function useActiveRoute(): ActiveRoute {
 	const params = useParams();
+	const location = useLocation();
 	const eventId = params.eventId ?? null;
 	const moduleId = params.module ?? null;
+
+	if (location.pathname === '/catalog') {
+		return { name: 'catalog', eventId: null };
+	}
 
 	if (!eventId) {
 		return { name: 'events', eventId: null };

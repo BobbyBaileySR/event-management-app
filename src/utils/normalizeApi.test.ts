@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	normalizeAttendee,
 	normalizeAttendeesResponse,
+	normalizeCatalogResponse,
 	normalizeEvent,
 	normalizeEventResponse,
 	normalizeEventsResponse,
@@ -130,5 +131,28 @@ describe('normalizeAttendeesResponse', () => {
 		expect(result.attendees[0]?.name).toBe('A B');
 		expect(result.attendees[0]?.status).toBe('Registered');
 		expect(result.total).toBe(1);
+	});
+});
+
+describe('normalizeCatalogResponse', () => {
+	it('maps API catalog tree fields to UI types', () => {
+		const result = normalizeCatalogResponse({
+			programs: [
+				{
+					id: 'prog-1',
+					name: 'Atlassian Event 2026',
+					hubspotFormId: 'form-1',
+					archived: false,
+					events: [{ id: 'ev-1', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: false }],
+				},
+			],
+		});
+
+		expect(result.programs[0]).toMatchObject({
+			id: 'prog-1',
+			name: 'Atlassian Event 2026',
+			hubspotFormId: 'form-1',
+			events: [{ id: 'ev-1', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: false }],
+		});
 	});
 });

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
-import { eventPath, isEventScopedRoute, useActiveRoute } from '../router/navigation';
+import { catalogPath, eventPath, isEventScopedRoute, useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
 import styles from './Sidebar.module.css';
 
@@ -30,6 +30,15 @@ export function Sidebar({ onLogout, eventName }: SidebarProps) {
 					active={activeRoute === 'events'}
 					onClick={() => navigate('/events')}
 				/>
+
+				{session?.role === 'admin' ? (
+					<NavButton
+						label="Catalog admin"
+						icon="🗂️"
+						active={activeRoute === 'catalog'}
+						onClick={() => navigate(catalogPath())}
+					/>
+				) : null}
 
 				{eventId && isEventScopedRoute(activeRoute) ? (
 					<div className={styles.section}>

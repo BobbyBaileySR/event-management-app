@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { CatalogPickers } from './CatalogPickers';
 import { PocBanner } from './PocBanner';
 import { Sidebar } from './Sidebar';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
 import { logoutRequest } from '../services/authService';
+import { CatalogProvider } from '../state/catalogContext';
 import { useSession } from '../state/appState';
 import styles from './AppLayout.module.css';
 
@@ -39,14 +41,19 @@ export function AppLayout() {
 	}
 
 	return (
-		<>
+		<CatalogProvider>
 			<PocBanner />
 			<div className={styles.layout}>
 				<Sidebar onLogout={handleLogout} eventName={eventName} />
 				<main className={styles.main} aria-live="polite">
-					<Outlet />
+					<div className={styles.pickerDock}>
+						<CatalogPickers />
+					</div>
+					<div className={styles.content}>
+						<Outlet />
+					</div>
 				</main>
 			</div>
-		</>
+		</CatalogProvider>
 	);
 }

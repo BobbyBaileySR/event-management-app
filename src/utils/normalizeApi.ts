@@ -3,7 +3,7 @@
  * Mock data already uses the UI shape; live responses are normalized here.
  */
 
-import type { Attendee, Event } from '../types';
+import type { Attendee, Event, CatalogEvent, CatalogProgram, CatalogResponse } from '../types';
 
 const ATTENDEE_STATUS_FROM_API: Record<string, Attendee['status']> = {
 	registered: 'Registered',
@@ -119,5 +119,32 @@ export function normalizeAttendeesResponse(
 	return {
 		...response,
 		attendees: attendees.map((attendee) => normalizeAttendee(attendee as Record<string, unknown>)),
+	};
+}
+
+function normalizeCatalogEvent(raw: Record<string, unknown>): CatalogEvent {
+	return {
+		id: String(raw.id ?? ''),
+		name: String(raw.name ?? ''),
+		partsAttendedOption: String(raw.partsAttendedOption ?? ''),
+		archived: Boolean(raw.archived),
+	};
+}
+
+function normalizeCatalogProgram(raw: Record<string, unknown>): CatalogProgram {
+	const events = Array.isArray(raw.events) ? raw.events : [];
+	return {
+		id: String(raw.id ?? ''),
+		name: String(raw.name ?? ''),
+		hubspotFormId: String(raw.hubspotFormId ?? ''),
+		archived: Boolean(raw.archived),
+		events: events.map((event) => normalizeCatalogEvent(event as Record<string, unknown>)),
+	};
+}
+
+export function normalizeCatalogResponse(response: Record<string, unknown>): CatalogResponse {
+	const programs = Array.isArray(response.programs) ? response.programs : [];
+	return {
+		programs: programs.map((program) => normalizeCatalogProgram(program as Record<string, unknown>)),
 	};
 }

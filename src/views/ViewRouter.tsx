@@ -1,4 +1,5 @@
 import { useActiveRoute } from '../router/navigation';
+import { CatalogAdminView } from './CatalogAdminView';
 import { AgendaView } from './AgendaView';
 import { AnalyticsView } from './AnalyticsView';
 import { AttendeesView } from './AttendeesView';
@@ -19,6 +20,8 @@ export function ViewRouter() {
 	switch (name) {
 		case 'events':
 			return <EventsView />;
+		case 'catalog':
+			return <CatalogAdminView />;
 		case 'event-hub':
 			return <EventHubView />;
 		case 'attendees':

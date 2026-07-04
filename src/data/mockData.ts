@@ -6,6 +6,9 @@ import type {
 	AttendeeStatus,
 	AuditEntry,
 	CampaignMetrics,
+	CatalogEvent,
+	CatalogProgram,
+	CatalogResponse,
 	EmailTemplate,
 	Event,
 	EventStatus,
@@ -331,4 +334,158 @@ export function getPortfolioStats(events: Event[]): { total: number; active: num
 
 export function getAuditLogForEvent(eventId: string, entries: AuditEntry[] = MOCK_AUDIT_LOG): AuditEntry[] {
     return entries.filter((entry) => entry.eventId === eventId);
+}
+
+const INITIAL_MOCK_CATALOG: CatalogResponse = {
+	programs: [
+		{
+			id: 'prog-atlassian-2026',
+			name: 'Atlassian Event 2026',
+			hubspotFormId: 'mock-form-2026',
+			archived: false,
+			events: [
+				{
+					id: 'ev-mr-2026',
+					name: 'Meeting Room',
+					partsAttendedOption: 'Meeting Room',
+					archived: false,
+				},
+				{
+					id: 'ev-vip-2026',
+					name: 'VIP Event',
+					partsAttendedOption: 'VIP Event',
+					archived: false,
+				},
+			],
+		},
+	],
+};
+
+let mockCatalogState: CatalogResponse = structuredClone(INITIAL_MOCK_CATALOG);
+
+export function getMockCatalog(includeArchived = false): CatalogResponse {
+	if (!includeArchived) {
+		return {
+			programs: mockCatalogState.programs
+				.filter((program) => !program.archived)
+				.map((program) => ({
+					...program,
+					events: program.events.filter((event) => !event.archived),
+				})),
+		};
+	}
+
+	const programs = mockCatalogState.programs
+		.map((program) => {
+			const archivedEvents = program.events.filter((event) => event.archived);
+			if (!program.archived && archivedEvents.length === 0) {
+				return null;
+			}
+			return {
+				...program,
+				events: archivedEvents,
+			};
+		})
+		.filter((program): program is CatalogProgram => program !== null);
+
+	return { programs };
+}
+
+export function resetMockCatalog(): void {
+	mockCatalogState = structuredClone(INITIAL_MOCK_CATALOG);
+}
+
+function normalizeProgramName(name: string): string {
+	return name.trim().toLowerCase();
+}
+
+export function mockCreateProgram(name: string, hubspotFormId: string): CatalogProgram {
+	const key = normalizeProgramName(name);
+	if (mockCatalogState.programs.some((program) => normalizeProgramName(program.name) === key)) {
+		throw new Error('duplicate_name');
+	}
+
+	const program: CatalogProgram = {
+		id: `prog-${Date.now()}`,
+		name: name.trim(),
+		hubspotFormId: hubspotFormId.trim(),
+		archived: false,
+		events: [],
+	};
+	mockCatalogState.programs.push(program);
+	return program;
+}
+
+export function mockUpdateProgram(
+	id: string,
+	patch: { name?: string; hubspotFormId?: string; archived?: boolean },
+): CatalogProgram {
+	const program = mockCatalogState.programs.find((entry) => entry.id === id);
+	if (!program) {
+		throw new Error('program_not_found');
+	}
+	if (patch.name !== undefined) {
+		const key = normalizeProgramName(patch.name);
+		if (mockCatalogState.programs.some((entry) => entry.id !== id && normalizeProgramName(entry.name) === key)) {
+			throw new Error('duplicate_name');
+		}
+		program.name = patch.name.trim();
+	}
+	if (patch.hubspotFormId !== undefined) {
+		program.hubspotFormId = patch.hubspotFormId.trim();
+	}
+	if (patch.archived === true) {
+		program.archived = true;
+		program.events.forEach((event) => {
+			event.archived = true;
+		});
+	}
+	if (patch.archived === false) {
+		program.archived = false;
+		program.events.forEach((event) => {
+			event.archived = false;
+		});
+	}
+	return program;
+}
+
+export function mockCreateEvent(programId: string, name: string, partsAttendedOption: string): CatalogEvent {
+	const program = mockCatalogState.programs.find((entry) => entry.id === programId);
+	if (!program) {
+		throw new Error('program_not_found');
+	}
+	const event: CatalogEvent = {
+		id: `ev-${Date.now()}`,
+		name: name.trim(),
+		partsAttendedOption: partsAttendedOption.trim(),
+		archived: false,
+	};
+	program.events.push(event);
+	return event;
+}
+
+export function mockUpdateEvent(
+	id: string,
+	patch: { name?: string; partsAttendedOption?: string; archived?: boolean },
+): CatalogEvent {
+	for (const program of mockCatalogState.programs) {
+		const event = program.events.find((entry) => entry.id === id);
+		if (!event) {
+			continue;
+		}
+		if (patch.name !== undefined) {
+			event.name = patch.name.trim();
+		}
+		if (patch.partsAttendedOption !== undefined) {
+			event.partsAttendedOption = patch.partsAttendedOption.trim();
+		}
+		if (patch.archived !== undefined) {
+			if (patch.archived === false && program.archived) {
+				throw new Error('program_archived');
+			}
+			event.archived = patch.archived;
+		}
+		return event;
+	}
+	throw new Error('event_not_found');
 }

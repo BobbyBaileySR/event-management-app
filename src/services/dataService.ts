@@ -12,9 +12,15 @@ import {
 	MOCK_ACTIVITY,
 	getEventById,
 	getAuditLogForEvent,
+	getMockCatalog,
+	mockCreateEvent,
+	mockCreateProgram,
+	mockUpdateEvent,
+	mockUpdateProgram,
 } from '../data/mockData';
 import {
 	normalizeAttendeesResponse,
+	normalizeCatalogResponse,
 	normalizeEventResponse,
 	normalizeEventsResponse,
 } from '../utils/normalizeApi';
@@ -25,6 +31,9 @@ import type {
 	AttendeesResponse,
 	AuditEntry,
 	CampaignMetrics,
+	CatalogEventRecord,
+	CatalogProgramRecord,
+	CatalogResponse,
 	EmailPreviewPayload,
 	EmailSendPayload,
 	EmailTemplate,
@@ -256,6 +265,141 @@ export async function sendEmail(
 	);
 }
 
+export interface FetchCatalogOptions extends DataServiceOptions {
+	includeArchived?: boolean;
+}
+
+function mapMockCatalogError(error: unknown): never {
+	if (error instanceof Error) {
+		throw error;
+	}
+	throw new Error('Catalog request failed');
+}
+
+export async function fetchCatalog(options: FetchCatalogOptions = {}): Promise<CatalogResponse> {
+	const { token, includeArchived = false } = options;
+	return withMockFallback(
+		() => mockDelay(getMockCatalog(includeArchived)),
+		async () =>
+			normalizeCatalogResponse(
+				((await apiRequest(
+					includeArchived ? '/catalog?includeArchived=true' : '/catalog',
+					{},
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function createProgram(
+	body: { name: string; hubspotFormId: string },
+	options: DataServiceOptions = {},
+): Promise<{ program: CatalogProgramRecord }> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				const program = mockCreateProgram(body.name, body.hubspotFormId);
+				return mockDelay({ program: { ...program, eventIds: [] } as CatalogProgramRecord });
+			} catch (error) {
+				mapMockCatalogError(error);
+			}
+		},
+		async () =>
+			(await apiRequest(
+				'/catalog/program',
+				{ method: 'POST', body: JSON.stringify(body) },
+				requestOptions(token),
+			)) as { program: CatalogProgramRecord },
+	);
+}
+
+export async function updateProgram(
+	id: string,
+	body: { name?: string; hubspotFormId?: string; archived?: boolean },
+	options: DataServiceOptions = {},
+): Promise<{ program: CatalogProgramRecord }> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				const program = mockUpdateProgram(id, body);
+				return mockDelay({ program: program as CatalogProgramRecord });
+			} catch (error) {
+				mapMockCatalogError(error);
+			}
+		},
+		async () =>
+			(await apiRequest(
+				`/catalog/program/${encodeURIComponent(id)}`,
+				{ method: 'PATCH', body: JSON.stringify(body) },
+				requestOptions(token),
+			)) as { program: CatalogProgramRecord },
+	);
+}
+
+export async function createEvent(
+	body: { programId: string; name: string; partsAttendedOption: string },
+	options: DataServiceOptions = {},
+): Promise<{ event: CatalogEventRecord }> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				const event = mockCreateEvent(body.programId, body.name, body.partsAttendedOption);
+				return mockDelay({
+					event: {
+						...event,
+						programId: body.programId,
+						archivedViaProgramId: null,
+					} as CatalogEventRecord,
+				});
+			} catch (error) {
+				mapMockCatalogError(error);
+			}
+		},
+		async () =>
+			(await apiRequest(
+				'/catalog/event',
+				{ method: 'POST', body: JSON.stringify(body) },
+				requestOptions(token),
+			)) as { event: CatalogEventRecord },
+	);
+}
+
+export async function updateEvent(
+	id: string,
+	body: { name?: string; partsAttendedOption?: string; archived?: boolean },
+	options: DataServiceOptions = {},
+): Promise<{ event: CatalogEventRecord }> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				const event = mockUpdateEvent(id, body);
+				const program = getMockCatalog(true).programs.find((entry) =>
+					entry.events.some((candidate) => candidate.id === id),
+				);
+				return mockDelay({
+					event: {
+						...event,
+						programId: program?.id ?? '',
+						archivedViaProgramId: null,
+					} as CatalogEventRecord,
+				});
+			} catch (error) {
+				mapMockCatalogError(error);
+			}
+		},
+		async () =>
+			(await apiRequest(
+				`/catalog/event/${encodeURIComponent(id)}`,
+				{ method: 'PATCH', body: JSON.stringify(body) },
+				requestOptions(token),
+			)) as { event: CatalogEventRecord },
+	);
+}
+
 /** Binds the session token to all data-service methods for use in React components. */
 export function createDataService(token?: string | null) {
 	const options: DataServiceOptions = { token };
@@ -272,6 +416,15 @@ export function createDataService(token?: string | null) {
 		fetchActivity: (eventId: string) => fetchActivity(eventId, options),
 		previewEmail: (payload: EmailPreviewPayload) => previewEmail(payload, options),
 		sendEmail: (payload: EmailSendPayload) => sendEmail(payload, options),
+		fetchCatalog: (catalogOptions?: Omit<FetchCatalogOptions, 'token'>) =>
+			fetchCatalog({ ...options, ...catalogOptions }),
+		createProgram: (body: { name: string; hubspotFormId: string }) => createProgram(body, options),
+		updateProgram: (id: string, body: { name?: string; hubspotFormId?: string; archived?: boolean }) =>
+			updateProgram(id, body, options),
+		createEvent: (body: { programId: string; name: string; partsAttendedOption: string }) =>
+			createEvent(body, options),
+		updateEvent: (id: string, body: { name?: string; partsAttendedOption?: string; archived?: boolean }) =>
+			updateEvent(id, body, options),
 	};
 }
 

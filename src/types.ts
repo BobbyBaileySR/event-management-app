@@ -129,3 +129,42 @@ export interface EmailSendPayload {
 	scheduledAt?: string;
 	idempotencyKey: string;
 }
+
+export interface CatalogEvent {
+	id: string;
+	name: string;
+	partsAttendedOption: string;
+	archived: boolean;
+}
+
+export interface CatalogProgram {
+	id: string;
+	name: string;
+	hubspotFormId: string;
+	archived: boolean;
+	events: CatalogEvent[];
+}
+
+export interface CatalogResponse {
+	programs: CatalogProgram[];
+}
+
+export interface CatalogProgramRecord {
+	id: string;
+	name: string;
+	hubspotFormId: string;
+	archived: boolean;
+	createdAt?: string;
+	updatedAt?: string;
+}
+
+export interface CatalogEventRecord {
+	id: string;
+	programId: string;
+	name: string;
+	partsAttendedOption: string;
+	archived: boolean;
+	archivedViaProgramId?: string | null;
+	createdAt?: string;
+	updatedAt?: string;
+}

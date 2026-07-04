@@ -42,6 +42,7 @@ function AuthGate() {
 			<Routes>
 				<Route element={<AppLayout />}>
 					<Route path="/events" element={<ViewRouter />} />
+					<Route path="/catalog" element={<ViewRouter />} />
 					<Route path="/events/:eventId" element={<ViewRouter />} />
 					<Route path="/events/:eventId/:module" element={<ViewRouter />} />
 					<Route path="*" element={<Navigate to="/events" replace />} />

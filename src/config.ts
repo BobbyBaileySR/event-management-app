@@ -35,7 +35,7 @@ export const CONFIG: EmsConfig = {
 	USE_MOCK_AUTH: false,
 
 	/** When true, uses local mock data for EMS read/write routes. */
-	USE_MOCK_API: true,
+	USE_MOCK_API: false,
 
 	ALLOWED_EMAIL_DOMAIN: 'adaptavist.com',
 	EMAIL_SEND_CONFIRM_THRESHOLD: 50,
@@ -46,3 +46,4 @@ export const CONFIG: EmsConfig = {
 	CELEBRATION_THEME_EMAIL: 'kjohnston@adaptavist.com',
 	CELEBRATION_TOAST_MESSAGE: '',
 };
+``
