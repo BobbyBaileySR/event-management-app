@@ -9,3 +9,12 @@
 .banner strong {
 	color: var(--color-gold);
 }
+
+.bannerUat {
+	background: var(--color-orange);
+	color: var(--color-black);
+}
+
+.bannerUat strong {
+	color: var(--color-denim);
+}

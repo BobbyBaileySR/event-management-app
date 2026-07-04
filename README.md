@@ -90,6 +90,8 @@ See [`AGENTS.md`](AGENTS.md) and `.cursor/rules/` for AI/dev guardrails. Shared 
 
 ## Deployment
 
-- Frontend: Git push to `main` → GitHub Actions builds and deploys `dist/` to Pages
-- Backend: separate ScriptRunner Connect workspace (deployed via SFTP, not this repo)
-- Register every hosting origin in the Google OAuth console
+- **Live:** Git push to `main` → GitHub Actions builds with `VITE_EMS_ENV=live` → GitHub Pages at `https://bobbybaileysr.github.io/event-management-app/`
+- **UAT:** Git push to `uat` → deploys to `https://bobbybaileysr.github.io/event-management-app-uat/` (separate repo)
+- **Backend:** ScriptRunner Connect (SFTP, not this repo)
+
+See [docs/environments.md](docs/environments.md) and [docs/multi-machine.md](docs/multi-machine.md).

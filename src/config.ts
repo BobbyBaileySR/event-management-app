@@ -1,9 +1,13 @@
 /**
  * Frontend configuration. Ported from js/config.js during the React migration.
  */
+export type EmsEnv = 'uat' | 'live';
+
 export interface EmsConfig {
 	APP_NAME: string;
 	APP_SHORT_NAME: string;
+	/** Build-time environment: UAT (HubSpot Staging) or Live. Set via VITE_EMS_ENV in CI. */
+	EMS_ENV: EmsEnv;
 	GOOGLE_CLIENT_ID: string;
 	API_BASE_URL: string;
 	USE_MOCK_AUTH: boolean;
@@ -17,9 +21,14 @@ export interface EmsConfig {
 	CELEBRATION_TOAST_MESSAGE: string;
 }
 
+function resolveEmsEnv(): EmsEnv {
+	return import.meta.env.VITE_EMS_ENV === 'uat' ? 'uat' : 'live';
+}
+
 export const CONFIG: EmsConfig = {
 	APP_NAME: 'Adaptavist EMS',
 	APP_SHORT_NAME: 'Event Console',
+	EMS_ENV: resolveEmsEnv(),
 
 	/** Set via Google Cloud Console OAuth client (Web application). */
 	GOOGLE_CLIENT_ID: '391161511150-ejvh658fsqb4cato9a58iq1ad4l3olsh.apps.googleusercontent.com',
@@ -27,7 +36,7 @@ export const CONFIG: EmsConfig = {
 	/**
 	 * API path on the same origin as the UI.
 	 * Local dev: `/api/ems` proxied to ScriptRunner via vite.config.ts (needs dev-server.config.js).
-	 * Production: same path via Cloudflare Worker, or a CORS-capable proxy URL.
+	 * Production: same path via Cloudflare Worker/Pages Function, or a CORS-capable proxy URL.
 	 */
 	API_BASE_URL: '/api/ems',
 

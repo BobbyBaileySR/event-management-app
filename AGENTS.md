@@ -103,7 +103,8 @@ Frontend/
 | Key | Notes |
 | :--- | :--- |
 | `GOOGLE_CLIENT_ID` | Public OAuth client ID |
-| `API_BASE_URL` | Full ScriptRunner listener URL (flat path); logical routes via `X-EMS-Route` header |
+| `EMS_ENV` | `uat` or `live` — build-time via `VITE_EMS_ENV`; see [docs/environments.md](docs/environments.md) |
+| `API_BASE_URL` | Same-origin path `/api/ems`; logical routes via `X-EMS-Route` header |
 | `APP_NAME` | Primary product label (login, browser title prefix) |
 | `APP_SHORT_NAME` | Sidebar header label |
 | `USE_MOCK_AUTH` | `true` until Phase 0 auth deployed; set `false` for live `auth/exchange` |
