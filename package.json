@@ -13,7 +13,7 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "check": "bash tooling/ems-check.sh",
-    "check:quick": "bash tooling/ems-quick.sh",
+    "check:quick": "npm run lint && npm test",
     "ship": "bash tooling/ems-ship.sh",
     "ship:all": "bash tooling/ems-check-all.sh"
   },

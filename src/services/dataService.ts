@@ -13,6 +13,7 @@ import {
 	getEventById,
 	getAuditLogForEvent,
 	getMockCatalog,
+	getMockSliceAttendees,
 	mockCreateEvent,
 	mockCreateProgram,
 	mockUpdateEvent,
@@ -23,6 +24,7 @@ import {
 	normalizeCatalogResponse,
 	normalizeEventResponse,
 	normalizeEventsResponse,
+	normalizeSliceAttendeesResponse,
 } from '../utils/normalizeApi';
 import type {
 	ActivityItem,
@@ -40,6 +42,7 @@ import type {
 	EventResponse,
 	EventsResponse,
 	ScheduledEmail,
+	SliceAttendeesResponse,
 } from '../types';
 
 export interface DataServiceOptions {
@@ -291,16 +294,48 @@ export async function fetchCatalog(options: FetchCatalogOptions = {}): Promise<C
 	);
 }
 
+export async function fetchSliceAttendees(
+	programId: string,
+	eventId: string,
+	query: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number } = {},
+	options: DataServiceOptions = {},
+): Promise<SliceAttendeesResponse> {
+	const { token } = options;
+	const search = new URLSearchParams();
+	if (query.checkedIn !== undefined) {
+		search.set('checkedIn', String(query.checkedIn));
+	}
+	if (query.q) {
+		search.set('q', query.q);
+	}
+	if (query.page) {
+		search.set('page', String(query.page));
+	}
+	if (query.pageSize) {
+		search.set('pageSize', String(query.pageSize));
+	}
+	const suffix = search.toString() ? `?${search}` : '';
+	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/attendees${suffix}`;
+
+	return withMockFallback(
+		() => mockDelay(getMockSliceAttendees(programId, eventId)),
+		async () =>
+			normalizeSliceAttendeesResponse(
+				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
 export async function createProgram(
-	body: { name: string; hubspotFormId: string },
+	body: { name: string; hubspotFormIds: string[] },
 	options: DataServiceOptions = {},
 ): Promise<{ program: CatalogProgramRecord }> {
 	const { token } = options;
 	return withMockFallback(
 		() => {
 			try {
-				const program = mockCreateProgram(body.name, body.hubspotFormId);
-				return mockDelay({ program: { ...program, eventIds: [] } as CatalogProgramRecord });
+				const program = mockCreateProgram(body.name, body.hubspotFormIds);
+				return mockDelay({ program: { ...program, eventIds: [] } as unknown as CatalogProgramRecord });
 			} catch (error) {
 				mapMockCatalogError(error);
 			}
@@ -316,7 +351,7 @@ export async function createProgram(
 
 export async function updateProgram(
 	id: string,
-	body: { name?: string; hubspotFormId?: string; archived?: boolean },
+	body: { name?: string; hubspotFormIds?: string[]; archived?: boolean },
 	options: DataServiceOptions = {},
 ): Promise<{ program: CatalogProgramRecord }> {
 	const { token } = options;
@@ -339,14 +374,19 @@ export async function updateProgram(
 }
 
 export async function createEvent(
-	body: { programId: string; name: string; partsAttendedOption: string },
+	body: { programId: string; name: string; partsAttendedOption: string; attendanceProperty: string },
 	options: DataServiceOptions = {},
 ): Promise<{ event: CatalogEventRecord }> {
 	const { token } = options;
 	return withMockFallback(
 		() => {
 			try {
-				const event = mockCreateEvent(body.programId, body.name, body.partsAttendedOption);
+				const event = mockCreateEvent(
+					body.programId,
+					body.name,
+					body.partsAttendedOption,
+					body.attendanceProperty,
+				);
 				return mockDelay({
 					event: {
 						...event,
@@ -369,7 +409,12 @@ export async function createEvent(
 
 export async function updateEvent(
 	id: string,
-	body: { name?: string; partsAttendedOption?: string; archived?: boolean },
+	body: {
+		name?: string;
+		partsAttendedOption?: string;
+		attendanceProperty?: string;
+		archived?: boolean;
+	},
 	options: DataServiceOptions = {},
 ): Promise<{ event: CatalogEventRecord }> {
 	const { token } = options;
@@ -418,13 +463,29 @@ export function createDataService(token?: string | null) {
 		sendEmail: (payload: EmailSendPayload) => sendEmail(payload, options),
 		fetchCatalog: (catalogOptions?: Omit<FetchCatalogOptions, 'token'>) =>
 			fetchCatalog({ ...options, ...catalogOptions }),
-		createProgram: (body: { name: string; hubspotFormId: string }) => createProgram(body, options),
-		updateProgram: (id: string, body: { name?: string; hubspotFormId?: string; archived?: boolean }) =>
+		fetchSliceAttendees: (
+			programId: string,
+			eventId: string,
+			query?: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number },
+		) => fetchSliceAttendees(programId, eventId, query, options),
+		createProgram: (body: { name: string; hubspotFormIds: string[] }) => createProgram(body, options),
+		updateProgram: (id: string, body: { name?: string; hubspotFormIds?: string[]; archived?: boolean }) =>
 			updateProgram(id, body, options),
-		createEvent: (body: { programId: string; name: string; partsAttendedOption: string }) =>
-			createEvent(body, options),
-		updateEvent: (id: string, body: { name?: string; partsAttendedOption?: string; archived?: boolean }) =>
-			updateEvent(id, body, options),
+		createEvent: (body: {
+			programId: string;
+			name: string;
+			partsAttendedOption: string;
+			attendanceProperty: string;
+		}) => createEvent(body, options),
+		updateEvent: (
+			id: string,
+			body: {
+				name?: string;
+				partsAttendedOption?: string;
+				attendanceProperty?: string;
+				archived?: boolean;
+			},
+		) => updateEvent(id, body, options),
 	};
 }
 

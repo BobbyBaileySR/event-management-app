@@ -67,9 +67,17 @@ describe('CatalogAdminView', () => {
 				{
 					id: 'prog-1',
 					name: 'Atlassian Event 2026',
-					hubspotFormId: 'form-1',
+					hubspotFormIds: ['form-1'],
 					archived: false,
-					events: [{ id: 'ev-1', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: true }],
+					events: [
+						{
+							id: 'ev-1',
+							name: 'Meeting Room',
+							partsAttendedOption: 'Meeting Room',
+							attendanceProperty: 'atlassian_event__customer_event_attendance',
+							archived: true,
+						},
+					],
 				},
 			],
 		});

@@ -1,70 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { filterAttendees, searchAttendees } from '../data/mockData';
+import { Navigate } from 'react-router-dom';
 import { EmptyState } from '../components/EmptyState';
-import { StatusBadge } from '../components/StatusBadge';
 import { TopBar } from '../components/TopBar';
-import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
-import { eventPath, useActiveRoute } from '../router/navigation';
-import type { Attendee, AttendeeStatus, Event } from '../types';
+import { useSession } from '../state/appState';
+import { useCatalogSelection } from '../state/catalogContext';
+import type { SliceAttendee } from '../types';
 import styles from './AttendeesView.module.css';
 
-type SegmentFilter = AttendeeStatus | 'All';
-
-const SEGMENT_FILTERS: SegmentFilter[] = ['All', 'Registered', 'Checked In', 'Cancelled'];
-
-interface AttendeeDetailProps {
-	person: Attendee;
-	onSendEmail: () => void;
-	onUpdateStatus: () => void;
-}
-
-function AttendeeDetail({ person, onSendEmail, onUpdateStatus }: AttendeeDetailProps) {
-	return (
-		<div className={`attendee-detail card ${styles.detailPanel}`} id="attendee-detail-panel">
-			<h3>{person.name}</h3>
-			<dl className="detail-list detail-list--inline">
-				<dt>Email</dt>
-				<dd>{person.email}</dd>
-				<dt>Company</dt>
-				<dd>{person.company}</dd>
-				<dt>Status</dt>
-				<dd>{person.status}</dd>
-				<dt>Ticket</dt>
-				<dd>{person.ticketType || 'General'}</dd>
-				<dt>Registered</dt>
-				<dd>{person.registeredAt || '—'}</dd>
-				<dt>Source</dt>
-				<dd>{person.source || '—'}</dd>
-			</dl>
-			<div className="form-row">
-				<button type="button" className="btn btn-outline btn-sm" onClick={onUpdateStatus}>
-					Update status
-				</button>
-				<button type="button" className="btn btn-outline btn-sm" onClick={onSendEmail}>
-					Send email
-				</button>
-			</div>
-		</div>
-	);
-}
+type CheckedInFilter = 'all' | 'checked-in' | 'not-checked-in';
 
 export function AttendeesView() {
-	const navigate = useNavigate();
-	const { showToast } = useToast();
-	const { eventId } = useActiveRoute();
+	const { session } = useSession();
 	const data = useDataService();
-	const [event, setEvent] = useState<Event | null>(null);
-	const [attendees, setAttendees] = useState<Attendee[]>([]);
-	const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('All');
+	const { programId, evId, programName, eventName } = useCatalogSelection();
+	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
-	const [selectedAttendeeId, setSelectedAttendeeId] = useState<string | null>(null);
+	const [checkedInFilter, setCheckedInFilter] = useState<CheckedInFilter>('all');
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (!eventId) {
+		if (!programId || !evId) {
 			setLoading(false);
 			return;
 		}
@@ -72,20 +29,16 @@ export function AttendeesView() {
 		let cancelled = false;
 		setLoading(true);
 		setError(null);
-		setSelectedAttendeeId(null);
 
-		Promise.all([data.fetchEvent(eventId), data.fetchAttendees(eventId)])
-			.then(([eventResult, attendeesResult]) => {
-				if (cancelled) {
-					return;
+		const checkedIn =
+			checkedInFilter === 'checked-in' ? true : checkedInFilter === 'not-checked-in' ? false : undefined;
+
+		void data
+			.fetchSliceAttendees(programId, evId, { q: searchQuery || undefined, checkedIn })
+			.then((result) => {
+				if (!cancelled) {
+					setAttendees(result.attendees);
 				}
-				if (!eventResult.event) {
-					setEvent(null);
-					setAttendees([]);
-					return;
-				}
-				setEvent(eventResult.event);
-				setAttendees(attendeesResult.attendees);
 			})
 			.catch((err: unknown) => {
 				if (!cancelled) {
@@ -101,23 +54,22 @@ export function AttendeesView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, programId, evId, searchQuery, checkedInFilter]);
 
-	const filteredAttendees = useMemo(
-		() => searchAttendees(searchQuery, filterAttendees(segmentFilter, attendees)),
-		[attendees, searchQuery, segmentFilter],
+	const sortedAttendees = useMemo(
+		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
+		[attendees],
 	);
 
-	const selectedAttendee = useMemo(
-		() => filteredAttendees.find((person) => person.id === selectedAttendeeId) ?? null,
-		[filteredAttendees, selectedAttendeeId],
-	);
+	if (session?.role !== 'admin') {
+		return <Navigate to="/events" replace />;
+	}
 
-	if (!eventId) {
+	if (!programId || !evId) {
 		return (
 			<EmptyState
 				viewId="view-attendees"
-				message="Select an event from All Events to view attendees."
+				message="Select a Program and Event using the catalog pickers to view registered attendees."
 				action={{ label: 'Go to All Events', to: '/events' }}
 			/>
 		);
@@ -131,58 +83,35 @@ export function AttendeesView() {
 		return <div className="empty-state">{error}</div>;
 	}
 
-	if (!event) {
-		return (
-			<EmptyState
-				viewId="view-attendees"
-				message="This event was not found."
-				action={{ label: 'Back to All Events', to: '/events' }}
-			/>
-		);
-	}
+	const title =
+		programName && eventName ? `${programName} — ${eventName} — Attendees` : 'Registered attendees';
 
 	return (
 		<section id="view-attendees" className={styles.view}>
-			<TopBar
-				title={`${event.name} — Attendees`}
-				meta={`${attendees.length} contacts linked · sample HubSpot data`}
-			/>
+			<TopBar title={title} meta={`${attendees.length} registered · HubSpot live`} />
 
 			<div className="card">
 				<div className="toolbar">
 					<div className="form-row">
-						{SEGMENT_FILTERS.map((filter) => (
+						{(['all', 'checked-in', 'not-checked-in'] as CheckedInFilter[]).map((filter) => (
 							<button
 								key={filter}
 								type="button"
-								className={`btn btn-outline${segmentFilter === filter ? ' active' : ''}`}
-								onClick={() => {
-									setSegmentFilter(filter);
-									setSelectedAttendeeId(null);
-								}}
+								className={`btn btn-outline${checkedInFilter === filter ? ' active' : ''}`}
+								onClick={() => setCheckedInFilter(filter)}
 							>
-								{filter}
+								{filter === 'all' ? 'All' : filter === 'checked-in' ? 'Checked in' : 'Not checked in'}
 							</button>
 						))}
 					</div>
-					<button
-						type="button"
-						className="btn btn-outline btn-sm"
-						onClick={() => showToast('Export downloads in a later phase (PoC mock).', 'success')}
-					>
-						Export CSV
-					</button>
 				</div>
 
 				<input
 					type="search"
 					className="search-input"
-					placeholder="Search name, email, or company…"
+					placeholder="Search name or company…"
 					value={searchQuery}
-					onChange={(changeEvent) => {
-						setSearchQuery(changeEvent.target.value);
-						setSelectedAttendeeId(null);
-					}}
+					onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
 					aria-label="Search attendees"
 				/>
 
@@ -191,32 +120,27 @@ export function AttendeesView() {
 						<thead>
 							<tr>
 								<th>Name</th>
-								<th>Email</th>
 								<th>Company</th>
-								<th>Ticket</th>
-								<th>Status</th>
+								<th>Email</th>
+								<th>Account manager</th>
+								<th>Track</th>
+								<th>Checked in</th>
 							</tr>
 						</thead>
 						<tbody>
-							{filteredAttendees.length === 0 ? (
+							{sortedAttendees.length === 0 ? (
 								<tr>
-									<td colSpan={5}>No attendees match this filter.</td>
+									<td colSpan={6}>No registered attendees match this view.</td>
 								</tr>
 							) : (
-								filteredAttendees.map((person) => (
-									<tr
-										key={person.id}
-										data-attendee-id={person.id}
-										className={selectedAttendeeId === person.id ? 'row-selected' : undefined}
-										onClick={() => setSelectedAttendeeId(person.id)}
-									>
-										<td>{person.name}</td>
-										<td>{person.email}</td>
+								sortedAttendees.map((person) => (
+									<tr key={person.contactId}>
+										<td>{`${person.firstName} ${person.lastName}`.trim()}</td>
 										<td>{person.company}</td>
-										<td>{person.ticketType || 'General'}</td>
-										<td>
-											<StatusBadge status={person.status} />
-										</td>
+										<td>{person.email}</td>
+										<td>{person.accountManager}</td>
+										<td>{person.attendeeType}</td>
+										<td>{person.checkedIn ? 'Yes' : 'No'}</td>
 									</tr>
 								))
 							)}
@@ -224,14 +148,6 @@ export function AttendeesView() {
 					</table>
 				</div>
 			</div>
-
-			{selectedAttendee ? (
-				<AttendeeDetail
-					person={selectedAttendee}
-					onSendEmail={() => navigate(eventPath(event.id, 'email'))}
-					onUpdateStatus={() => showToast('Status updates write to HubSpot in Phase 5+.', 'success')}
-				/>
-			) : null}
 		</section>
 	);
 }

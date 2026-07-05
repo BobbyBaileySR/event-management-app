@@ -2,7 +2,7 @@
 
 Ubiquitous language for Adaptavist EMS. **Glossary only** — no implementation, API shapes, or storage choices. See `docs/hubspot-schema.md`, `docs/api-contract.md`, and `docs/decisions/` for technical detail.
 
-> **Last updated:** 2026-07-03 (2-level catalog — Program → Event; iteration layer removed)
+> **Last updated:** 2026-07-05 (HubSpot schema verified — dual Parts Attended tracks, attendance properties, multi-form Programs)
 
 ---
 
@@ -12,11 +12,9 @@ A top-level grouping of related **Events** (sub-events or “parts”) for one r
 
 EMS catalog supports **multiple Programs** from Phase 1 — **`admin`** can create several Program roots, each with its own **Events**.
 
-Each Program has its **own HubSpot registration form** (the Program holds the **form ID**). Contacts must submit **that Program’s form** to satisfy the form leg of **Registered attendee** for Events under that Program.
+Each Program has **one or more HubSpot registration form IDs** (the Program holds `hubspotFormIds` in the catalog). Contacts must submit **any** of those forms to satisfy the form leg of **Registered attendee** for Events under that Program.
 
-Today HubSpot does **not** expose a Program object; EMS holds Program metadata in Record Storage until custom objects exist.
-
-*Display name and date boundaries for each Program — to be confirmed with events team.*
+Program display name, dates, and location are set in the EMS catalog admin UI (optional metadata fields) — not in HubSpot until custom objects exist.
 
 ---
 
@@ -24,27 +22,36 @@ Today HubSpot does **not** expose a Program object; EMS holds Program metadata i
 
 A child item under a **Program** — a specific part or sub-event the team tracks separately (e.g. “Meeting Room”, “VIP Event”).
 
-In the current HubSpot workaround, each Event maps to an **option** on the Contact multi-select **Parts Attended** (see below), not to a HubSpot Event custom object.
+In the current HubSpot workaround, each Event maps to an **option** on a Contact **Parts Attended** multi-select property (customer or partner track — see below), not to a HubSpot Event custom object. Each Event also stores an **`attendanceProperty`** — the HubSpot Contact property EMS updates on check-in.
 
 ---
 
 ## Parts Attended
 
-HubSpot Contact property (label: **“Atlassian Event - Parts Attended”**). Multi-select; each option corresponds to an **Event** under a **Program** (e.g. “Meeting Room”, “VIP Event”).
+HubSpot Contact multi-select properties. Each **option** corresponds to an **Event** under a **Program** (e.g. “Meeting Room”, “VIP Event”).
 
-**Multiple Programs in EMS share this one HubSpot property for now** — option labels map to Events per Program via the EMS catalog; **Program + registration form** disambiguate registration scope. If a future Program needs its own HubSpot field, that becomes a catalog/config change (not assumed in Phase 1).
+Two **tracks** (verified 2026-07-05):
+
+| Track | HubSpot property (internal name) |
+| :--- | :--- |
+| Customer | `atlassian_event___parts_attended` |
+| Partner | `atlassian_event__partners__parts_attended` |
+
+Both properties share the **same option values**. If a Contact has the customer property populated, they are a **customer**; if the partner property is populated, they are a **partner**.
+
+**Multiple Programs in EMS share these HubSpot properties** — option labels map to Events per Program via the EMS catalog; **Program + registration form submission** disambiguate registration scope.
 
 Option **labels can repeat across Programs** (e.g. “Meeting Room” on Atlassian Event 2025 and 2026). The label alone is **not** globally unique — always interpret together with the **Program** and that Program’s **registration form** submission.
 
-Only meaningful for sub-events of programs using this property (today: primarily the Atlassian programs; other Programs reuse the same field until HubSpot adds per-program objects).
+EMS stores the option as **free text** on each Event (`partsAttendedOption`). Wrong text → no matching attendees.
 
 ---
 
 ## Program registration form
 
-The HubSpot form a contact must submit to be in scope for a **Program**. **One unique form per Program** (the Program record holds the form ID). Filling the correct Program’s form is **one of two** requirements for counting someone as registered (see **Registered attendee**). **Walk-in** staff intake in EMS uses the **same field set** as this form for that Program.
+The HubSpot form(s) a contact must submit to be in scope for a **Program**. The Program catalog record holds **one or more form IDs** (`hubspotFormIds`). Submitting **any** of those forms satisfies the form leg of **Registered attendee**. **Walk-in** staff intake should submit a real HubSpot form when possible (iframe embed preferred — see walk-in spike).
 
-*Exact form IDs/names in HubSpot — to be confirmed. How EMS loads form field definitions (HubSpot API vs catalog) — **open**. Whether sub-events share one form per Program (with **Parts Attended** distinguishing Event) vs other Contact fields — **open; events team to clarify**.*
+*Walk-in field discovery — HubSpot embed or Forms API at runtime; not duplicated in EMS when embed works.*
 
 ---
 
@@ -52,14 +59,14 @@ The HubSpot form a contact must submit to be in scope for a **Program**. **One u
 
 A **Contact** who meets **both**, scoped to a specific **Program** and **Event**:
 
-1. Has HubSpot activity showing they **submitted that Program’s registration form**, and  
-2. Has that **Event’s** option selected on **Parts Attended** (e.g. “Meeting Room”).
+1. Has HubSpot activity showing they **submitted any of that Program’s registration forms**, and  
+2. Has that **Event’s** option on **either** the customer **or** partner **Parts Attended** property (e.g. “Meeting Room”).
 
-Example: “Meeting Room” selected plus the form for **Atlassian Event 2025** only → registered for 2025’s Meeting Room **Event**, **not** for 2026’s Meeting Room — even though the option label is the same.
+The attendee list **includes both tracks** and shows `attendeeType: customer | partner` per row.
+
+Example: “Meeting Room” selected plus a form submission for **Atlassian Event 2025** only → registered for 2025’s Meeting Room **Event**, **not** for 2026’s Meeting Room — even though the option label is the same.
 
 Someone with only the form, or only the multi-select value, is **not** a registered attendee for that Event under current rules.
-
-*Other Contact fields that may affect eligibility — open; events team to clarify.*
 
 ---
 
@@ -67,8 +74,10 @@ Someone with only the form, or only the multi-select value, is **not** a registe
 
 A **Contact** marked as **attended** at an **Event** (on-site or virtual).
 
-- **Pre-registered** (Program form + Parts Attended already satisfied): check-in **only** updates attended/checked-in state in HubSpot; registration is left unchanged.  
-- **Walk-in**: staff form → match or create Contact → registered **and** attended in one flow (see **Walk-in**).
+HubSpot stores attendance as **global** Yes/No select properties on the Contact (customer, partner, or VIP variants — see `hubspot-schema.md`). Each EMS **Event** catalog record specifies which property (`attendanceProperty`) EMS updates on check-in.
+
+- **Pre-registered** (Program form + Parts Attended already satisfied): check-in **only** updates the attendance property to `Yes`; registration is left unchanged.  
+- **Walk-in**: staff form → match or create Contact → Parts Attended + attendance + form submission in one flow (see **Walk-in**).
 
 Distinct from **Registered attendee** who has not yet arrived.
 
@@ -78,7 +87,7 @@ Distinct from **Registered attendee** who has not yet arrived.
 
 The staff-facing hierarchy of **Programs** and **Events** shown in EMS when HubSpot does not yet provide Program/Event objects. Two levels — **Program → Event**. Distinct from HubSpot Contact data; stored in **ScriptRunner Record Storage** (Plan C — see ADR-003).
 
-**Maintenance:** **events team self-service** in EMS — a Settings or admin screen (**`admin` role only**) to create and update Programs (including HubSpot **form ID**) and Events (including **Parts Attended** option mapping). Viewers and other roles read the catalog through navigation but cannot edit it.
+**Maintenance:** **events team self-service** in EMS — a Settings or admin screen (**`admin` role only**) to create and update Programs (including HubSpot **form IDs**) and Events (including **Parts Attended** option mapping and **attendance property**). Viewers and other roles read the catalog through navigation but cannot edit it.
 
 **Removal:** **archive / disable** — archived Programs or Events are **hidden from navigation** but **retained** in Record Storage for audit and historical attendee/check-in context (not hard delete).
 
@@ -102,7 +111,7 @@ Default staff flow: choose a **Program** (e.g. “Atlassian Event 2026”), then
 
 ## White glove registration
 
-A Program where mass automated outreach (registration page blast, follow-up “sign up for other events” email) is **turned off** — customers are handled personally. EMS/catalog should allow flagging a Program or cohort as white glove so optional sends are suppressed.
+A Program where mass automated outreach (registration page blast, follow-up “sign up for other events” email) is **turned off** — customers are handled personally. **Not a HubSpot property or EMS catalog flag** — the events team knows which Programs are white glove. EMS Email module offers bulk send; staff simply skip it for white-glove Programs.
 
 ---
 
@@ -124,7 +133,7 @@ A **separate application** historically handled QR generation for registrants an
 
 This flow is **staff-mediated** (scan → review → button), not customer self-service check-in without staff action.
 
-*Exact HubSpot property/workflow updated on button press — **open; team does not know today** (see `docs/hubspot-schema.md` → Check-in / attended).*
+*HubSpot attendance properties verified — see `docs/hubspot-schema.md`. No check-in timestamp in HubSpot; duplicate check-in is idempotent (skip write if already `Yes`).*
 
 ---
 
@@ -140,7 +149,7 @@ For **pre-registered** contacts, check-in **only** updates attended/checked-in i
 
 **RBAC:** attendee list, check-in actions (QR confirm, name search confirm, walk-in submit), and catalog admin all require the **`admin`** role. Other roles do not see attendee PII or check-in modules in Phase 1.
 
-**Duplicate check-in:** **idempotent** — if the Contact is already checked in for that Event, show **“already checked in”** (with timestamp when available); do not error or write HubSpot again unless the attended property needs a no-op refresh.
+**Duplicate check-in:** **idempotent** — if the Contact’s attendance property is already `Yes`, show **“already checked in”**; do not write HubSpot again.
 
 ---
 
@@ -161,7 +170,7 @@ Walk-in therefore **waives** the normal two-step rule (Program form + Parts Atte
 
 The staff-facing list of **Registered attendees** (and checked-in state) for an **Event** under a **Program**, derived from HubSpot rules plus EMS catalog mapping until HubSpot objects exist. **`admin` role only** — same gate as check-in (includes email and account manager on each row).
 
-**Columns (fixed, all Events):** name, company, email, account manager, **checked-in status** — same field set as the QR check-in confirm screen, plus whether the Contact is already checked in.
+**Columns (fixed, all Events):** name, company, email, account manager, **attendee type** (customer/partner), **checked-in status** — same field set as the QR check-in confirm screen, plus track and checked-in state.
 
 **Default view:** **all registered attendees**; staff may **filter** by checked-in / not checked-in (optional). **Default sort:** **last name A→Z**.
 
@@ -179,4 +188,4 @@ Deferred from Phase 1: public registration webpage, second registration wave / f
 
 *QR JWT minting for registrant emails — **not confirmed**; likely HubSpot-driven, possible future EMS control.*
 
-*Check-in representation in HubSpot — **open** (team unsure which property SRC updates today).*
+*Check-in uses per-Event `attendanceProperty` from catalog — see `docs/hubspot-schema.md`.*

@@ -3,7 +3,7 @@
  * Mock data already uses the UI shape; live responses are normalized here.
  */
 
-import type { Attendee, Event, CatalogEvent, CatalogProgram, CatalogResponse } from '../types';
+import type { Attendee, Event, CatalogEvent, CatalogProgram, CatalogResponse, SliceAttendeesResponse } from '../types';
 
 const ATTENDEE_STATUS_FROM_API: Record<string, Attendee['status']> = {
 	registered: 'Registered',
@@ -127,18 +127,52 @@ function normalizeCatalogEvent(raw: Record<string, unknown>): CatalogEvent {
 		id: String(raw.id ?? ''),
 		name: String(raw.name ?? ''),
 		partsAttendedOption: String(raw.partsAttendedOption ?? ''),
+		attendanceProperty: String(
+			raw.attendanceProperty ?? 'atlassian_event__customer_event_attendance',
+		),
 		archived: Boolean(raw.archived),
 	};
 }
 
 function normalizeCatalogProgram(raw: Record<string, unknown>): CatalogProgram {
 	const events = Array.isArray(raw.events) ? raw.events : [];
+	const formIds = raw.hubspotFormIds;
+	const legacyFormId = raw.hubspotFormId;
+	const hubspotFormIds = Array.isArray(formIds)
+		? formIds.map(String)
+		: legacyFormId
+			? [String(legacyFormId)]
+			: [];
+
 	return {
 		id: String(raw.id ?? ''),
 		name: String(raw.name ?? ''),
-		hubspotFormId: String(raw.hubspotFormId ?? ''),
+		hubspotFormIds,
 		archived: Boolean(raw.archived),
 		events: events.map((event) => normalizeCatalogEvent(event as Record<string, unknown>)),
+	};
+}
+
+export function normalizeSliceAttendeesResponse(response: Record<string, unknown>): SliceAttendeesResponse {
+	const attendees = Array.isArray(response.attendees) ? response.attendees : [];
+	return {
+		attendees: attendees.map((row) => {
+			const raw = row as Record<string, unknown>;
+			return {
+				contactId: String(raw.contactId ?? ''),
+				firstName: String(raw.firstName ?? ''),
+				lastName: String(raw.lastName ?? ''),
+				company: String(raw.company ?? ''),
+				email: String(raw.email ?? ''),
+				accountManager: String(raw.accountManager ?? ''),
+				attendeeType: raw.attendeeType === 'partner' ? 'partner' : 'customer',
+				checkedIn: Boolean(raw.checkedIn),
+				checkedInAt: null,
+			};
+		}),
+		page: Number(response.page ?? 1),
+		pageSize: Number(response.pageSize ?? 50),
+		total: Number(response.total ?? attendees.length),
 	};
 }
 

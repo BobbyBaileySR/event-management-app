@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /**
  * Production Content-Security-Policy. Injected into index.html at BUILD time only —
@@ -42,7 +42,7 @@ async function loadDevProxyTarget(): Promise<string | null> {
 	if (!existsSync(configPath)) {
 		return null;
 	}
-	const module = await import(configPath);
+	const module = await import(pathToFileURL(configPath).href);
 	return module.DEV_SERVER_CONFIG?.srcListenerUrl ?? null;
 }
 

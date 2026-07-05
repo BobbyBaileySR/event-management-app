@@ -2,6 +2,11 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
+import {
+	ATTENDANCE_PROPERTY_PRESETS,
+	parseFormIdsInput,
+	suggestAttendanceProperty,
+} from '../constants/hubspot';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
@@ -20,10 +25,13 @@ export function CatalogAdminView() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [programName, setProgramName] = useState('');
-	const [programFormId, setProgramFormId] = useState('');
+	const [programFormIds, setProgramFormIds] = useState('');
 	const [eventProgramId, setEventProgramId] = useState('');
 	const [eventName, setEventName] = useState('');
 	const [eventOption, setEventOption] = useState('');
+	const [eventAttendanceProperty, setEventAttendanceProperty] = useState(
+		ATTENDANCE_PROPERTY_PRESETS[0],
+	);
 
 	const loadCatalog = useCallback(async () => {
 		setLoading(true);
@@ -52,9 +60,9 @@ export function CatalogAdminView() {
 	async function handleCreateProgram(event: FormEvent) {
 		event.preventDefault();
 		try {
-			await data.createProgram({ name: programName, hubspotFormId: programFormId });
+			await data.createProgram({ name: programName, hubspotFormIds: parseFormIdsInput(programFormIds) });
 			setProgramName('');
-			setProgramFormId('');
+			setProgramFormIds('');
 			showToast('Program created', 'success');
 			bumpCatalog();
 			await loadCatalog();
@@ -70,9 +78,11 @@ export function CatalogAdminView() {
 				programId: eventProgramId,
 				name: eventName,
 				partsAttendedOption: eventOption,
+				attendanceProperty: eventAttendanceProperty,
 			});
 			setEventName('');
 			setEventOption('');
+			setEventAttendanceProperty(ATTENDANCE_PROPERTY_PRESETS[0]);
 			showToast('Event created', 'success');
 			bumpCatalog();
 			await loadCatalog();
@@ -118,7 +128,9 @@ export function CatalogAdminView() {
 								<div className={styles.cardHeader}>
 									<div>
 										<strong>{event.name}</strong>
-										<p className={styles.meta}>Parts Attended: {event.partsAttendedOption}</p>
+										<p className={styles.meta}>
+											Parts Attended: {event.partsAttendedOption} · Attendance: {event.attendanceProperty}
+										</p>
 									</div>
 									<button
 										type="button"
@@ -140,7 +152,7 @@ export function CatalogAdminView() {
 				<div className={styles.cardHeader}>
 					<div>
 						<strong>{program.name}</strong>
-						<p className={styles.meta}>Form ID: {program.hubspotFormId}</p>
+						<p className={styles.meta}>Form IDs: {(program.hubspotFormIds ?? []).join(', ') || '—'}</p>
 					</div>
 					<div className={styles.actions}>
 						<button type="button" className={styles.secondary} onClick={() => void toggleProgramArchive(program)}>
@@ -204,8 +216,13 @@ export function CatalogAdminView() {
 							<input value={programName} onChange={(event) => setProgramName(event.target.value)} required />
 						</label>
 						<label>
-							HubSpot form ID
-							<input value={programFormId} onChange={(event) => setProgramFormId(event.target.value)} required />
+							HubSpot form IDs (one per line or comma-separated)
+							<textarea
+								value={programFormIds}
+								onChange={(event) => setProgramFormIds(event.target.value)}
+								required
+								rows={3}
+							/>
 						</label>
 						<div className={styles.actions}>
 							<button type="submit" className={styles.primary}>
@@ -228,11 +245,34 @@ export function CatalogAdminView() {
 						</label>
 						<label>
 							Event name
-							<input value={eventName} onChange={(event) => setEventName(event.target.value)} required />
+							<input
+								value={eventName}
+								onChange={(event) => {
+									setEventName(event.target.value);
+									if (event.target.value.trim()) {
+										setEventAttendanceProperty(suggestAttendanceProperty(event.target.value));
+									}
+								}}
+								required
+							/>
 						</label>
 						<label>
 							Parts Attended option
 							<input value={eventOption} onChange={(event) => setEventOption(event.target.value)} required />
+						</label>
+						<label>
+							Attendance property (HubSpot internal name)
+							<input
+								list="attendance-property-presets"
+								value={eventAttendanceProperty}
+								onChange={(event) => setEventAttendanceProperty(event.target.value)}
+								required
+							/>
+							<datalist id="attendance-property-presets">
+								{ATTENDANCE_PROPERTY_PRESETS.map((preset) => (
+									<option key={preset} value={preset} />
+								))}
+							</datalist>
 						</label>
 						<div className={styles.actions}>
 							<button type="submit" className={styles.primary}>

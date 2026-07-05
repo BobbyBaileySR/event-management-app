@@ -107,6 +107,49 @@ export interface EventResponse {
 	event: Event | null;
 }
 
+export interface SliceAttendee {
+	contactId: string;
+	firstName: string;
+	lastName: string;
+	company: string;
+	email: string;
+	accountManager: string;
+	attendeeType: 'customer' | 'partner';
+	checkedIn: boolean;
+	checkedInAt: null;
+}
+
+export interface SliceAttendeesResponse {
+	attendees: SliceAttendee[];
+	page: number;
+	pageSize: number;
+	total: number;
+}
+
+export interface CheckInContactSummary {
+	contactId: string;
+	firstName: string;
+	lastName: string;
+	company: string;
+	email: string;
+	accountManager: string;
+	attendeeType: 'customer' | 'partner' | null;
+	checkedIn: boolean;
+}
+
+export interface CheckInScanResponse {
+	contact: CheckInContactSummary;
+	programId: string;
+	eventId: string;
+}
+
+export interface CheckInConfirmResponse {
+	contactId: string;
+	checkedIn: boolean;
+	alreadyCheckedIn: boolean;
+	attendeeType: 'customer' | 'partner' | null;
+}
+
 export interface AttendeesResponse {
 	attendees: Attendee[];
 	page?: number;
@@ -134,13 +177,14 @@ export interface CatalogEvent {
 	id: string;
 	name: string;
 	partsAttendedOption: string;
+	attendanceProperty: string;
 	archived: boolean;
 }
 
 export interface CatalogProgram {
 	id: string;
 	name: string;
-	hubspotFormId: string;
+	hubspotFormIds: string[];
 	archived: boolean;
 	events: CatalogEvent[];
 }
@@ -152,7 +196,7 @@ export interface CatalogResponse {
 export interface CatalogProgramRecord {
 	id: string;
 	name: string;
-	hubspotFormId: string;
+	hubspotFormIds: string[];
 	archived: boolean;
 	createdAt?: string;
 	updatedAt?: string;
@@ -163,6 +207,7 @@ export interface CatalogEventRecord {
 	programId: string;
 	name: string;
 	partsAttendedOption: string;
+	attendanceProperty: string;
 	archived: boolean;
 	archivedViaProgramId?: string | null;
 	createdAt?: string;

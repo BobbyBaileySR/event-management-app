@@ -20,11 +20,23 @@ const catalogFixture = {
 		{
 			id: 'prog-1',
 			name: '<img onerror=alert(1)> Summit',
-			hubspotFormId: 'form-1',
+			hubspotFormIds: ['form-1'],
 			archived: false,
 			events: [
-				{ id: 'ev-1', name: 'VIP', partsAttendedOption: 'VIP', archived: false },
-				{ id: 'ev-2', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: false },
+				{
+					id: 'ev-1',
+					name: 'VIP',
+					partsAttendedOption: 'VIP',
+					attendanceProperty: 'atlassian_event__vip_event_attendance',
+					archived: false,
+				},
+				{
+					id: 'ev-2',
+					name: 'Meeting Room',
+					partsAttendedOption: 'Meeting Room',
+					attendanceProperty: 'atlassian_event__customer_event_attendance',
+					archived: false,
+				},
 			],
 		},
 	],

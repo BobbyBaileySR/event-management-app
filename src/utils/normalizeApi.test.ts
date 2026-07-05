@@ -141,9 +141,17 @@ describe('normalizeCatalogResponse', () => {
 				{
 					id: 'prog-1',
 					name: 'Atlassian Event 2026',
-					hubspotFormId: 'form-1',
+					hubspotFormIds: ['form-1', 'form-2'],
 					archived: false,
-					events: [{ id: 'ev-1', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: false }],
+					events: [
+						{
+							id: 'ev-1',
+							name: 'Meeting Room',
+							partsAttendedOption: 'Meeting Room',
+							attendanceProperty: 'atlassian_event__customer_event_attendance',
+							archived: false,
+						},
+					],
 				},
 			],
 		});
@@ -151,8 +159,32 @@ describe('normalizeCatalogResponse', () => {
 		expect(result.programs[0]).toMatchObject({
 			id: 'prog-1',
 			name: 'Atlassian Event 2026',
-			hubspotFormId: 'form-1',
-			events: [{ id: 'ev-1', name: 'Meeting Room', partsAttendedOption: 'Meeting Room', archived: false }],
+			hubspotFormIds: ['form-1', 'form-2'],
+			events: [
+				{
+					id: 'ev-1',
+					name: 'Meeting Room',
+					partsAttendedOption: 'Meeting Room',
+					attendanceProperty: 'atlassian_event__customer_event_attendance',
+					archived: false,
+				},
+			],
 		});
+	});
+
+	it('migrates legacy hubspotFormId to hubspotFormIds array', () => {
+		const result = normalizeCatalogResponse({
+			programs: [
+				{
+					id: 'prog-legacy',
+					name: 'Legacy Program',
+					hubspotFormId: 'legacy-form',
+					archived: false,
+					events: [],
+				},
+			],
+		});
+
+		expect(result.programs[0]?.hubspotFormIds).toEqual(['legacy-form']);
 	});
 });

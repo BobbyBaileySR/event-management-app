@@ -341,19 +341,21 @@ const INITIAL_MOCK_CATALOG: CatalogResponse = {
 		{
 			id: 'prog-atlassian-2026',
 			name: 'Atlassian Event 2026',
-			hubspotFormId: 'mock-form-2026',
+			hubspotFormIds: ['mock-form-2026'],
 			archived: false,
 			events: [
 				{
 					id: 'ev-mr-2026',
 					name: 'Meeting Room',
 					partsAttendedOption: 'Meeting Room',
+					attendanceProperty: 'atlassian_event__customer_event_attendance',
 					archived: false,
 				},
 				{
 					id: 'ev-vip-2026',
 					name: 'VIP Event',
 					partsAttendedOption: 'VIP Event',
+					attendanceProperty: 'atlassian_event__vip_event_attendance',
 					archived: false,
 				},
 			],
@@ -361,7 +363,7 @@ const INITIAL_MOCK_CATALOG: CatalogResponse = {
 	],
 };
 
-let mockCatalogState: CatalogResponse = structuredClone(INITIAL_MOCK_CATALOG);
+const mockCatalogState: CatalogResponse = structuredClone(INITIAL_MOCK_CATALOG);
 
 export function getMockCatalog(includeArchived = false): CatalogResponse {
 	if (!includeArchived) {
@@ -391,15 +393,51 @@ export function getMockCatalog(includeArchived = false): CatalogResponse {
 	return { programs };
 }
 
-export function resetMockCatalog(): void {
-	mockCatalogState = structuredClone(INITIAL_MOCK_CATALOG);
+export function getMockSliceAttendees(_programId: string, eventId: string): import('../types').SliceAttendeesResponse {
+	const catalog = getMockCatalog(false);
+	for (const program of catalog.programs) {
+		const event = program.events.find((entry) => entry.id === eventId);
+		if (!event) {
+			continue;
+		}
+		return {
+			attendees: [
+				{
+					contactId: 'mock-101',
+					firstName: 'Jane',
+					lastName: 'Doe',
+					company: 'Acme Corp',
+					email: 'jane.doe@acme.com',
+					accountManager: 'owner-1',
+					attendeeType: 'customer',
+					checkedIn: false,
+					checkedInAt: null,
+				},
+				{
+					contactId: 'mock-202',
+					firstName: 'Pat',
+					lastName: 'Lee',
+					company: 'Partner Ltd',
+					email: 'pat@partner.com',
+					accountManager: 'owner-2',
+					attendeeType: 'partner',
+					checkedIn: true,
+					checkedInAt: null,
+				},
+			],
+			page: 1,
+			pageSize: 50,
+			total: 2,
+		};
+	}
+	return { attendees: [], page: 1, pageSize: 50, total: 0 };
 }
 
 function normalizeProgramName(name: string): string {
 	return name.trim().toLowerCase();
 }
 
-export function mockCreateProgram(name: string, hubspotFormId: string): CatalogProgram {
+export function mockCreateProgram(name: string, hubspotFormIds: string[]): CatalogProgram {
 	const key = normalizeProgramName(name);
 	if (mockCatalogState.programs.some((program) => normalizeProgramName(program.name) === key)) {
 		throw new Error('duplicate_name');
@@ -408,7 +446,7 @@ export function mockCreateProgram(name: string, hubspotFormId: string): CatalogP
 	const program: CatalogProgram = {
 		id: `prog-${Date.now()}`,
 		name: name.trim(),
-		hubspotFormId: hubspotFormId.trim(),
+		hubspotFormIds: hubspotFormIds.map((id) => id.trim()).filter(Boolean),
 		archived: false,
 		events: [],
 	};
@@ -418,7 +456,7 @@ export function mockCreateProgram(name: string, hubspotFormId: string): CatalogP
 
 export function mockUpdateProgram(
 	id: string,
-	patch: { name?: string; hubspotFormId?: string; archived?: boolean },
+	patch: { name?: string; hubspotFormIds?: string[]; archived?: boolean },
 ): CatalogProgram {
 	const program = mockCatalogState.programs.find((entry) => entry.id === id);
 	if (!program) {
@@ -431,8 +469,8 @@ export function mockUpdateProgram(
 		}
 		program.name = patch.name.trim();
 	}
-	if (patch.hubspotFormId !== undefined) {
-		program.hubspotFormId = patch.hubspotFormId.trim();
+	if (patch.hubspotFormIds !== undefined) {
+		program.hubspotFormIds = patch.hubspotFormIds.map((formId) => formId.trim()).filter(Boolean);
 	}
 	if (patch.archived === true) {
 		program.archived = true;
@@ -449,7 +487,12 @@ export function mockUpdateProgram(
 	return program;
 }
 
-export function mockCreateEvent(programId: string, name: string, partsAttendedOption: string): CatalogEvent {
+export function mockCreateEvent(
+	programId: string,
+	name: string,
+	partsAttendedOption: string,
+	attendanceProperty: string,
+): CatalogEvent {
 	const program = mockCatalogState.programs.find((entry) => entry.id === programId);
 	if (!program) {
 		throw new Error('program_not_found');
@@ -458,6 +501,7 @@ export function mockCreateEvent(programId: string, name: string, partsAttendedOp
 		id: `ev-${Date.now()}`,
 		name: name.trim(),
 		partsAttendedOption: partsAttendedOption.trim(),
+		attendanceProperty: attendanceProperty.trim(),
 		archived: false,
 	};
 	program.events.push(event);
@@ -466,7 +510,7 @@ export function mockCreateEvent(programId: string, name: string, partsAttendedOp
 
 export function mockUpdateEvent(
 	id: string,
-	patch: { name?: string; partsAttendedOption?: string; archived?: boolean },
+	patch: { name?: string; partsAttendedOption?: string; attendanceProperty?: string; archived?: boolean },
 ): CatalogEvent {
 	for (const program of mockCatalogState.programs) {
 		const event = program.events.find((entry) => entry.id === id);
@@ -478,6 +522,9 @@ export function mockUpdateEvent(
 		}
 		if (patch.partsAttendedOption !== undefined) {
 			event.partsAttendedOption = patch.partsAttendedOption.trim();
+		}
+		if (patch.attendanceProperty !== undefined) {
+			event.attendanceProperty = patch.attendanceProperty.trim();
 		}
 		if (patch.archived !== undefined) {
 			if (patch.archived === false && program.archived) {
