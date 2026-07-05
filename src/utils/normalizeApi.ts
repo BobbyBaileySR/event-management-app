@@ -122,12 +122,27 @@ export function normalizeAttendeesResponse(
 	};
 }
 
+function copyOptionalString(raw: Record<string, unknown>, key: string): string | undefined {
+	const value = raw[key];
+	return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function copyOptionalNumber(raw: Record<string, unknown>, key: string): number | undefined {
+	const value = raw[key];
+	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 function normalizeCatalogEvent(raw: Record<string, unknown>): CatalogEvent {
 	return {
 		id: String(raw.id ?? ''),
 		name: String(raw.name ?? ''),
 		partsAttendedOption: String(raw.partsAttendedOption ?? ''),
 		archived: Boolean(raw.archived),
+		owner: copyOptionalString(raw, 'owner'),
+		description: copyOptionalString(raw, 'description'),
+		date: copyOptionalString(raw, 'date'),
+		location: copyOptionalString(raw, 'location'),
+		capacity: copyOptionalNumber(raw, 'capacity'),
 	};
 }
 
@@ -139,6 +154,11 @@ function normalizeCatalogProgram(raw: Record<string, unknown>): CatalogProgram {
 		hubspotFormId: String(raw.hubspotFormId ?? ''),
 		archived: Boolean(raw.archived),
 		events: events.map((event) => normalizeCatalogEvent(event as Record<string, unknown>)),
+		description: copyOptionalString(raw, 'description'),
+		startDate: copyOptionalString(raw, 'startDate'),
+		endDate: copyOptionalString(raw, 'endDate'),
+		location: copyOptionalString(raw, 'location'),
+		timezone: copyOptionalString(raw, 'timezone'),
 	};
 }
 

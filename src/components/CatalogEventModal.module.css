@@ -1,0 +1,125 @@
+.modal {
+	max-width: min(560px, calc(100vw - 32px));
+	width: 100%;
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-top: 12px;
+}
+
+.form label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: var(--color-denim);
+}
+
+.form input,
+.form textarea {
+	padding: 8px 10px;
+	border: 1px solid rgba(11, 5, 115, 0.2);
+	border-radius: 6px;
+	font: inherit;
+}
+
+.form textarea {
+	resize: vertical;
+	min-height: 72px;
+}
+
+.readOnlyProgram {
+	margin: 0;
+	font-size: 0.9rem;
+	color: rgba(0, 10, 39, 0.85);
+}
+
+.programField {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: var(--color-denim);
+}
+
+.selectWrap {
+	position: relative;
+	width: 100%;
+}
+
+.programTrigger {
+	width: 100%;
+	min-height: 44px;
+	padding: 8px 36px 8px 10px;
+	border: 1px solid rgba(11, 5, 115, 0.2);
+	border-radius: 6px;
+	background: #fff;
+	color: var(--color-black);
+	font: inherit;
+	font-weight: 400;
+	text-align: left;
+	cursor: pointer;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%230B0573' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 12px center;
+}
+
+.programTrigger:focus-visible {
+	outline: 2px solid var(--color-link);
+	outline-offset: 2px;
+}
+
+.programMenu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	z-index: 20;
+	margin: 0;
+	padding: 4px;
+	list-style: none;
+	border: 1px solid rgba(11, 5, 115, 0.2);
+	border-radius: 8px;
+	background: #fff;
+	box-shadow: 0 8px 24px rgba(0, 10, 39, 0.12);
+	max-height: min(200px, 40vh);
+	overflow-y: auto;
+}
+
+.programOption {
+	width: 100%;
+	min-height: 44px;
+	padding: 10px 12px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--color-black);
+	font: inherit;
+	font-weight: 400;
+	text-align: left;
+	cursor: pointer;
+}
+
+.programOption[aria-selected='true'] {
+	background: var(--color-ice);
+	color: var(--color-denim);
+	font-weight: 600;
+}
+
+.programOption:hover,
+.programOption:focus-visible {
+	background: var(--color-ice);
+	outline: none;
+}
+
+@media (max-width: 900px) {
+	.programTrigger,
+	.programOption {
+		font-size: 16px;
+	}
+}

@@ -124,6 +124,10 @@
 	color: #b42318;
 }
 
+.metadata {
+	margin-top: 4px;
+}
+
 @media (max-width: 600px) {
 	.panel {
 		padding: 12px;
