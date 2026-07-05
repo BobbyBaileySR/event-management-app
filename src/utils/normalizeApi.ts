@@ -3,7 +3,17 @@
  * Mock data already uses the UI shape; live responses are normalized here.
  */
 
-import type { Attendee, Event, CatalogEvent, CatalogProgram, CatalogResponse, SliceAttendeesResponse } from '../types';
+import type {
+	Attendee,
+	CheckInContactSummary,
+	CheckInScanResponse,
+	ConfirmCheckInResponse,
+	Event,
+	CatalogEvent,
+	CatalogProgram,
+	CatalogResponse,
+	SliceAttendeesResponse,
+} from '../types';
 
 const ATTENDEE_STATUS_FROM_API: Record<string, Attendee['status']> = {
 	registered: 'Registered',
@@ -200,5 +210,43 @@ export function normalizeCatalogResponse(response: Record<string, unknown>): Cat
 	const programs = Array.isArray(response.programs) ? response.programs : [];
 	return {
 		programs: programs.map((program) => normalizeCatalogProgram(program as Record<string, unknown>)),
+	};
+}
+
+function normalizeCheckInContact(raw: Record<string, unknown>): CheckInContactSummary {
+	const attendeeType = raw.attendeeType;
+	return {
+		contactId: String(raw.contactId ?? ''),
+		firstName: String(raw.firstName ?? ''),
+		lastName: String(raw.lastName ?? ''),
+		company: String(raw.company ?? ''),
+		email: String(raw.email ?? ''),
+		accountManager: String(raw.accountManager ?? ''),
+		attendeeType: attendeeType === 'partner' ? 'partner' : attendeeType === 'customer' ? 'customer' : null,
+		checkedIn: Boolean(raw.checkedIn),
+	};
+}
+
+export function normalizeCheckInScanResponse(response: Record<string, unknown>): CheckInScanResponse {
+	const contactRaw = response.contact;
+	const contact =
+		contactRaw && typeof contactRaw === 'object'
+			? normalizeCheckInContact(contactRaw as Record<string, unknown>)
+			: normalizeCheckInContact({});
+
+	return {
+		contact,
+		programId: String(response.programId ?? ''),
+		eventId: String(response.eventId ?? ''),
+	};
+}
+
+export function normalizeConfirmCheckInResponse(response: Record<string, unknown>): ConfirmCheckInResponse {
+	const attendeeType = response.attendeeType;
+	return {
+		contactId: String(response.contactId ?? ''),
+		checkedIn: Boolean(response.checkedIn),
+		alreadyCheckedIn: Boolean(response.alreadyCheckedIn),
+		attendeeType: attendeeType === 'partner' ? 'partner' : attendeeType === 'customer' ? 'customer' : null,
 	};
 }

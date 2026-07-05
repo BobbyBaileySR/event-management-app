@@ -1,0 +1,16 @@
+.panel {
+	margin-bottom: 16px;
+}
+
+.reader {
+	min-height: 220px;
+	border-radius: 8px;
+	overflow: hidden;
+	background: rgba(0, 0, 0, 0.04);
+}
+
+.hint {
+	margin: 8px 0 0;
+	font-size: 0.875rem;
+	opacity: 0.8;
+}

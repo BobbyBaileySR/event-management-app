@@ -1,65 +1,127 @@
+import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '../components/Toast';
-import type { Attendee, Event } from '../types';
+import { SessionProvider, useSession } from '../state/appState';
+import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
+import type { Session, SliceAttendee } from '../types';
 import { CheckInView } from './CheckInView';
 
-const mockEvent: Event = {
-	id: 'evt-london-q3',
-	name: 'London Q3 Summit',
-	date: 'Oct 15, 2026',
-	dateIso: '2026-10-15',
-	location: 'London',
-	status: 'active',
-	attendeeCount: 150,
-	capacity: 200,
-	type: 'In-person',
-	owner: 'events@adaptavist.com',
-	registrationClose: 'Oct 10, 2026',
-	hubspotId: 'HS-1',
-	description: 'Test',
-};
-
-const mockAttendees: Attendee[] = [
+const mockSliceAttendees: SliceAttendee[] = [
 	{
-		id: 'c-001',
-		name: 'Jane Doe',
-		email: 'jane@example.com',
-		company: 'Adaptavist',
-		status: 'Registered',
-		ticketType: 'General',
-		registeredAt: '2026-08-01',
-		source: 'HubSpot form',
+		contactId: 'mock-101',
+		firstName: 'Jane',
+		lastName: 'Doe',
+		email: 'jane.doe@acme.com',
+		company: 'Acme Corp',
+		accountManager: 'owner-1',
+		attendeeType: 'customer',
+		checkedIn: false,
+		checkedInAt: null,
 	},
 	{
-		id: 'c-002',
-		name: 'John Smith',
-		email: 'john@example.com',
-		company: 'Atlassian',
-		status: 'Checked In',
-		ticketType: 'VIP',
-		registeredAt: '2026-08-12',
-		source: 'Partner invite',
+		contactId: 'mock-202',
+		firstName: 'Pat',
+		lastName: 'Lee',
+		email: 'pat@partner.com',
+		company: 'Partner Ltd',
+		accountManager: 'owner-2',
+		attendeeType: 'partner',
+		checkedIn: true,
+		checkedInAt: null,
 	},
 ];
 
-const mockDataService = {
-	fetchEvent: vi.fn().mockResolvedValue({ event: mockEvent }),
-	fetchAttendees: vi.fn().mockResolvedValue({ attendees: mockAttendees }),
-};
+const mockFetchSliceAttendees = vi.fn().mockResolvedValue({
+	attendees: mockSliceAttendees,
+	page: 1,
+	pageSize: 50,
+	total: 2,
+});
+
+const mockConfirmCheckIn = vi.fn().mockResolvedValue({
+	contactId: 'mock-101',
+	checkedIn: true,
+	alreadyCheckedIn: false,
+	attendeeType: 'customer',
+});
+
+const mockCheckInScan = vi.fn().mockResolvedValue({
+	programId: 'prog-atlassian-2026',
+	eventId: 'ev-mr-2026',
+	contact: {
+		contactId: 'mock-101',
+		firstName: 'Jane',
+		lastName: 'Doe',
+		company: 'Acme Corp',
+		email: 'jane.doe@acme.com',
+		accountManager: 'owner-1',
+		attendeeType: 'customer',
+		checkedIn: false,
+	},
+});
 
 vi.mock('../hooks/useDataService', () => ({
-	useDataService: () => mockDataService,
+	useDataService: () => ({
+		fetchSliceAttendees: mockFetchSliceAttendees,
+		confirmCheckIn: mockConfirmCheckIn,
+		checkInScan: mockCheckInScan,
+	}),
 }));
 
-function renderCheckIn(eventId = 'evt-london-q3') {
+vi.mock('../components/CheckInQrPanel', () => ({
+	CheckInQrPanel: ({ onDecode }: { onDecode: (jwt: string) => void }) => (
+		<button type="button" onClick={() => onDecode('mock-jwt-token')}>
+			Simulate QR scan
+		</button>
+	),
+}));
+
+const adminSession: Session = {
+	token: 't',
+	email: 'admin@adaptavist.com',
+	role: 'admin',
+	expiresAt: '2099-01-01T00:00:00.000Z',
+};
+
+const staffSession: Session = {
+	...adminSession,
+	role: 'staff',
+};
+
+function SessionHarness({ session }: { session: Session }) {
+	const { setSession } = useSession();
+	useEffect(() => {
+		setSession(session);
+	}, [session, setSession]);
+	return null;
+}
+
+function CatalogHarness() {
+	const { setSelection } = useCatalogSelection();
+	useEffect(() => {
+		setSelection({
+			programId: 'prog-atlassian-2026',
+			evId: 'ev-mr-2026',
+			programName: 'Atlassian Event 2026',
+			eventName: 'Meeting Room',
+		});
+	}, [setSelection]);
+	return null;
+}
+
+function renderCheckIn(session: Session = adminSession) {
 	return render(
-		<MemoryRouter initialEntries={[`/events/${eventId}/check-in`]}>
+		<MemoryRouter>
 			<ToastProvider>
-				<Routes>
-					<Route path="/events/:eventId/:module" element={<CheckInView />} />
-				</Routes>
+				<SessionProvider>
+					<CatalogProvider>
+						<SessionHarness session={session} />
+						<CatalogHarness />
+						<CheckInView />
+					</CatalogProvider>
+				</SessionProvider>
 			</ToastProvider>
 		</MemoryRouter>,
 	);
@@ -67,52 +129,161 @@ function renderCheckIn(eventId = 'evt-london-q3') {
 
 describe('CheckInView', () => {
 	beforeEach(() => {
-		mockAttendees.splice(
-			0,
-			mockAttendees.length,
-			{
-				id: 'c-001',
-				name: 'Jane Doe',
-				email: 'jane@example.com',
-				company: 'Adaptavist',
-				status: 'Registered',
-				ticketType: 'General',
-				registeredAt: '2026-08-01',
-				source: 'HubSpot form',
+		mockFetchSliceAttendees.mockClear();
+		mockConfirmCheckIn.mockClear();
+		mockCheckInScan.mockClear();
+		mockFetchSliceAttendees.mockResolvedValue({
+			attendees: mockSliceAttendees,
+			page: 1,
+			pageSize: 50,
+			total: 2,
+		});
+		mockConfirmCheckIn.mockResolvedValue({
+			contactId: 'mock-101',
+			checkedIn: true,
+			alreadyCheckedIn: false,
+			attendeeType: 'customer',
+		});
+		mockCheckInScan.mockResolvedValue({
+			programId: 'prog-atlassian-2026',
+			eventId: 'ev-mr-2026',
+			contact: {
+				contactId: 'mock-101',
+				firstName: 'Jane',
+				lastName: 'Doe',
+				company: 'Acme Corp',
+				email: 'jane.doe@acme.com',
+				accountManager: 'owner-1',
+				attendeeType: 'customer',
+				checkedIn: false,
 			},
-			{
-				id: 'c-002',
-				name: 'John Smith',
-				email: 'john@example.com',
-				company: 'Atlassian',
-				status: 'Checked In',
-				ticketType: 'VIP',
-				registeredAt: '2026-08-12',
-				source: 'Partner invite',
-			},
-		);
+		});
 	});
 
-	it('shows only registered attendees and supports check-in toast', async () => {
+	it('renders attendee search, summary card, and confirm check-in', async () => {
 		renderCheckIn();
 
 		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'London Q3 Summit — Check-in' })).toBeInTheDocument();
+			expect(
+				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
+			).toBeInTheDocument();
 		});
 
 		expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-		expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+		expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', expect.any(Object));
 
-		fireEvent.click(screen.getByRole('button', { name: 'Check in' }));
+		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
 
 		await waitFor(() => {
-			expect(screen.getByRole('status')).toHaveTextContent('Jane Doe checked in (PoC — no HubSpot write yet).');
+			expect(screen.getByText('jane.doe@acme.com')).toBeInTheDocument();
+		});
+		expect(screen.getByText('owner-1')).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Confirm check-in' }));
+
+		await waitFor(() => {
+			expect(mockConfirmCheckIn).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', 'mock-101');
+			expect(screen.getByRole('status')).toHaveTextContent('Jane Doe checked in successfully.');
 		});
 	});
 
-	it('renders a hostile attendee name as text, never as markup (XSS guard)', async () => {
+	it('shows idempotent message when contact is already checked in', async () => {
+		mockConfirmCheckIn.mockResolvedValue({
+			contactId: 'mock-202',
+			checkedIn: true,
+			alreadyCheckedIn: true,
+			attendeeType: 'partner',
+		});
+
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(screen.getByText('Pat Lee')).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[1]!);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Confirm check-in' })).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Confirm check-in' }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('status')).toHaveTextContent('Pat Lee is already checked in.');
+		});
+	});
+
+	it('calls checkInScan when QR panel decodes a token', async () => {
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Simulate QR scan' }));
+
+		await waitFor(() => {
+			expect(mockCheckInScan).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', 'mock-jwt-token');
+			expect(screen.getByText('jane.doe@acme.com')).toBeInTheDocument();
+		});
+	});
+
+	it('shows catalog selection prompt when no Program or Event is selected', async () => {
+		render(
+			<MemoryRouter>
+				<ToastProvider>
+					<SessionProvider>
+						<CatalogProvider>
+							<SessionHarness session={adminSession} />
+							<CheckInView />
+						</CatalogProvider>
+					</SessionProvider>
+				</ToastProvider>
+			</MemoryRouter>,
+		);
+
+		expect(
+			await screen.findByText(/Select a Program and Event using the catalog pickers/i),
+		).toBeInTheDocument();
+	});
+
+	it('redirects non-admin users to the events list', async () => {
+		render(
+			<MemoryRouter initialEntries={['/events/check-in']}>
+				<ToastProvider>
+					<SessionProvider>
+						<CatalogProvider>
+							<Routes>
+								<Route path="/events" element={<div>Events list</div>} />
+								<Route
+									path="/events/check-in"
+									element={
+										<>
+											<SessionHarness session={staffSession} />
+											<CatalogHarness />
+											<CheckInView />
+										</>
+									}
+								/>
+							</Routes>
+						</CatalogProvider>
+					</SessionProvider>
+				</ToastProvider>
+			</MemoryRouter>,
+		);
+
+		expect(await screen.findByText('Events list')).toBeInTheDocument();
+	});
+
+	it('renders hostile attendee data as text, never as markup (XSS guard)', async () => {
 		const hostile = '"><img src=x onerror=alert(1)>';
-		mockAttendees[0] = { ...mockAttendees[0], name: hostile };
+		mockFetchSliceAttendees.mockResolvedValue({
+			attendees: [{ ...mockSliceAttendees[0]!, firstName: hostile, lastName: '' }],
+			page: 1,
+			pageSize: 50,
+			total: 1,
+		});
 
 		renderCheckIn();
 
@@ -121,5 +292,38 @@ describe('CheckInView', () => {
 		});
 
 		expect(document.querySelector('img')).toBeNull();
+	});
+
+	it('keeps the check-in layout mounted while typing in search', async () => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
+		});
+
+		const callsBeforeSearch = mockFetchSliceAttendees.mock.calls.length;
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Jane' },
+		});
+
+		expect(screen.queryByText('Loading check-in…')).not.toBeInTheDocument();
+		expect(
+			screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
+		).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
+
+		await vi.advanceTimersByTimeAsync(300);
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees.mock.calls.length).toBeGreaterThan(callsBeforeSearch);
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+				q: 'Jane',
+			});
+		});
+
+		vi.useRealTimers();
 	});
 });

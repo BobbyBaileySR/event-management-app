@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
-import { catalogPath, eventPath, isEventScopedRoute, useActiveRoute } from '../router/navigation';
+import { catalogPath, eventPath, isEventScopedRoute, sliceModulePath, useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
+import { useCatalogSelection } from '../state/catalogContext';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -11,10 +12,11 @@ interface SidebarProps {
 	eventName?: string | null;
 }
 
-export function Sidebar({ onLogout, eventName }: SidebarProps) {
+export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 	const navigate = useNavigate();
 	const { session } = useSession();
 	const { name: activeRoute, eventId } = useActiveRoute();
+	const { programId, evId, programName, eventName: catalogEventName } = useCatalogSelection();
 
 	return (
 		<aside className={styles.sidebar} aria-label="Sidebar">
@@ -40,9 +42,31 @@ export function Sidebar({ onLogout, eventName }: SidebarProps) {
 					/>
 				) : null}
 
+				{session?.role === 'admin' && programId && evId ? (
+					<div className={styles.section}>
+						<p className={styles.sectionLabel}>
+							{programName && catalogEventName
+								? `${programName} — ${catalogEventName}`
+								: 'Catalog selection'}
+						</p>
+						<NavButton
+							label="Attendees"
+							icon="👥"
+							active={activeRoute === 'attendees'}
+							onClick={() => navigate(sliceModulePath('attendees'))}
+						/>
+						<NavButton
+							label="Check-in"
+							icon="✓"
+							active={activeRoute === 'check-in'}
+							onClick={() => navigate(sliceModulePath('check-in'))}
+						/>
+					</div>
+				) : null}
+
 				{eventId && isEventScopedRoute(activeRoute) ? (
 					<div className={styles.section}>
-						<p className={styles.sectionLabel}>{eventName ?? 'Selected event'}</p>
+						<p className={styles.sectionLabel}>{hubEventName ?? 'Selected event'}</p>
 						{SIDEBAR_EVENT_MODULES.map((item: EventModule) => (
 							<NavButton
 								key={item.id}

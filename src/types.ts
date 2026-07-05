@@ -143,7 +143,7 @@ export interface CheckInScanResponse {
 	eventId: string;
 }
 
-export interface CheckInConfirmResponse {
+export interface ConfirmCheckInResponse {
 	contactId: string;
 	checkedIn: boolean;
 	alreadyCheckedIn: boolean;

@@ -9,6 +9,8 @@ import type {
 	CatalogEvent,
 	CatalogProgram,
 	CatalogResponse,
+	CheckInScanResponse,
+	ConfirmCheckInResponse,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
@@ -17,6 +19,8 @@ import type {
 	Event,
 	EventStatus,
 	ScheduledEmail,
+	SliceAttendee,
+	SliceAttendeesResponse,
 } from '../types';
 
 /**
@@ -397,44 +401,156 @@ export function getMockCatalog(includeArchived = false): CatalogResponse {
 	return { programs };
 }
 
-export function getMockSliceAttendees(_programId: string, eventId: string): import('../types').SliceAttendeesResponse {
-	const catalog = getMockCatalog(false);
-	for (const program of catalog.programs) {
-		const event = program.events.find((entry) => entry.id === eventId);
-		if (!event) {
-			continue;
-		}
+interface MockSliceAttendeeEntry extends SliceAttendee {}
+
+const INITIAL_MOCK_SLICE_ATTENDEES: Record<string, MockSliceAttendeeEntry[]> = {
+	'ev-mr-2026': [
+		{
+			contactId: 'mock-101',
+			firstName: 'Jane',
+			lastName: 'Doe',
+			company: 'Acme Corp',
+			email: 'jane.doe@acme.com',
+			accountManager: 'owner-1',
+			attendeeType: 'customer',
+			checkedIn: false,
+			checkedInAt: null,
+		},
+		{
+			contactId: 'mock-202',
+			firstName: 'Pat',
+			lastName: 'Lee',
+			company: 'Partner Ltd',
+			email: 'pat@partner.com',
+			accountManager: 'owner-2',
+			attendeeType: 'partner',
+			checkedIn: true,
+			checkedInAt: null,
+		},
+	],
+};
+
+const mockSliceAttendeesState: Record<string, MockSliceAttendeeEntry[]> = structuredClone(INITIAL_MOCK_SLICE_ATTENDEES);
+
+export function resetMockCheckInState(): void {
+	for (const key of Object.keys(mockSliceAttendeesState)) {
+		delete mockSliceAttendeesState[key];
+	}
+	Object.assign(mockSliceAttendeesState, structuredClone(INITIAL_MOCK_SLICE_ATTENDEES));
+}
+
+function findMockSliceAttendee(eventId: string, contactId: string): MockSliceAttendeeEntry | undefined {
+	return mockSliceAttendeesState[eventId]?.find((entry) => entry.contactId === contactId);
+}
+
+function decodeCheckInJwtPayload(jwt: string): { contactId?: string; sub?: string; emsEventId?: string } {
+	const parts = jwt.split('.');
+	if (parts.length !== 3 || !parts[1]) {
+		throw new Error('invalid_checkin_token');
+	}
+	const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+	return JSON.parse(atob(padded)) as { contactId?: string; sub?: string; emsEventId?: string };
+}
+
+export function getMockSliceAttendees(
+	_programId: string,
+	eventId: string,
+	query: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number } = {},
+): SliceAttendeesResponse {
+	const attendees = mockSliceAttendeesState[eventId];
+	const pageSize = query.pageSize ?? 50;
+	const page = query.page ?? 1;
+
+	if (!attendees) {
+		return { attendees: [], page, pageSize, total: 0 };
+	}
+
+	let filtered = attendees;
+
+	if (query.checkedIn !== undefined) {
+		filtered = filtered.filter((entry) => entry.checkedIn === query.checkedIn);
+	}
+
+	const needle = query.q?.trim().toLowerCase();
+	if (needle) {
+		filtered = filtered.filter(
+			(entry) =>
+				entry.firstName.toLowerCase().includes(needle) ||
+				entry.lastName.toLowerCase().includes(needle) ||
+				`${entry.firstName} ${entry.lastName}`.toLowerCase().includes(needle) ||
+				entry.email.toLowerCase().includes(needle) ||
+				entry.company.toLowerCase().includes(needle),
+		);
+	}
+
+	const total = filtered.length;
+	const start = (page - 1) * pageSize;
+
+	return {
+		attendees: filtered.slice(start, start + pageSize).map((entry) => ({ ...entry })),
+		page,
+		pageSize,
+		total,
+	};
+}
+
+export function mockCheckInScan(programId: string, eventId: string, jwt: string): CheckInScanResponse {
+	const payload = decodeCheckInJwtPayload(jwt);
+	const contactId = payload.contactId ?? payload.sub;
+	if (!contactId) {
+		throw new Error('invalid_checkin_claims');
+	}
+	if (payload.emsEventId && payload.emsEventId !== eventId) {
+		throw new Error('checkin_event_mismatch');
+	}
+
+	const attendee = findMockSliceAttendee(eventId, contactId);
+	if (!attendee) {
+		throw new Error('contact_not_found');
+	}
+
+	return {
+		contact: {
+			contactId: attendee.contactId,
+			firstName: attendee.firstName,
+			lastName: attendee.lastName,
+			company: attendee.company,
+			email: attendee.email,
+			accountManager: attendee.accountManager,
+			attendeeType: attendee.attendeeType,
+			checkedIn: attendee.checkedIn,
+		},
+		programId,
+		eventId,
+	};
+}
+
+export function mockConfirmCheckIn(
+	_programId: string,
+	eventId: string,
+	contactId: string,
+): ConfirmCheckInResponse {
+	const attendee = findMockSliceAttendee(eventId, contactId);
+	if (!attendee) {
+		throw new Error('contact_not_found');
+	}
+
+	if (attendee.checkedIn) {
 		return {
-			attendees: [
-				{
-					contactId: 'mock-101',
-					firstName: 'Jane',
-					lastName: 'Doe',
-					company: 'Acme Corp',
-					email: 'jane.doe@acme.com',
-					accountManager: 'owner-1',
-					attendeeType: 'customer',
-					checkedIn: false,
-					checkedInAt: null,
-				},
-				{
-					contactId: 'mock-202',
-					firstName: 'Pat',
-					lastName: 'Lee',
-					company: 'Partner Ltd',
-					email: 'pat@partner.com',
-					accountManager: 'owner-2',
-					attendeeType: 'partner',
-					checkedIn: true,
-					checkedInAt: null,
-				},
-			],
-			page: 1,
-			pageSize: 50,
-			total: 2,
+			contactId: attendee.contactId,
+			checkedIn: true,
+			alreadyCheckedIn: true,
+			attendeeType: attendee.attendeeType,
 		};
 	}
-	return { attendees: [], page: 1, pageSize: 50, total: 0 };
+
+	attendee.checkedIn = true;
+	return {
+		contactId: attendee.contactId,
+		checkedIn: true,
+		alreadyCheckedIn: false,
+		attendeeType: attendee.attendeeType,
+	};
 }
 
 function normalizeProgramName(name: string): string {

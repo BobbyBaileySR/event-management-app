@@ -3,6 +3,8 @@ import {
 	normalizeAttendee,
 	normalizeAttendeesResponse,
 	normalizeCatalogResponse,
+	normalizeCheckInScanResponse,
+	normalizeConfirmCheckInResponse,
 	normalizeEvent,
 	normalizeEventResponse,
 	normalizeEventsResponse,
@@ -269,5 +271,80 @@ describe('normalizeCatalogResponse', () => {
 
 		expect(result.programs[0]?.description).toBeUndefined();
 		expect(result.programs[0]?.events[0]?.owner).toBeUndefined();
+	});
+});
+
+describe('normalizeCheckInScanResponse', () => {
+	it('maps API contact summary and route ids', () => {
+		const result = normalizeCheckInScanResponse({
+			contact: {
+				contactId: 'c-001',
+				firstName: 'Jane',
+				lastName: 'Doe',
+				company: 'Acme',
+				email: 'jane@acme.com',
+				accountManager: 'sam@adaptavist.com',
+				attendeeType: 'customer',
+				checkedIn: false,
+			},
+			programId: 'prog-2026',
+			eventId: 'ev-mr',
+		});
+
+		expect(result).toEqual({
+			contact: {
+				contactId: 'c-001',
+				firstName: 'Jane',
+				lastName: 'Doe',
+				company: 'Acme',
+				email: 'jane@acme.com',
+				accountManager: 'sam@adaptavist.com',
+				attendeeType: 'customer',
+				checkedIn: false,
+			},
+			programId: 'prog-2026',
+			eventId: 'ev-mr',
+		});
+	});
+
+	it('defaults missing contact fields', () => {
+		const result = normalizeCheckInScanResponse({ programId: 'prog-1', eventId: 'ev-1' });
+
+		expect(result.contact).toMatchObject({
+			contactId: '',
+			firstName: '',
+			lastName: '',
+			attendeeType: null,
+			checkedIn: false,
+		});
+	});
+});
+
+describe('normalizeConfirmCheckInResponse', () => {
+	it('maps confirm payload fields', () => {
+		const result = normalizeConfirmCheckInResponse({
+			contactId: 'c-001',
+			checkedIn: true,
+			alreadyCheckedIn: false,
+			attendeeType: 'partner',
+		});
+
+		expect(result).toEqual({
+			contactId: 'c-001',
+			checkedIn: true,
+			alreadyCheckedIn: false,
+			attendeeType: 'partner',
+		});
+	});
+
+	it('treats unknown attendeeType as null', () => {
+		const result = normalizeConfirmCheckInResponse({
+			contactId: 'c-002',
+			checkedIn: true,
+			alreadyCheckedIn: true,
+			attendeeType: 'unknown',
+		});
+
+		expect(result.attendeeType).toBeNull();
 	});
 });

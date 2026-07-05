@@ -19,6 +19,16 @@ export function catalogPath(): string {
 	return '/catalog';
 }
 
+/** Catalog-scoped slice views (Attendees, Check-in) — not tied to legacy event hub URLs. */
+export function sliceModulePath(moduleId: 'attendees' | 'check-in'): string {
+	return `/events/${moduleId}`;
+}
+
+const SLICE_MODULE_PATHS: Record<string, string> = {
+	'/events/attendees': 'attendees',
+	'/events/check-in': 'check-in',
+};
+
 /** Derive the active logical route from URL params (URL is the source of truth). */
 export function useActiveRoute(): ActiveRoute {
 	const params = useParams();
@@ -28,6 +38,11 @@ export function useActiveRoute(): ActiveRoute {
 
 	if (location.pathname === '/catalog') {
 		return { name: 'catalog', eventId: null };
+	}
+
+	const sliceRoute = SLICE_MODULE_PATHS[location.pathname];
+	if (sliceRoute) {
+		return { name: sliceRoute, eventId: null };
 	}
 
 	if (!eventId) {

@@ -1,48 +1,71 @@
-import { useEffect, useMemo, useState } from 'react';
-import { filterAttendees, searchAttendees } from '../data/mockData';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { CheckInQrPanel } from '../components/CheckInQrPanel';
 import { EmptyState } from '../components/EmptyState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
-import { useActiveRoute } from '../router/navigation';
-import type { Attendee, Event } from '../types';
+import { useSession } from '../state/appState';
+import { useCatalogSelection } from '../state/catalogContext';
+import type { CheckInContactSummary, SliceAttendee } from '../types';
 import styles from './CheckInView.module.css';
 
-const CHECK_IN_FILTER = 'Registered' as const;
-const MAX_VISIBLE_ROWS = 8;
+type SelectedAttendee = SliceAttendee | CheckInContactSummary;
+
+function attendeeName(person: { firstName: string; lastName: string }): string {
+	return `${person.firstName} ${person.lastName}`.trim();
+}
 
 export function CheckInView() {
+	const { session } = useSession();
 	const { showToast } = useToast();
-	const { eventId } = useActiveRoute();
 	const data = useDataService();
-	const [event, setEvent] = useState<Event | null>(null);
-	const [attendees, setAttendees] = useState<Attendee[]>([]);
+	const { programId, evId, programName, eventName } = useCatalogSelection();
+	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [selected, setSelected] = useState<SelectedAttendee | null>(null);
+	const [confirming, setConfirming] = useState(false);
+	const [scanning, setScanning] = useState(false);
+	const awaitingInitialLoadRef = useRef(true);
 
 	useEffect(() => {
-		if (!eventId) {
+		setSearchQuery('');
+		setDebouncedSearch('');
+		awaitingInitialLoadRef.current = true;
+	}, [programId, evId]);
+
+	useEffect(() => {
+		const handle = window.setTimeout(() => {
+			setDebouncedSearch(searchQuery);
+		}, 300);
+
+		return () => window.clearTimeout(handle);
+	}, [searchQuery]);
+
+	useEffect(() => {
+		if (!programId || !evId) {
 			setLoading(false);
 			return;
 		}
 
 		let cancelled = false;
-		setLoading(true);
+		if (awaitingInitialLoadRef.current) {
+			setLoading(true);
+		} else {
+			setRefreshing(true);
+		}
 		setError(null);
 
-		Promise.all([data.fetchEvent(eventId), data.fetchAttendees(eventId)])
-			.then(([eventResult, attendeesResult]) => {
-				if (cancelled) {
-					return;
+		void data
+			.fetchSliceAttendees(programId, evId, { q: debouncedSearch || undefined })
+			.then((result) => {
+				if (!cancelled) {
+					setAttendees(result.attendees);
 				}
-				if (!eventResult.event) {
-					setEvent(null);
-					setAttendees([]);
-					return;
-				}
-				setEvent(eventResult.event);
-				setAttendees(attendeesResult.attendees);
 			})
 			.catch((err: unknown) => {
 				if (!cancelled) {
@@ -52,24 +75,82 @@ export function CheckInView() {
 			.finally(() => {
 				if (!cancelled) {
 					setLoading(false);
+					setRefreshing(false);
+					awaitingInitialLoadRef.current = false;
 				}
 			});
 
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, programId, evId, debouncedSearch]);
 
-	const visibleAttendees = useMemo(() => {
-		const pool = filterAttendees(CHECK_IN_FILTER, attendees);
-		return searchAttendees(searchQuery, pool).slice(0, MAX_VISIBLE_ROWS);
-	}, [attendees, searchQuery]);
+	const sortedAttendees = useMemo(
+		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
+		[attendees],
+	);
 
-	if (!eventId) {
+	const selectAttendee = useCallback((person: SliceAttendee) => {
+		setSelected(person);
+	}, []);
+
+	const handleQrDecode = useCallback(
+		async (jwt: string) => {
+			if (!programId || !evId) {
+				return;
+			}
+
+			setScanning(true);
+			try {
+				const result = await data.checkInScan(programId, evId, jwt);
+				setSelected(result.contact);
+			} catch (err: unknown) {
+				showToast(err instanceof Error ? err.message : 'QR scan failed', 'error');
+			} finally {
+				setScanning(false);
+			}
+		},
+		[data, evId, programId, showToast],
+	);
+
+	async function handleConfirmCheckIn() {
+		if (!programId || !evId || !selected) {
+			return;
+		}
+
+		setConfirming(true);
+		try {
+			const result = await data.confirmCheckIn(programId, evId, selected.contactId);
+			const name = attendeeName(selected);
+
+			if (result.alreadyCheckedIn) {
+				showToast(`${name} is already checked in.`, 'success');
+			} else {
+				showToast(`${name} checked in successfully.`, 'success');
+			}
+
+			setAttendees((current) =>
+				current.map((person) =>
+					person.contactId === result.contactId ? { ...person, checkedIn: true } : person,
+				),
+			);
+			setSelected((current) => (current ? { ...current, checkedIn: true } : null));
+		} catch (err: unknown) {
+			showToast(err instanceof Error ? err.message : 'Check-in failed', 'error');
+		} finally {
+			setConfirming(false);
+		}
+	}
+
+	if (session?.role !== 'admin') {
+		return <Navigate to="/events" replace />;
+	}
+
+	if (!programId || !evId) {
 		return (
 			<EmptyState
 				viewId="view-check-in"
-				message="Select an event from All Events to open check-in."
+				message="Select a Program and Event using the catalog pickers to open check-in."
 				action={{ label: 'Go to All Events', to: '/events' }}
 			/>
 		);
@@ -83,68 +164,69 @@ export function CheckInView() {
 		return <div className="empty-state">{error}</div>;
 	}
 
-	if (!event) {
-		return (
-			<EmptyState
-				viewId="view-check-in"
-				message="This event was not found."
-				action={{ label: 'Back to All Events', to: '/events' }}
-			/>
-		);
-	}
+	const title =
+		programName && eventName ? `${programName} — ${eventName} — Check-in` : 'Event check-in';
 
 	return (
 		<section id="view-check-in" className={styles.view}>
-			<TopBar title={`${event.name} — Check-in`} meta="On-site and virtual arrival desk (PoC shell)" />
+			<TopBar title={title} meta={`${attendees.length} registered · arrival desk`} />
 
 			<div className="grid-2">
 				<div className="card">
 					<div className="card__header">
 						<h3>Find attendee</h3>
+						{refreshing ? <span className={styles.refreshHint}>Searching…</span> : null}
 					</div>
 					<input
 						type="search"
 						className="search-input"
-						placeholder="Search by name, email, or company…"
+						placeholder="Search name or company…"
 						value={searchQuery}
 						onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
 						aria-label="Search attendees for check-in"
 					/>
-					<p className="shell-note">Showing Registered contacts ready for check-in.</p>
 					<div className="table-scroll table-scroll--short">
 						<table>
 							<thead>
 								<tr>
 									<th>Name</th>
 									<th>Company</th>
-									<th>Ticket</th>
+									<th>Track</th>
 									<th aria-label="Actions" />
 								</tr>
 							</thead>
 							<tbody>
-								{visibleAttendees.length === 0 ? (
+								{sortedAttendees.length === 0 ? (
 									<tr>
 										<td colSpan={4}>No matching registrants.</td>
 									</tr>
 								) : (
-									visibleAttendees.map((person) => (
-										<tr key={person.id}>
-											<td>{person.name}</td>
-											<td>{person.company}</td>
-											<td>{person.ticketType || 'General'}</td>
-											<td>
-												<button
-													type="button"
-													className="btn btn-outline btn-sm"
-													onClick={() =>
-														showToast(`${person.name} checked in (PoC — no HubSpot write yet).`, 'success')
-													}
-												>
-													Check in
-												</button>
-											</td>
-										</tr>
-									))
+									sortedAttendees.map((person) => {
+										const isSelected = selected?.contactId === person.contactId;
+										return (
+											<tr
+												key={person.contactId}
+												className={isSelected ? styles.selectedRow : undefined}
+												onClick={() => selectAttendee(person)}
+											>
+												<td>{attendeeName(person)}</td>
+												<td>{person.company}</td>
+												<td>{person.attendeeType}</td>
+												<td>
+													<button
+														type="button"
+														className="btn btn-outline btn-sm"
+														onClick={(clickEvent) => {
+															clickEvent.stopPropagation();
+															selectAttendee(person);
+														}}
+													>
+														Check in
+													</button>
+												</td>
+											</tr>
+										);
+									})
 								)}
 							</tbody>
 						</table>
@@ -153,20 +235,46 @@ export function CheckInView() {
 
 				<div className="card card--accent">
 					<div className="card__header">
-						<h3>QR scan (coming soon)</h3>
+						<h3>QR scan</h3>
 					</div>
-					<div className="qr-placeholder">
-						<span className="qr-placeholder__icon" aria-hidden="true">
-							▦
-						</span>
-						<p>Camera / QR scanner connects in a later phase.</p>
-					</div>
-					<button type="button" className="btn btn-primary" disabled>
-						Mark selected as checked in
-					</button>
-					<p className="empty-state__hint">
-						Write-back to HubSpot attendee status is Phase 5+. Use row action below for PoC demo.
-					</p>
+					<CheckInQrPanel onDecode={handleQrDecode} disabled={scanning} />
+					{selected ? (
+						<div className={styles.summaryCard} aria-live="polite">
+							<h4>{attendeeName(selected)}</h4>
+							<dl className={styles.summaryList}>
+								<div>
+									<dt>Company</dt>
+									<dd>{selected.company}</dd>
+								</div>
+								<div>
+									<dt>Email</dt>
+									<dd>{selected.email}</dd>
+								</div>
+								<div>
+									<dt>Account manager</dt>
+									<dd>{selected.accountManager}</dd>
+								</div>
+								<div>
+									<dt>Track</dt>
+									<dd>{selected.attendeeType ?? '—'}</dd>
+								</div>
+								<div>
+									<dt>Checked in</dt>
+									<dd>{selected.checkedIn ? 'Yes' : 'No'}</dd>
+								</div>
+							</dl>
+							<button
+								type="button"
+								className="btn btn-primary"
+								disabled={confirming}
+								onClick={() => void handleConfirmCheckIn()}
+							>
+								{confirming ? 'Confirming…' : 'Confirm check-in'}
+							</button>
+						</div>
+					) : (
+						<p className="shell-note">Select a row or scan a QR code to review attendee details.</p>
+					)}
 				</div>
 			</div>
 		</section>

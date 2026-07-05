@@ -14,6 +14,8 @@ import {
 	getAuditLogForEvent,
 	getMockCatalog,
 	getMockSliceAttendees,
+	mockCheckInScan,
+	mockConfirmCheckIn,
 	mockCreateEvent,
 	mockCreateProgram,
 	mockUpdateEvent,
@@ -22,6 +24,8 @@ import {
 import {
 	normalizeAttendeesResponse,
 	normalizeCatalogResponse,
+	normalizeCheckInScanResponse,
+	normalizeConfirmCheckInResponse,
 	normalizeEventResponse,
 	normalizeEventsResponse,
 	normalizeSliceAttendeesResponse,
@@ -36,6 +40,8 @@ import type {
 	CatalogEventRecord,
 	CatalogProgramRecord,
 	CatalogResponse,
+	CheckInScanResponse,
+	ConfirmCheckInResponse,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
@@ -322,10 +328,54 @@ export async function fetchSliceAttendees(
 	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/attendees${suffix}`;
 
 	return withMockFallback(
-		() => mockDelay(getMockSliceAttendees(programId, eventId)),
+		() => mockDelay(getMockSliceAttendees(programId, eventId, query)),
 		async () =>
 			normalizeSliceAttendeesResponse(
 				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function checkInScan(
+	programId: string,
+	eventId: string,
+	jwt: string,
+	options: DataServiceOptions = {},
+): Promise<CheckInScanResponse> {
+	const { token } = options;
+	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/checkin/scan`;
+
+	return withMockFallback(
+		() => mockDelay(mockCheckInScan(programId, eventId, jwt)),
+		async () =>
+			normalizeCheckInScanResponse(
+				((await apiRequest(
+					route,
+					{ method: 'POST', body: JSON.stringify({ jwt }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function confirmCheckIn(
+	programId: string,
+	eventId: string,
+	contactId: string,
+	options: DataServiceOptions = {},
+): Promise<ConfirmCheckInResponse> {
+	const { token } = options;
+	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/checkin`;
+
+	return withMockFallback(
+		() => mockDelay(mockConfirmCheckIn(programId, eventId, contactId)),
+		async () =>
+			normalizeConfirmCheckInResponse(
+				((await apiRequest(
+					route,
+					{ method: 'POST', body: JSON.stringify({ contactId }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
 			),
 	);
 }
@@ -462,6 +512,10 @@ export function createDataService(token?: string | null) {
 			eventId: string,
 			query?: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number },
 		) => fetchSliceAttendees(programId, eventId, query, options),
+		checkInScan: (programId: string, eventId: string, jwt: string) =>
+			checkInScan(programId, eventId, jwt, options),
+		confirmCheckIn: (programId: string, eventId: string, contactId: string) =>
+			confirmCheckIn(programId, eventId, contactId, options),
 		createProgram: (body: CreateCatalogProgramBody) => createProgram(body, options),
 		updateProgram: (id: string, body: PatchCatalogProgramBody) => updateProgram(id, body, options),
 		createEvent: (body: CreateCatalogEventBody) => createEvent(body, options),
