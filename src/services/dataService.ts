@@ -36,6 +36,10 @@ import type {
 	CatalogEventRecord,
 	CatalogProgramRecord,
 	CatalogResponse,
+	CreateCatalogEventBody,
+	CreateCatalogProgramBody,
+	PatchCatalogEventBody,
+	PatchCatalogProgramBody,
 	EmailPreviewPayload,
 	EmailSendPayload,
 	EmailTemplate,
@@ -327,15 +331,15 @@ export async function fetchSliceAttendees(
 }
 
 export async function createProgram(
-	body: { name: string; hubspotFormIds: string[] },
+	body: CreateCatalogProgramBody,
 	options: DataServiceOptions = {},
 ): Promise<{ program: CatalogProgramRecord }> {
 	const { token } = options;
 	return withMockFallback(
 		() => {
 			try {
-				const program = mockCreateProgram(body.name, body.hubspotFormIds);
-				return mockDelay({ program: { ...program, eventIds: [] } as unknown as CatalogProgramRecord });
+				const program = mockCreateProgram(body);
+				return mockDelay({ program: { ...program, eventIds: [] } as CatalogProgramRecord });
 			} catch (error) {
 				mapMockCatalogError(error);
 			}
@@ -351,7 +355,7 @@ export async function createProgram(
 
 export async function updateProgram(
 	id: string,
-	body: { name?: string; hubspotFormIds?: string[]; archived?: boolean },
+	body: PatchCatalogProgramBody,
 	options: DataServiceOptions = {},
 ): Promise<{ program: CatalogProgramRecord }> {
 	const { token } = options;
@@ -374,19 +378,14 @@ export async function updateProgram(
 }
 
 export async function createEvent(
-	body: { programId: string; name: string; partsAttendedOption: string; attendanceProperty: string },
+	body: CreateCatalogEventBody,
 	options: DataServiceOptions = {},
 ): Promise<{ event: CatalogEventRecord }> {
 	const { token } = options;
 	return withMockFallback(
 		() => {
 			try {
-				const event = mockCreateEvent(
-					body.programId,
-					body.name,
-					body.partsAttendedOption,
-					body.attendanceProperty,
-				);
+				const event = mockCreateEvent(body);
 				return mockDelay({
 					event: {
 						...event,
@@ -409,12 +408,7 @@ export async function createEvent(
 
 export async function updateEvent(
 	id: string,
-	body: {
-		name?: string;
-		partsAttendedOption?: string;
-		attendanceProperty?: string;
-		archived?: boolean;
-	},
+	body: PatchCatalogEventBody,
 	options: DataServiceOptions = {},
 ): Promise<{ event: CatalogEventRecord }> {
 	const { token } = options;
@@ -468,24 +462,10 @@ export function createDataService(token?: string | null) {
 			eventId: string,
 			query?: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number },
 		) => fetchSliceAttendees(programId, eventId, query, options),
-		createProgram: (body: { name: string; hubspotFormIds: string[] }) => createProgram(body, options),
-		updateProgram: (id: string, body: { name?: string; hubspotFormIds?: string[]; archived?: boolean }) =>
-			updateProgram(id, body, options),
-		createEvent: (body: {
-			programId: string;
-			name: string;
-			partsAttendedOption: string;
-			attendanceProperty: string;
-		}) => createEvent(body, options),
-		updateEvent: (
-			id: string,
-			body: {
-				name?: string;
-				partsAttendedOption?: string;
-				attendanceProperty?: string;
-				archived?: boolean;
-			},
-		) => updateEvent(id, body, options),
+		createProgram: (body: CreateCatalogProgramBody) => createProgram(body, options),
+		updateProgram: (id: string, body: PatchCatalogProgramBody) => updateProgram(id, body, options),
+		createEvent: (body: CreateCatalogEventBody) => createEvent(body, options),
+		updateEvent: (id: string, body: PatchCatalogEventBody) => updateEvent(id, body, options),
 	};
 }
 

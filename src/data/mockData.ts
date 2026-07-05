@@ -9,6 +9,10 @@ import type {
 	CatalogEvent,
 	CatalogProgram,
 	CatalogResponse,
+	CreateCatalogEventBody,
+	CreateCatalogProgramBody,
+	PatchCatalogEventBody,
+	PatchCatalogProgramBody,
 	EmailTemplate,
 	Event,
 	EventStatus,
@@ -437,27 +441,111 @@ function normalizeProgramName(name: string): string {
 	return name.trim().toLowerCase();
 }
 
-export function mockCreateProgram(name: string, hubspotFormIds: string[]): CatalogProgram {
-	const key = normalizeProgramName(name);
+function normalizeOptionalText(value: string | undefined): string | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function applyProgramMetadataCreate(program: CatalogProgram, body: CreateCatalogProgramBody): CatalogProgram {
+	return {
+		...program,
+		description: normalizeOptionalText(body.description),
+		startDate: normalizeOptionalText(body.startDate),
+		endDate: normalizeOptionalText(body.endDate),
+		location: normalizeOptionalText(body.location),
+		timezone: normalizeOptionalText(body.timezone),
+	};
+}
+
+function mergeProgramMetadata(program: CatalogProgram, patch: PatchCatalogProgramBody): CatalogProgram {
+	const next = { ...program };
+	const metadataKeys = ['description', 'startDate', 'endDate', 'location', 'timezone'] as const;
+	for (const key of metadataKeys) {
+		if (!(key in patch)) {
+			continue;
+		}
+		const raw = patch[key];
+		if (raw === null || raw === undefined || (typeof raw === 'string' && !raw.trim())) {
+			delete next[key];
+			continue;
+		}
+		if (typeof raw === 'string') {
+			next[key] = raw.trim();
+		}
+	}
+	return next;
+}
+
+function applyEventMetadataCreate(event: CatalogEvent, body: CreateCatalogEventBody): CatalogEvent {
+	const next: CatalogEvent = { ...event };
+	if (body.owner?.trim()) {
+		next.owner = body.owner.trim();
+	}
+	if (body.description?.trim()) {
+		next.description = body.description.trim();
+	}
+	if (body.date?.trim()) {
+		next.date = body.date.trim();
+	}
+	if (body.location?.trim()) {
+		next.location = body.location.trim();
+	}
+	if (body.capacity !== undefined && Number.isFinite(body.capacity)) {
+		next.capacity = body.capacity;
+	}
+	return next;
+}
+
+function mergeEventMetadata(event: CatalogEvent, patch: PatchCatalogEventBody): CatalogEvent {
+	const next = { ...event };
+	const textKeys = ['owner', 'description', 'date', 'location'] as const;
+	for (const key of textKeys) {
+		if (!(key in patch)) {
+			continue;
+		}
+		const raw = patch[key];
+		if (raw === null || raw === undefined || (typeof raw === 'string' && !raw.trim())) {
+			delete next[key];
+			continue;
+		}
+		if (typeof raw === 'string') {
+			next[key] = raw.trim();
+		}
+	}
+	if ('capacity' in patch) {
+		if (patch.capacity === null) {
+			delete next.capacity;
+		} else if (patch.capacity !== undefined && Number.isFinite(patch.capacity)) {
+			next.capacity = patch.capacity;
+		}
+	}
+	return next;
+}
+
+export function mockCreateProgram(body: CreateCatalogProgramBody): CatalogProgram {
+	const key = normalizeProgramName(body.name);
 	if (mockCatalogState.programs.some((program) => normalizeProgramName(program.name) === key)) {
 		throw new Error('duplicate_name');
 	}
 
-	const program: CatalogProgram = {
-		id: `prog-${Date.now()}`,
-		name: name.trim(),
-		hubspotFormIds: hubspotFormIds.map((id) => id.trim()).filter(Boolean),
-		archived: false,
-		events: [],
-	};
+	const program = applyProgramMetadataCreate(
+		{
+			id: `prog-${Date.now()}`,
+			name: body.name.trim(),
+			hubspotFormIds: body.hubspotFormIds.map((id) => id.trim()).filter(Boolean),
+			archived: false,
+			events: [],
+		},
+		body,
+	);
 	mockCatalogState.programs.push(program);
 	return program;
 }
 
-export function mockUpdateProgram(
-	id: string,
-	patch: { name?: string; hubspotFormIds?: string[]; archived?: boolean },
-): CatalogProgram {
+export function mockUpdateProgram(id: string, patch: PatchCatalogProgramBody): CatalogProgram {
 	const program = mockCatalogState.programs.find((entry) => entry.id === id);
 	if (!program) {
 		throw new Error('program_not_found');
@@ -484,34 +572,31 @@ export function mockUpdateProgram(
 			event.archived = false;
 		});
 	}
+	const merged = mergeProgramMetadata(program, patch);
+	Object.assign(program, merged);
 	return program;
 }
 
-export function mockCreateEvent(
-	programId: string,
-	name: string,
-	partsAttendedOption: string,
-	attendanceProperty: string,
-): CatalogEvent {
-	const program = mockCatalogState.programs.find((entry) => entry.id === programId);
+export function mockCreateEvent(body: CreateCatalogEventBody): CatalogEvent {
+	const program = mockCatalogState.programs.find((entry) => entry.id === body.programId);
 	if (!program) {
 		throw new Error('program_not_found');
 	}
-	const event: CatalogEvent = {
-		id: `ev-${Date.now()}`,
-		name: name.trim(),
-		partsAttendedOption: partsAttendedOption.trim(),
-		attendanceProperty: attendanceProperty.trim(),
-		archived: false,
-	};
+	const event = applyEventMetadataCreate(
+		{
+			id: `ev-${Date.now()}`,
+			name: body.name.trim(),
+			partsAttendedOption: body.partsAttendedOption.trim(),
+			attendanceProperty: body.attendanceProperty.trim(),
+			archived: false,
+		},
+		body,
+	);
 	program.events.push(event);
 	return event;
 }
 
-export function mockUpdateEvent(
-	id: string,
-	patch: { name?: string; partsAttendedOption?: string; attendanceProperty?: string; archived?: boolean },
-): CatalogEvent {
+export function mockUpdateEvent(id: string, patch: PatchCatalogEventBody): CatalogEvent {
 	for (const program of mockCatalogState.programs) {
 		const event = program.events.find((entry) => entry.id === id);
 		if (!event) {
@@ -532,6 +617,8 @@ export function mockUpdateEvent(
 			}
 			event.archived = patch.archived;
 		}
+		const merged = mergeEventMetadata(event, patch);
+		Object.assign(event, merged);
 		return event;
 	}
 	throw new Error('event_not_found');

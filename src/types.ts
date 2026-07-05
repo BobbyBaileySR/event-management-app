@@ -179,6 +179,11 @@ export interface CatalogEvent {
 	partsAttendedOption: string;
 	attendanceProperty: string;
 	archived: boolean;
+	owner?: string;
+	description?: string;
+	date?: string;
+	location?: string;
+	capacity?: number;
 }
 
 export interface CatalogProgram {
@@ -187,6 +192,11 @@ export interface CatalogProgram {
 	hubspotFormIds: string[];
 	archived: boolean;
 	events: CatalogEvent[];
+	description?: string;
+	startDate?: string;
+	endDate?: string;
+	location?: string;
+	timezone?: string;
 }
 
 export interface CatalogResponse {
@@ -200,6 +210,11 @@ export interface CatalogProgramRecord {
 	archived: boolean;
 	createdAt?: string;
 	updatedAt?: string;
+	description?: string;
+	startDate?: string;
+	endDate?: string;
+	location?: string;
+	timezone?: string;
 }
 
 export interface CatalogEventRecord {
@@ -212,4 +227,54 @@ export interface CatalogEventRecord {
 	archivedViaProgramId?: string | null;
 	createdAt?: string;
 	updatedAt?: string;
+	owner?: string;
+	description?: string;
+	date?: string;
+	location?: string;
+	capacity?: number;
+}
+
+export interface CreateCatalogProgramBody {
+	name: string;
+	hubspotFormIds: string[];
+	description?: string;
+	startDate?: string;
+	endDate?: string;
+	location?: string;
+	timezone?: string;
+}
+
+export interface PatchCatalogProgramBody {
+	name?: string;
+	hubspotFormIds?: string[];
+	archived?: boolean;
+	description?: string | null;
+	startDate?: string | null;
+	endDate?: string | null;
+	location?: string | null;
+	timezone?: string | null;
+}
+
+export interface CreateCatalogEventBody {
+	programId: string;
+	name: string;
+	partsAttendedOption: string;
+	attendanceProperty: string;
+	owner?: string;
+	description?: string;
+	date?: string;
+	location?: string;
+	capacity?: number;
+}
+
+export interface PatchCatalogEventBody {
+	name?: string;
+	partsAttendedOption?: string;
+	attendanceProperty?: string;
+	archived?: boolean;
+	owner?: string | null;
+	description?: string | null;
+	date?: string | null;
+	location?: string | null;
+	capacity?: number | null;
 }

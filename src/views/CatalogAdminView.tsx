@@ -1,19 +1,44 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { CatalogEventModal } from '../components/CatalogEventModal';
+import { CatalogProgramModal } from '../components/CatalogProgramModal';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
-import {
-	ATTENDANCE_PROPERTY_PRESETS,
-	parseFormIdsInput,
-	suggestAttendanceProperty,
-} from '../constants/hubspot';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
-import type { CatalogProgram } from '../types';
+import type {
+	CatalogEvent,
+	CatalogProgram,
+	CreateCatalogEventBody,
+	CreateCatalogProgramBody,
+	PatchCatalogEventBody,
+	PatchCatalogProgramBody,
+} from '../types';
+import { eventMetadataLines, programMetadataLines } from '../utils/catalogMetadata';
 import styles from './CatalogAdminView.module.css';
 
 type CatalogTab = 'active' | 'archived';
+type ProgramModalState = { mode: 'create' } | { mode: 'edit'; program: CatalogProgram };
+type EventModalState =
+	| { mode: 'create' }
+	| { mode: 'edit'; event: CatalogEvent; parentProgram: CatalogProgram };
+
+function MetadataSummary({ lines }: { lines: Array<{ label: string; value: string }> }) {
+	if (lines.length === 0) {
+		return null;
+	}
+
+	return (
+		<div className={styles.metadata}>
+			{lines.map((line) => (
+				<p key={line.label} className={styles.meta}>
+					{line.label}: {line.value}
+				</p>
+			))}
+		</div>
+	);
+}
 
 export function CatalogAdminView() {
 	const { session } = useSession();
@@ -24,14 +49,8 @@ export function CatalogAdminView() {
 	const [programs, setPrograms] = useState<CatalogProgram[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [programName, setProgramName] = useState('');
-	const [programFormIds, setProgramFormIds] = useState('');
-	const [eventProgramId, setEventProgramId] = useState('');
-	const [eventName, setEventName] = useState('');
-	const [eventOption, setEventOption] = useState('');
-	const [eventAttendanceProperty, setEventAttendanceProperty] = useState(
-		ATTENDANCE_PROPERTY_PRESETS[0],
-	);
+	const [programModal, setProgramModal] = useState<ProgramModalState | null>(null);
+	const [eventModal, setEventModal] = useState<EventModalState | null>(null);
 
 	const loadCatalog = useCallback(async () => {
 		setLoading(true);
@@ -39,15 +58,12 @@ export function CatalogAdminView() {
 		try {
 			const response = await data.fetchCatalog({ includeArchived: tab === 'archived' });
 			setPrograms(response.programs);
-			if (!eventProgramId && response.programs[0]) {
-				setEventProgramId(response.programs[0].id);
-			}
 		} catch (err: unknown) {
 			setError(err instanceof Error ? err.message : 'Failed to load catalog');
 		} finally {
 			setLoading(false);
 		}
-	}, [data, eventProgramId, tab]);
+	}, [data, tab]);
 
 	useEffect(() => {
 		void loadCatalog();
@@ -57,37 +73,40 @@ export function CatalogAdminView() {
 		return <Navigate to="/events" replace />;
 	}
 
-	async function handleCreateProgram(event: FormEvent) {
-		event.preventDefault();
+	const isActiveTab = tab === 'active';
+	const activeProgramsForCreate = programs.filter((program) => !program.archived);
+
+	async function handleProgramSave(body: CreateCatalogProgramBody | PatchCatalogProgramBody) {
 		try {
-			await data.createProgram({ name: programName, hubspotFormIds: parseFormIdsInput(programFormIds) });
-			setProgramName('');
-			setProgramFormIds('');
-			showToast('Program created', 'success');
+			if (programModal?.mode === 'create') {
+				await data.createProgram(body as CreateCatalogProgramBody);
+				showToast('Program created', 'success');
+			} else if (programModal?.mode === 'edit') {
+				await data.updateProgram(programModal.program.id, body as PatchCatalogProgramBody);
+				showToast('Program updated', 'success');
+			}
+			setProgramModal(null);
 			bumpCatalog();
 			await loadCatalog();
 		} catch (err: unknown) {
-			showToast(err instanceof Error ? err.message : 'Failed to create Program', 'error');
+			showToast(err instanceof Error ? err.message : 'Failed to save Program', 'error');
 		}
 	}
 
-	async function handleCreateEvent(formEvent: FormEvent) {
-		formEvent.preventDefault();
+	async function handleEventSave(body: CreateCatalogEventBody | PatchCatalogEventBody) {
 		try {
-			await data.createEvent({
-				programId: eventProgramId,
-				name: eventName,
-				partsAttendedOption: eventOption,
-				attendanceProperty: eventAttendanceProperty,
-			});
-			setEventName('');
-			setEventOption('');
-			setEventAttendanceProperty(ATTENDANCE_PROPERTY_PRESETS[0]);
-			showToast('Event created', 'success');
+			if (eventModal?.mode === 'create') {
+				await data.createEvent(body as CreateCatalogEventBody);
+				showToast('Event created', 'success');
+			} else if (eventModal?.mode === 'edit') {
+				await data.updateEvent(eventModal.event.id, body as PatchCatalogEventBody);
+				showToast('Event updated', 'success');
+			}
+			setEventModal(null);
 			bumpCatalog();
 			await loadCatalog();
 		} catch (err: unknown) {
-			showToast(err instanceof Error ? err.message : 'Failed to create Event', 'error');
+			showToast(err instanceof Error ? err.message : 'Failed to save Event', 'error');
 		}
 	}
 
@@ -122,6 +141,7 @@ export function CatalogAdminView() {
 				<article key={program.id} className={styles.card}>
 					<h3 className={styles.sectionLabel}>{program.name}</h3>
 					<p className={styles.meta}>Active Program — archived Events only</p>
+					<MetadataSummary lines={programMetadataLines(program)} />
 					<ul>
 						{program.events.map((event) => (
 							<li key={event.id}>
@@ -131,6 +151,7 @@ export function CatalogAdminView() {
 										<p className={styles.meta}>
 											Parts Attended: {event.partsAttendedOption} · Attendance: {event.attendanceProperty}
 										</p>
+										<MetadataSummary lines={eventMetadataLines(event)} />
 									</div>
 									<button
 										type="button"
@@ -153,8 +174,18 @@ export function CatalogAdminView() {
 					<div>
 						<strong>{program.name}</strong>
 						<p className={styles.meta}>Form IDs: {(program.hubspotFormIds ?? []).join(', ') || '—'}</p>
+						<MetadataSummary lines={programMetadataLines(program)} />
 					</div>
 					<div className={styles.actions}>
+						{isActiveTab ? (
+							<button
+								type="button"
+								className={styles.secondary}
+								onClick={() => setProgramModal({ mode: 'edit', program })}
+							>
+								Edit Program
+							</button>
+						) : null}
 						<button type="button" className={styles.secondary} onClick={() => void toggleProgramArchive(program)}>
 							{program.archived ? 'Unarchive Program' : 'Archive Program'}
 						</button>
@@ -166,15 +197,29 @@ export function CatalogAdminView() {
 							<div className={styles.cardHeader}>
 								<div>
 									<strong>{event.name}</strong>
-									<p className={styles.meta}>Parts Attended: {event.partsAttendedOption}</p>
+									<p className={styles.meta}>
+										Parts Attended: {event.partsAttendedOption} · Attendance: {event.attendanceProperty}
+									</p>
+									<MetadataSummary lines={eventMetadataLines(event)} />
 								</div>
-								<button
-									type="button"
-									className={program.archived ? styles.secondary : styles.danger}
-									onClick={() => void toggleEventArchive(event.id, event.archived)}
-								>
-									{event.archived ? 'Unarchive Event' : 'Archive Event'}
-								</button>
+								<div className={styles.actions}>
+									{isActiveTab ? (
+										<button
+											type="button"
+											className={styles.secondary}
+											onClick={() => setEventModal({ mode: 'edit', event, parentProgram: program })}
+										>
+											Edit Event
+										</button>
+									) : null}
+									<button
+										type="button"
+										className={program.archived ? styles.secondary : styles.danger}
+										onClick={() => void toggleEventArchive(event.id, event.archived)}
+									>
+										{event.archived ? 'Unarchive Event' : 'Archive Event'}
+									</button>
+								</div>
 							</div>
 						</li>
 					))}
@@ -207,79 +252,21 @@ export function CatalogAdminView() {
 			{loading ? <p>Loading catalog…</p> : null}
 			{error ? <p className={styles.error}>{error}</p> : null}
 
-			{tab === 'active' ? (
+			{isActiveTab ? (
 				<section className={styles.panel}>
-					<h2>Create Program</h2>
-					<form className={styles.formGrid} onSubmit={handleCreateProgram}>
-						<label>
-							Program name
-							<input value={programName} onChange={(event) => setProgramName(event.target.value)} required />
-						</label>
-						<label>
-							HubSpot form IDs (one per line or comma-separated)
-							<textarea
-								value={programFormIds}
-								onChange={(event) => setProgramFormIds(event.target.value)}
-								required
-								rows={3}
-							/>
-						</label>
-						<div className={styles.actions}>
-							<button type="submit" className={styles.primary}>
-								Save Program
-							</button>
-						</div>
-					</form>
-
-					<h2>Add Event</h2>
-					<form className={styles.formGrid} onSubmit={handleCreateEvent}>
-						<label>
-							Program
-							<select value={eventProgramId} onChange={(event) => setEventProgramId(event.target.value)} required>
-								{programs.map((program) => (
-									<option key={program.id} value={program.id}>
-										{program.name}
-									</option>
-								))}
-							</select>
-						</label>
-						<label>
-							Event name
-							<input
-								value={eventName}
-								onChange={(event) => {
-									setEventName(event.target.value);
-									if (event.target.value.trim()) {
-										setEventAttendanceProperty(suggestAttendanceProperty(event.target.value));
-									}
-								}}
-								required
-							/>
-						</label>
-						<label>
-							Parts Attended option
-							<input value={eventOption} onChange={(event) => setEventOption(event.target.value)} required />
-						</label>
-						<label>
-							Attendance property (HubSpot internal name)
-							<input
-								list="attendance-property-presets"
-								value={eventAttendanceProperty}
-								onChange={(event) => setEventAttendanceProperty(event.target.value)}
-								required
-							/>
-							<datalist id="attendance-property-presets">
-								{ATTENDANCE_PROPERTY_PRESETS.map((preset) => (
-									<option key={preset} value={preset} />
-								))}
-							</datalist>
-						</label>
-						<div className={styles.actions}>
-							<button type="submit" className={styles.primary}>
-								Save Event
-							</button>
-						</div>
-					</form>
+					<div className={styles.actions}>
+						<button type="button" className={styles.primary} onClick={() => setProgramModal({ mode: 'create' })}>
+							Create Program
+						</button>
+						<button
+							type="button"
+							className={styles.primary}
+							onClick={() => setEventModal({ mode: 'create' })}
+							disabled={activeProgramsForCreate.length === 0}
+						>
+							Create Event
+						</button>
+					</div>
 				</section>
 			) : null}
 
@@ -290,6 +277,23 @@ export function CatalogAdminView() {
 					{programs.map((program) => renderProgramTree(program))}
 				</div>
 			</section>
+
+			<CatalogProgramModal
+				open={programModal !== null}
+				mode={programModal?.mode ?? 'create'}
+				program={programModal?.mode === 'edit' ? programModal.program : undefined}
+				onCancel={() => setProgramModal(null)}
+				onSave={handleProgramSave}
+			/>
+			<CatalogEventModal
+				open={eventModal !== null}
+				mode={eventModal?.mode ?? 'create'}
+				programs={activeProgramsForCreate}
+				event={eventModal?.mode === 'edit' ? eventModal.event : undefined}
+				parentProgram={eventModal?.mode === 'edit' ? eventModal.parentProgram : undefined}
+				onCancel={() => setEventModal(null)}
+				onSave={handleEventSave}
+			/>
 		</div>
 	);
 }

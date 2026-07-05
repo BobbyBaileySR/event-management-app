@@ -187,4 +187,87 @@ describe('normalizeCatalogResponse', () => {
 
 		expect(result.programs[0]?.hubspotFormIds).toEqual(['legacy-form']);
 	});
+
+	it('passes through optional Program metadata fields', () => {
+		const result = normalizeCatalogResponse({
+			programs: [
+				{
+					id: 'prog-meta',
+					name: 'Meta Program',
+					hubspotFormIds: ['form-meta'],
+					archived: false,
+					description: 'Annual flagship',
+					startDate: '2026-09-01',
+					endDate: '2026-09-05',
+					location: 'London',
+					timezone: 'Europe/London',
+					events: [],
+				},
+			],
+		});
+
+		expect(result.programs[0]).toMatchObject({
+			description: 'Annual flagship',
+			startDate: '2026-09-01',
+			endDate: '2026-09-05',
+			location: 'London',
+			timezone: 'Europe/London',
+		});
+	});
+
+	it('passes through optional Event metadata fields', () => {
+		const result = normalizeCatalogResponse({
+			programs: [
+				{
+					id: 'prog-1',
+					name: 'Host',
+					hubspotFormIds: ['form-1'],
+					archived: false,
+					events: [
+						{
+							id: 'ev-1',
+							name: 'Keynote',
+							partsAttendedOption: 'Keynote',
+							attendanceProperty: 'atlassian_event__customer_event_attendance',
+							archived: false,
+							owner: 'Events Team',
+							date: '2026-09-02',
+							capacity: 12.5,
+						},
+					],
+				},
+			],
+		});
+
+		expect(result.programs[0]?.events[0]).toMatchObject({
+			owner: 'Events Team',
+			date: '2026-09-02',
+			capacity: 12.5,
+		});
+	});
+
+	it('treats legacy catalog nodes without metadata keys as unset', () => {
+		const result = normalizeCatalogResponse({
+			programs: [
+				{
+					id: 'legacy-prog',
+					name: 'Legacy Program',
+					hubspotFormId: 'legacy-form',
+					archived: false,
+					events: [
+						{
+							id: 'legacy-ev',
+							name: 'Legacy Event',
+							partsAttendedOption: 'Legacy Event',
+							attendanceProperty: 'atlassian_event__customer_event_attendance',
+							archived: false,
+						},
+					],
+				},
+			],
+		});
+
+		expect(result.programs[0]?.description).toBeUndefined();
+		expect(result.programs[0]?.events[0]?.owner).toBeUndefined();
+	});
 });
