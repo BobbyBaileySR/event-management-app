@@ -131,7 +131,7 @@ Unmentioned keys on PATCH leave existing values unchanged (standard partial upda
 | Backend Jest | Metadata round-trip create/PATCH, clear-on-save `null`, legacy record load, date format reject, GET tree includes metadata, 001 regression (cascade, uniqueness) |
 | Frontend Vitest | Modal open/save/cancel, edit pre-fill, archived tab no edit button, XSS on description/owner, normalizer optional fields, picker still name-only |
 
-**Rationale**: [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) — behaviour + XSS on new UI.
+**Rationale**: [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) — behaviour + XSS on new UI.
 
 ---
 
@@ -139,4 +139,4 @@ Unmentioned keys on PATCH leave existing values unchanged (standard partial upda
 
 **Decision**: Merge [contracts/catalog-api.md](./contracts/catalog-api.md) delta into `docs/api-contract.md` and `docs/rbac.md` in the **same implementation change** (no rbac matrix change expected).
 
-**Rationale**: [ems-api-contract-discipline](../../.cursor/rules/ems-api-contract-discipline.mdc).
+**Rationale**: [ems-api-contract-discipline](../../../.cursor/rules/ems-api-contract-discipline.mdc).

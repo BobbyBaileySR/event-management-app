@@ -47,10 +47,14 @@ function formFromProgram(program: CatalogProgram): ProgramFormState {
 }
 
 function buildCreateBody(form: ProgramFormState): CreateCatalogProgramBody {
+	const formIds = parseFormIdsInput(form.hubspotFormIds);
 	const body: CreateCatalogProgramBody = {
 		name: form.name.trim(),
-		hubspotFormIds: parseFormIdsInput(form.hubspotFormIds),
+		hubspotFormIds: formIds,
 	};
+	if (formIds[0]) {
+		body.hubspotFormId = formIds[0];
+	}
 	if (form.description.trim()) {
 		body.description = form.description.trim();
 	}
@@ -70,10 +74,14 @@ function buildCreateBody(form: ProgramFormState): CreateCatalogProgramBody {
 }
 
 function buildPatchBody(program: CatalogProgram, form: ProgramFormState): PatchCatalogProgramBody {
+	const formIds = parseFormIdsInput(form.hubspotFormIds);
 	const body: PatchCatalogProgramBody = {
 		name: form.name.trim(),
-		hubspotFormIds: parseFormIdsInput(form.hubspotFormIds),
+		hubspotFormIds: formIds,
 	};
+	if (formIds[0]) {
+		body.hubspotFormId = formIds[0];
+	}
 
 	const description = optionalTextForPatch(program.description, form.description);
 	if (description !== undefined) {
@@ -150,19 +158,29 @@ export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: C
 				<form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
 					<label>
 						Program name
+						<span className={styles.requiredMark} aria-hidden="true">
+							{' '}
+							*
+						</span>
 						<input
 							ref={firstFieldRef}
 							value={form.name}
 							onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
 							required
+							aria-required="true"
 						/>
 					</label>
 					<label>
 						HubSpot form IDs (one per line or comma-separated)
+						<span className={styles.requiredMark} aria-hidden="true">
+							{' '}
+							*
+						</span>
 						<textarea
 							value={form.hubspotFormIds}
 							onChange={(event) => setForm((current) => ({ ...current, hubspotFormIds: event.target.value }))}
 							required
+							aria-required="true"
 							rows={3}
 						/>
 					</label>

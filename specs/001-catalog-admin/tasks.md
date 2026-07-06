@@ -8,7 +8,7 @@ description: "Task list for Catalog Admin (001-catalog-admin)"
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [research.md](./research.md) · [data-model.md](./data-model.md) · [contracts/catalog-api.md](./contracts/catalog-api.md)
 
-**Tests**: Included — [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) and [plan.md](./plan.md) require Jest + Vitest with each behaviour change.
+**Tests**: Included — [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) and [plan.md](./plan.md) require Jest + Vitest with each behaviour change.
 
 **Organization**: Tasks grouped by user story (P1 → P2 → P3). Backend catalog API lands before Frontend consumption.
 

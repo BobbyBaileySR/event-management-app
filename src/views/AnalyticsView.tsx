@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ConversionChart } from '../components/ConversionChart';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
@@ -84,7 +85,12 @@ export function AnalyticsView() {
 	}
 
 	if (loading) {
-		return <div className="loading">Loading analytics…</div>;
+		return (
+			<section id="view-analytics" className={styles.view}>
+				<TopBar title="Analytics" meta="Loading metrics…" />
+				<LoadingState message="Loading analytics…" skeleton="cards" />
+			</section>
+		);
 	}
 
 	if (error) {

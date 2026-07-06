@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CatalogProgramModal } from './CatalogProgramModal';
+import styles from './CatalogProgramModal.module.css';
 
 describe('CatalogProgramModal', () => {
 	const onCancel = vi.fn();
@@ -13,6 +14,14 @@ describe('CatalogProgramModal', () => {
 		onSave.mockResolvedValue(undefined);
 	});
 
+	it('marks required fields with a visible asterisk', () => {
+		const { container } = render(
+			<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />,
+		);
+
+		expect(container.querySelectorAll(`.${styles.requiredMark}`)).toHaveLength(2);
+	});
+
 	it('renders create dialog with a11y attributes and focuses first field', async () => {
 		render(<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />);
 
@@ -20,7 +29,7 @@ describe('CatalogProgramModal', () => {
 		expect(dialog).toHaveAttribute('aria-modal', 'true');
 		expect(screen.getByRole('heading', { name: 'Create Program' })).toHaveAttribute('id', dialog.getAttribute('aria-labelledby'));
 
-		const nameField = screen.getByLabelText('Program name');
+		const nameField = screen.getByLabelText(/^Program name/);
 		expect(nameField).toHaveFocus();
 	});
 
@@ -28,7 +37,7 @@ describe('CatalogProgramModal', () => {
 		render(<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Program name'), 'Summit 2026');
+		await user.type(screen.getByLabelText(/^Program name/), 'Summit 2026');
 		await user.type(screen.getByLabelText(/HubSpot form IDs/i), 'form-123');
 		await user.type(screen.getByLabelText('Description'), 'Annual event');
 		await user.click(screen.getByRole('button', { name: 'Save Program' }));
@@ -36,6 +45,7 @@ describe('CatalogProgramModal', () => {
 		expect(onSave).toHaveBeenCalledWith({
 			name: 'Summit 2026',
 			hubspotFormIds: ['form-123'],
+			hubspotFormId: 'form-123',
 			description: 'Annual event',
 		});
 	});

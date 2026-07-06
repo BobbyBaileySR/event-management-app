@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { useConfirm } from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { countSegment, filterAttendees } from '../data/mockData';
@@ -151,7 +152,12 @@ export function EmailView() {
 	}
 
 	if (loading) {
-		return <div className="loading">Loading email module…</div>;
+		return (
+			<section id="view-email">
+				<TopBar title="Email" meta="Loading email module…" />
+				<LoadingState message="Loading email module…" skeleton="lines" skeletonRows={6} />
+			</section>
+		);
 	}
 
 	if (error) {

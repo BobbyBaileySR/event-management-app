@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
@@ -10,15 +11,38 @@ import styles from './AttendeesView.module.css';
 
 type CheckedInFilter = 'all' | 'checked-in' | 'not-checked-in';
 
+const DEFAULT_PAGE_SIZE = 50;
+
 export function AttendeesView() {
 	const { session } = useSession();
 	const data = useDataService();
 	const { programId, evId, programName, eventName } = useCatalogSelection();
 	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [checkedInFilter, setCheckedInFilter] = useState<CheckedInFilter>('all');
+	const [page, setPage] = useState(1);
+	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+	const [total, setTotal] = useState(0);
 	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const awaitingInitialLoadRef = useRef(true);
+
+	useEffect(() => {
+		setSearchQuery('');
+		setDebouncedSearch('');
+		setPage(1);
+		awaitingInitialLoadRef.current = true;
+	}, [programId, evId]);
+
+	useEffect(() => {
+		const handle = window.setTimeout(() => {
+			setDebouncedSearch(searchQuery);
+		}, 300);
+
+		return () => window.clearTimeout(handle);
+	}, [searchQuery]);
 
 	useEffect(() => {
 		if (!programId || !evId) {
@@ -27,17 +51,29 @@ export function AttendeesView() {
 		}
 
 		let cancelled = false;
-		setLoading(true);
+		if (awaitingInitialLoadRef.current) {
+			setLoading(true);
+		} else {
+			setRefreshing(true);
+		}
 		setError(null);
 
 		const checkedIn =
 			checkedInFilter === 'checked-in' ? true : checkedInFilter === 'not-checked-in' ? false : undefined;
 
 		void data
-			.fetchSliceAttendees(programId, evId, { q: searchQuery || undefined, checkedIn })
+			.fetchSliceAttendees(programId, evId, {
+				q: debouncedSearch || undefined,
+				checkedIn,
+				page,
+				pageSize: DEFAULT_PAGE_SIZE,
+			})
 			.then((result) => {
 				if (!cancelled) {
 					setAttendees(result.attendees);
+					setPage(result.page);
+					setPageSize(result.pageSize);
+					setTotal(result.total);
 				}
 			})
 			.catch((err: unknown) => {
@@ -48,18 +84,25 @@ export function AttendeesView() {
 			.finally(() => {
 				if (!cancelled) {
 					setLoading(false);
+					setRefreshing(false);
+					awaitingInitialLoadRef.current = false;
 				}
 			});
 
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId, searchQuery, checkedInFilter]);
+	}, [data, programId, evId, debouncedSearch, checkedInFilter, page]);
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
 		[attendees],
 	);
+
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
+	const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+	const rangeEnd = Math.min(page * pageSize, total);
+	const showPagination = total > pageSize;
 
 	if (session?.role !== 'admin') {
 		return <Navigate to="/events" replace />;
@@ -75,22 +118,39 @@ export function AttendeesView() {
 		);
 	}
 
+	const title =
+		programName && eventName ? `${programName} — ${eventName} — Attendees` : 'Registered attendees';
+
 	if (loading) {
-		return <div className="loading">Loading attendees…</div>;
+		return (
+			<section id="view-attendees" className={styles.view}>
+				<TopBar title={title} meta="Loading registered attendees…" />
+				<div className={`card ${styles.card}`}>
+					<LoadingState
+						message="Loading attendees…"
+						variant="panel"
+						skeleton="table"
+						skeletonRows={8}
+					/>
+				</div>
+			</section>
+		);
 	}
 
 	if (error) {
 		return <div className="empty-state">{error}</div>;
 	}
 
-	const title =
-		programName && eventName ? `${programName} — ${eventName} — Attendees` : 'Registered attendees';
+	const meta =
+		total > 0
+			? `${total} registered · showing ${rangeStart}–${rangeEnd} · HubSpot live`
+			: '0 registered · HubSpot live';
 
 	return (
 		<section id="view-attendees" className={styles.view}>
-			<TopBar title={title} meta={`${attendees.length} registered · HubSpot live`} />
+			<TopBar title={title} meta={meta} />
 
-			<div className="card">
+			<div className={`card ${styles.card}`}>
 				<div className="toolbar">
 					<div className="form-row">
 						{(['all', 'checked-in', 'not-checked-in'] as CheckedInFilter[]).map((filter) => (
@@ -98,7 +158,10 @@ export function AttendeesView() {
 								key={filter}
 								type="button"
 								className={`btn btn-outline${checkedInFilter === filter ? ' active' : ''}`}
-								onClick={() => setCheckedInFilter(filter)}
+								onClick={() => {
+									setCheckedInFilter(filter);
+									setPage(1);
+								}}
 							>
 								{filter === 'all' ? 'All' : filter === 'checked-in' ? 'Checked in' : 'Not checked in'}
 							</button>
@@ -111,42 +174,81 @@ export function AttendeesView() {
 					className="search-input"
 					placeholder="Search name or company…"
 					value={searchQuery}
-					onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
+					onChange={(changeEvent) => {
+						setSearchQuery(changeEvent.target.value);
+						setPage(1);
+					}}
 					aria-label="Search attendees"
 				/>
 
-				<div className="table-scroll">
-					<table>
-						<thead>
-							<tr>
-								<th>Name</th>
-								<th>Company</th>
-								<th>Email</th>
-								<th>Account manager</th>
-								<th>Track</th>
-								<th>Checked in</th>
-							</tr>
-						</thead>
-						<tbody>
-							{sortedAttendees.length === 0 ? (
+				<div className={styles.tableWrap}>
+					<div
+						className={`table-scroll ${styles.tableScroll}${refreshing ? ` ${styles.tableScrollLoading}` : ''}`}
+						aria-busy={refreshing}
+					>
+						<table>
+							<thead>
 								<tr>
-									<td colSpan={6}>No registered attendees match this view.</td>
+									<th>Name</th>
+									<th className={styles.colCompany}>Company</th>
+									<th className={styles.colEmail}>Email</th>
+									<th className={styles.colAccountManager}>Account manager</th>
+									<th className={styles.colTrack}>Track</th>
+									<th>Checked in</th>
 								</tr>
-							) : (
-								sortedAttendees.map((person) => (
-									<tr key={person.contactId}>
-										<td>{`${person.firstName} ${person.lastName}`.trim()}</td>
-										<td>{person.company}</td>
-										<td>{person.email}</td>
-										<td>{person.accountManager}</td>
-										<td>{person.attendeeType}</td>
-										<td>{person.checkedIn ? 'Yes' : 'No'}</td>
+							</thead>
+							<tbody>
+								{sortedAttendees.length === 0 ? (
+									<tr>
+										<td colSpan={6}>No registered attendees match this view.</td>
 									</tr>
-								))
-							)}
-						</tbody>
-					</table>
+								) : (
+									sortedAttendees.map((person) => (
+										<tr key={person.contactId}>
+											<td>{`${person.firstName} ${person.lastName}`.trim()}</td>
+											<td className={styles.colCompany}>{person.company}</td>
+											<td className={styles.colEmail}>{person.email}</td>
+											<td className={styles.colAccountManager}>{person.accountManager}</td>
+											<td className={styles.colTrack}>{person.attendeeType}</td>
+											<td>{person.checkedIn ? 'Yes' : 'No'}</td>
+										</tr>
+									))
+								)}
+							</tbody>
+						</table>
+					</div>
+					{refreshing ? (
+						<div className={styles.tableLoadingOverlay}>
+							<LoadingState message="Updating…" variant="inline" />
+						</div>
+					) : null}
 				</div>
+
+				{showPagination ? (
+					<nav className={`toolbar ${styles.pagination}`} aria-label="Attendee list pages">
+						<span className={styles.pageSummary}>
+							{refreshing ? 'Loading page…' : `Page ${page} of ${totalPages}`}
+						</span>
+						<div className="filter-row">
+							<button
+								type="button"
+								className="btn btn-outline btn-sm"
+								disabled={page <= 1 || refreshing}
+								onClick={() => setPage((current) => Math.max(1, current - 1))}
+							>
+								Previous
+							</button>
+							<button
+								type="button"
+								className="btn btn-outline btn-sm"
+								disabled={page >= totalPages || refreshing}
+								onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+							>
+								Next
+							</button>
+						</div>
+					</nav>
+				) : null}
 			</div>
 		</section>
 	);

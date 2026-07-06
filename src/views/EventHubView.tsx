@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { HUB_MODULE_CARDS } from '../config/eventModules';
 import { CapacityBar } from '../components/CapacityBar';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { StatusBadge } from '../components/StatusBadge';
 import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
@@ -71,7 +72,12 @@ export function EventHubView() {
 	}
 
 	if (loading) {
-		return <div className="loading">Loading event…</div>;
+		return (
+			<section id="view-event-hub" className={styles.view}>
+				<TopBar title="Event Hub" meta="Loading event overview…" />
+				<LoadingState message="Loading event…" skeleton="cards" />
+			</section>
+		);
 	}
 
 	if (error) {

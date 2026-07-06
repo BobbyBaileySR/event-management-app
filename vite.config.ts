@@ -46,11 +46,20 @@ async function loadDevProxyTarget(): Promise<string | null> {
 	return module.DEV_SERVER_CONFIG?.srcListenerUrl ?? null;
 }
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ mode }) => {
 	const proxyTarget = await loadDevProxyTarget();
+	const isTest = mode === 'test' || process.env.VITEST === 'true';
+	const html5QrcodeStub = fileURLToPath(new URL('./src/test/html5-qrcode.stub.ts', import.meta.url));
 
 	return {
 		plugins: [react(), injectProductionCsp()],
+		resolve: isTest
+			? {
+					alias: {
+						'html5-qrcode': html5QrcodeStub,
+					},
+				}
+			: undefined,
 		// Relative base so built assets resolve on GitHub Pages project subpaths and custom domains alike.
 		base: './',
 		server: {

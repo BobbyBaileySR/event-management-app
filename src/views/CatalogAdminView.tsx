@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CatalogEventModal } from '../components/CatalogEventModal';
 import { CatalogProgramModal } from '../components/CatalogProgramModal';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
@@ -249,7 +250,7 @@ export function CatalogAdminView() {
 				</button>
 			</div>
 
-			{loading ? <p>Loading catalog…</p> : null}
+			{loading ? <LoadingState message="Loading catalog…" variant="panel" skeleton="table" /> : null}
 			{error ? <p className={styles.error}>{error}</p> : null}
 
 			{isActiveTab ? (

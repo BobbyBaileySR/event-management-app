@@ -8,7 +8,7 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [contracts/check-in-api.md](./contracts/check-in-api.md) · **001-catalog-admin** + **002-catalog-metadata-modal** complete on `uat`
 
-**Tests**: Included — [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) requires Jest + Vitest with each behaviour change.
+**Tests**: Included — [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) requires Jest + Vitest with each behaviour change.
 
 **Organization**: Backend slice API first (Foundational), then US1 Attendees → US2 Check-in → US3 Walk-in (deferred) → Polish.
 
@@ -74,8 +74,8 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 ### Tests for User Story 1
 
 - [X] T019 [P] [US1] Add `AttendeesView` render, filter, empty catalog, XSS tests in `Frontend/src/views/AttendeesView.test.tsx`
-- [ ] T020 [P] [US1] Add non-admin redirect test in `Frontend/src/views/AttendeesView.test.tsx`
-- [ ] T021 [P] [US1] Add `normalizeSliceAttendeesResponse` tests in `Frontend/src/utils/normalizeApi.test.ts`
+- [X] T020 [P] [US1] Add non-admin redirect test in `Frontend/src/views/AttendeesView.test.tsx`
+- [X] T021 [P] [US1] Add `normalizeSliceAttendeesResponse` tests in `Frontend/src/utils/normalizeApi.test.ts`
 
 ### Implementation for User Story 1
 
@@ -102,9 +102,9 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 - [X] T029 [P] [US2] Add `CheckInQrPanel` StrictMode + disabled + unmount cleanup tests in `Frontend/src/components/CheckInQrPanel.test.tsx`
 - [X] T030 [P] [US2] Add mock-path `fetchSliceAttendees` filter + scan/confirm tests in `Frontend/src/services/dataService.test.ts`
 - [X] T031 [P] [US2] Add POST scan/confirm error-path route tests in `Backend/node/tests/Slice1Routes.test.ts`
-- [ ] T032 [P] [US2] Add happy-path POST scan (valid JWT → 200) in `Backend/node/tests/Slice1Routes.test.ts`
-- [ ] T033 [P] [US2] Add happy-path POST checkin (first write calls HubSpot) in `Backend/node/tests/Slice1Routes.test.ts`
-- [ ] T034 [P] [US2] Add `CheckInAdapter` unit tests in `Backend/node/tests/CheckInAdapter.test.ts`
+- [X] T032 [P] [US2] Add happy-path POST scan (valid JWT → 200) in `Backend/node/tests/Slice1Routes.test.ts`
+- [X] T033 [P] [US2] Add happy-path POST checkin (first write calls HubSpot) in `Backend/node/tests/Slice1Routes.test.ts`
+- [X] T034 [P] [US2] Add `CheckInAdapter` unit tests in `Backend/node/tests/CheckInAdapter.test.ts`
 
 ### Implementation for User Story 2
 
@@ -142,17 +142,18 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 
 **Purpose**: Docs, regression, deploy, live validation
 
-- [ ] T049 [P] Document `#/events/attendees` and `#/events/check-in` in `Frontend/docs/ui-routes.md`
+- [X] T049 [P] Document `#/events/attendees` and `#/events/check-in` in `Frontend/docs/ui-routes.md`
 - [X] T050 [P] Add Slice 1 backend test note to `Backend/CHANGELOG.md`
-- [ ] T051 [P] Add 003 check-in UI entries to `Frontend/CHANGELOG.md`
+- [X] T051 [P] Add 003 check-in UI entries to `Frontend/CHANGELOG.md`
 - [X] T052 Run `Backend/npm test` and `npm run lint:fix`
 - [X] T053 Run `Frontend/npm test` and `npm run lint` (`npm run check:quick`)
-- [ ] T054 [P] Add Sidebar slice-link tests (admin + catalog gating) in `Frontend/src/components/Sidebar.test.tsx`
-- [ ] T055 Execute manual QA in `specs/003-check-in/quickstart.md` §3–§7 and update Manual QA log table
-- [ ] T056 SFTP deploy Backend slice handlers (`OnGetAttendees`, `OnCheckInScan`, `OnCheckIn`, adapters, router)
-- [ ] T057 Set ScriptRunner Parameters `CHECKIN_JWT_PUBLIC_KEY` + `CHECKIN_JWT_ISSUER`
-- [ ] T058 Live smoke: `USE_MOCK_API: false` on UAT — quickstart §8
-- [ ] T059 [P] Git push Frontend `uat` → UAT Pages after §55 pass
+- [X] T054 [P] Add Sidebar slice-link tests (admin + catalog gating) in `Frontend/src/components/Sidebar.test.tsx`
+- [X] T055 Execute manual QA in `specs/003-check-in/quickstart.md` §3–§4, §6–§7, **§9** — update Manual QA log (§5 live QR deferred → T060)
+- [X] T056 SFTP deploy Backend slice handlers (`OnGetAttendees`, `OnCheckInScan`, `OnCheckIn`, `HubSpotApiClient`, adapters, router)
+- [X] T057 Set ScriptRunner Parameters `CHECKIN_JWT_PUBLIC_KEY` + `CHECKIN_JWT_ISSUER`
+- [X] T058 Live smoke: `USE_MOCK_API: false` on UAT — quickstart **§8** (+ §9 UI/UX gate); §5 live QR excluded (see T060)
+- [X] T059 [P] Git push Frontend `uat` → UAT Pages — committed locally (`f7c9f4d`); **push pending** (run `git push origin uat` to trigger deploy)
+- [ ] T060 **End-of-Slice 1** — live QR scanner QA per `quickstart.md` **§10** (camera + Event JWT on UAT/Live device); pairs **FE-SLICE1-007** / **BE-SLICE1-007**
 
 ---
 
@@ -206,7 +207,8 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 
 ### Post-SFTP (release gate)
 
-- T056–T058: deploy, Parameters, live smoke
+- T056–T058: deploy ✅, Parameters ✅, live smoke (§8 + §9; QR excluded)
+- T060: end-of-Slice 1 live QR (§10) — **FE-SLICE1-007**
 - T043–T048: walk-in (separate tranche)
 
 ---
@@ -217,11 +219,11 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 | :--- | :--- | ---: | ---: |
 | Setup | T001–T003 | 3 | 0 |
 | Foundational | T004–T018 | 15 | 0 |
-| US1 Attendees (P1) | T019–T026 | 6 | 2 |
-| US2 Check-in (P1) | T027–T042 | 14 | 3 |
+| US1 Attendees (P1) | T019–T026 | 8 | 0 |
+| US2 Check-in (P1) | T027–T042 | 17 | 0 |
 | US3 Walk-in (P2) | T043–T048 | 0 | 6 |
-| Polish | T049–T059 | 2 | 9 |
-| **Total** | T001–T059 | **40** | **19** |
+| Polish | T049–T060 | 10 | 4 |
+| **Total** | T001–T060 | **51** | **10** |
 
 **Slice 1 mock MVP**: ~95% complete (US1 + US2). **Production complete**: pending SFTP, live smoke, walk-in, and polish tasks above.
 
@@ -231,6 +233,9 @@ description: "Task list for Attendees & Check-in (003-check-in / Slice 1)"
 
 - Catalog context (`programId` + `evId`) is the only scope key — not legacy `#/events/:eventId`
 - `html5-qrcode` MUST stay an npm dependency (NFR-003); no CDN script
-- Attendees search on `AttendeesView` still uses immediate refetch (full-page loading) — consider debounce parity with Check-in (optional polish, not blocking)
-- Update `Frontend/TODO.md` FE-SLICE1-* and `Backend/TODO.md` BE-SLICE1-* status when closing T058
+- Attendees search debounce + non-blocking refresh ✅ (2026-07-06); check-in search-first + `pageSize` 200 ✅
+- Attendees pagination UI ✅; table flex height ✅; responsive Check-in/Attendees ✅; `LoadingState` spinner/skeletons ✅
+- HubSpot Managed Fetch fix (`HubSpotApiClient.ts`) ✅; Check-in Vitest hang fix (stable mock) ✅
+- **Performance (deferred):** live attendee load is slow — full HubSpot join per request; review after schema meeting → **BE-SLICE1-006** / **FE-SLICE1-005**
+- **QR (live):** deferred to §10 / **FE-SLICE1-007** — not a §8 blocker (2026-07-06 QA)
 - Contract source of truth for edits: `specs/003-check-in/contracts/check-in-api.md` → merge to gitignored `Frontend/docs/api-contract.md`

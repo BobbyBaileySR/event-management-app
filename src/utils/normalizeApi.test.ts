@@ -8,6 +8,7 @@ import {
 	normalizeEvent,
 	normalizeEventResponse,
 	normalizeEventsResponse,
+	normalizeSliceAttendeesResponse,
 } from './normalizeApi';
 
 describe('normalizeEvent', () => {
@@ -271,6 +272,95 @@ describe('normalizeCatalogResponse', () => {
 
 		expect(result.programs[0]?.description).toBeUndefined();
 		expect(result.programs[0]?.events[0]?.owner).toBeUndefined();
+	});
+});
+
+describe('normalizeSliceAttendeesResponse', () => {
+	it('maps API attendee rows and pagination fields', () => {
+		const result = normalizeSliceAttendeesResponse({
+			attendees: [
+				{
+					contactId: 'c-001',
+					firstName: 'Jane',
+					lastName: 'Doe',
+					company: 'Acme',
+					email: 'jane@acme.com',
+					accountManager: 'owner-1',
+					attendeeType: 'customer',
+					checkedIn: false,
+				},
+				{
+					contactId: 'c-002',
+					firstName: 'Pat',
+					lastName: 'Lee',
+					company: 'Partner Co',
+					email: 'pat@partner.com',
+					accountManager: 'owner-2',
+					attendeeType: 'partner',
+					checkedIn: true,
+				},
+			],
+			page: 2,
+			pageSize: 50,
+			total: 120,
+		});
+
+		expect(result).toEqual({
+			attendees: [
+				{
+					contactId: 'c-001',
+					firstName: 'Jane',
+					lastName: 'Doe',
+					company: 'Acme',
+					email: 'jane@acme.com',
+					accountManager: 'owner-1',
+					attendeeType: 'customer',
+					checkedIn: false,
+					checkedInAt: null,
+				},
+				{
+					contactId: 'c-002',
+					firstName: 'Pat',
+					lastName: 'Lee',
+					company: 'Partner Co',
+					email: 'pat@partner.com',
+					accountManager: 'owner-2',
+					attendeeType: 'partner',
+					checkedIn: true,
+					checkedInAt: null,
+				},
+			],
+			page: 2,
+			pageSize: 50,
+			total: 120,
+		});
+	});
+
+	it('defaults missing fields and treats unknown attendeeType as customer', () => {
+		const result = normalizeSliceAttendeesResponse({
+			attendees: [{ contactId: 'c-003', attendeeType: 'unknown' }],
+		});
+
+		expect(result.attendees[0]).toMatchObject({
+			contactId: 'c-003',
+			firstName: '',
+			lastName: '',
+			attendeeType: 'customer',
+			checkedIn: false,
+			checkedInAt: null,
+		});
+		expect(result.page).toBe(1);
+		expect(result.pageSize).toBe(50);
+		expect(result.total).toBe(1);
+	});
+
+	it('returns empty attendees when response.attendees is missing', () => {
+		expect(normalizeSliceAttendeesResponse({ page: 1, pageSize: 50, total: 0 })).toEqual({
+			attendees: [],
+			page: 1,
+			pageSize: 50,
+			total: 0,
+		});
 	});
 });
 

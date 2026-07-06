@@ -3,7 +3,10 @@
 }
 
 .reader {
-	min-height: 220px;
+	width: 100%;
+	min-height: min(60vw, 280px);
+	max-height: 320px;
+	aspect-ratio: 1;
 	border-radius: 8px;
 	overflow: hidden;
 	background: rgba(0, 0, 0, 0.04);
@@ -13,4 +16,10 @@
 	margin: 8px 0 0;
 	font-size: 0.875rem;
 	opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+	.reader {
+		min-height: min(70vw, 300px);
+	}
 }

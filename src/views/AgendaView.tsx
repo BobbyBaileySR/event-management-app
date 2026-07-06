@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
@@ -64,7 +65,14 @@ export function AgendaView() {
 	}
 
 	if (loading) {
-		return <div className="loading">Loading agenda…</div>;
+		return (
+			<section id="view-agenda" className={styles.view}>
+				<TopBar title="Agenda" meta="Loading sessions…" />
+				<div className="card">
+					<LoadingState message="Loading agenda…" variant="panel" skeleton="table" />
+				</div>
+			</section>
+		);
 	}
 
 	if (error) {

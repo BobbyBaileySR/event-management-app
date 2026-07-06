@@ -39,8 +39,8 @@ Deliver **Program → Event** catalog administration for Slice 1: admins create/
 | Security — no HubSpot write until slice gate | [backend-security.mdc](../../../Backend/.cursor/rules/backend-security.mdc) | ✅ Pass — Record Storage only; no HubSpot API |
 | XSS — dynamic catalog names via JSX | [frontend-security.mdc](../../.cursor/rules/frontend-security.mdc) | ✅ Pass — Vitest XSS cases required |
 | Responsive UI | [frontend-responsive.mdc](../../.cursor/rules/frontend-responsive.mdc) | ✅ Pass — pickers + admin forms mobile/tablet/desktop |
-| Tests ship with behaviour | [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) | ✅ Pass — plan includes Jest + Vitest scope |
-| Contract + RBAC sync | [ems-api-contract-discipline](../../.cursor/rules/ems-api-contract-discipline.mdc) | ✅ Pass — [contracts/catalog-api.md](./contracts/catalog-api.md) delta merges into `docs/api-contract.md` + `docs/rbac.md` + `RouteGuard.ts` in same change |
+| Tests ship with behaviour | [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) | ✅ Pass — plan includes Jest + Vitest scope |
+| Contract + RBAC sync | [ems-api-contract-discipline](../../../.cursor/rules/ems-api-contract-discipline.mdc) | ✅ Pass — [contracts/catalog-api.md](./contracts/catalog-api.md) delta merges into `docs/api-contract.md` + `docs/rbac.md` + `RouteGuard.ts` in same change |
 | Domain language — 2-level catalog | [CONTEXT.md](../../CONTEXT.md), [spec clarifications](./spec.md#clarifications) | ✅ Pass |
 | Deploy paths | [constitution.md](../../.specify/memory/constitution.md) | ✅ Pass — SFTP scripts / Git frontend |
 

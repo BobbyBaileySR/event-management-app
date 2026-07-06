@@ -4,6 +4,7 @@ import { filterEventsByStatus, getPortfolioStats, searchEvents } from '../data/m
 import { useDataService } from '../hooks/useDataService';
 import type { Event, EventStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { eventPath } from '../router/navigation';
 import styles from './EventsView.module.css';
@@ -62,7 +63,12 @@ export function EventsView() {
 	const stats = useMemo(() => getPortfolioStats(allEvents), [allEvents]);
 
 	if (loading) {
-		return <div className="loading">Loading events…</div>;
+		return (
+			<section id="view-events" className={styles.view}>
+				<TopBar title="All Events" meta="Loading portfolio…" />
+				<LoadingState message="Loading events…" skeleton="cards" />
+			</section>
+		);
 	}
 
 	if (error) {
@@ -112,7 +118,8 @@ export function EventsView() {
 					/>
 				</div>
 
-				<table>
+				<div className="table-scroll">
+					<table>
 					<thead>
 						<tr>
 							<th>Event</th>
@@ -156,6 +163,7 @@ export function EventsView() {
 						)}
 					</tbody>
 				</table>
+				</div>
 			</div>
 		</section>
 	);

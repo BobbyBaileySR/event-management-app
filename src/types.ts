@@ -237,6 +237,8 @@ export interface CatalogEventRecord {
 export interface CreateCatalogProgramBody {
 	name: string;
 	hubspotFormIds: string[];
+	/** @deprecated Legacy single form — still sent for older ScriptRunner builds */
+	hubspotFormId?: string;
 	description?: string;
 	startDate?: string;
 	endDate?: string;
@@ -247,6 +249,8 @@ export interface CreateCatalogProgramBody {
 export interface PatchCatalogProgramBody {
 	name?: string;
 	hubspotFormIds?: string[];
+	/** @deprecated Legacy single form — still sent for older ScriptRunner builds */
+	hubspotFormId?: string;
 	archived?: boolean;
 	description?: string | null;
 	startDate?: string | null;

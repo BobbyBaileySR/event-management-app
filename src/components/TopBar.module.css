@@ -17,6 +17,29 @@
 	margin: 6px 0 0;
 	color: var(--color-muted);
 	font-size: 0.95rem;
+	word-break: break-word;
+}
+
+@media (max-width: 900px) {
+	.topBar {
+		margin-bottom: 16px;
+		gap: 8px 16px;
+	}
+
+	.topBar h1 {
+		font-size: 1.35rem;
+		word-break: break-word;
+	}
+
+	.meta {
+		font-size: 0.875rem;
+	}
+}
+
+@media (max-width: 600px) {
+	.topBar h1 {
+		font-size: 1.15rem;
+	}
 }
 
 .trailing {

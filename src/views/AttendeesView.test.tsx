@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SessionProvider, useSession } from '../state/appState';
 import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
 import type { Session, SliceAttendee } from '../types';
@@ -49,6 +49,13 @@ const adminSession: Session = {
 	token: 't',
 	email: 'admin@adaptavist.com',
 	role: 'admin',
+	expiresAt: '2099-01-01T00:00:00.000Z',
+};
+
+const staffSession: Session = {
+	token: 't',
+	email: 'staff@adaptavist.com',
+	role: 'staff',
 	expiresAt: '2099-01-01T00:00:00.000Z',
 };
 
@@ -145,5 +152,185 @@ describe('AttendeesView', () => {
 		});
 
 		expect(document.querySelector('img')).toBeNull();
+	});
+
+	it('shows total count and pagination when more than one page exists', async () => {
+		mockFetchSliceAttendees.mockResolvedValue({
+			attendees: mockSliceAttendees,
+			page: 1,
+			pageSize: 50,
+			total: 120,
+		});
+
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText(/120 registered · showing 1–50/i)).toBeInTheDocument();
+		});
+
+		expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+	});
+
+	it('shows loading feedback while fetching the next page', async () => {
+		let resolvePage2: (value: {
+			attendees: SliceAttendee[];
+			page: number;
+			pageSize: number;
+			total: number;
+		}) => void;
+		const page2Promise = new Promise<{
+			attendees: SliceAttendee[];
+			page: number;
+			pageSize: number;
+			total: number;
+		}>((resolve) => {
+			resolvePage2 = resolve;
+		});
+
+		mockFetchSliceAttendees.mockImplementation(async (_programId, _eventId, query) => {
+			if (query?.page === 2) {
+				return page2Promise;
+			}
+			return {
+				attendees: mockSliceAttendees,
+				page: 1,
+				pageSize: 50,
+				total: 120,
+			};
+		});
+
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+		expect(await screen.findByText('Loading page…')).toBeInTheDocument();
+		expect(screen.getByRole('status')).toHaveTextContent('Updating…');
+		expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+
+		resolvePage2!({
+			attendees: [mockSliceAttendees[0]!],
+			page: 2,
+			pageSize: 50,
+			total: 120,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText(/120 registered · showing 51–100/i)).toBeInTheDocument();
+		});
+
+		expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+	});
+
+	it('requests the next page when Next is clicked', async () => {
+		mockFetchSliceAttendees.mockImplementation(async (_programId, _eventId, query) => {
+			if (query?.page === 2) {
+				return {
+					attendees: [mockSliceAttendees[0]!],
+					page: 2,
+					pageSize: 50,
+					total: 120,
+				};
+			}
+			return {
+				attendees: mockSliceAttendees,
+				page: 1,
+				pageSize: 50,
+				total: 120,
+			};
+		});
+
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+				q: undefined,
+				checkedIn: undefined,
+				page: 2,
+				pageSize: 50,
+			});
+		});
+
+		expect(await screen.findByText(/120 registered · showing 51–100/i)).toBeInTheDocument();
+	});
+
+	it('keeps the attendees layout mounted while typing in search', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Search attendees')).toBeInTheDocument();
+		});
+
+		fireEvent.change(screen.getByLabelText('Search attendees'), {
+			target: { value: 'Jane' },
+		});
+
+		expect(screen.queryByText('Loading attendees…')).not.toBeInTheDocument();
+		expect(
+			screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Attendees' }),
+		).toBeInTheDocument();
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+				q: 'Jane',
+				checkedIn: undefined,
+				page: 1,
+				pageSize: 50,
+			});
+		});
+	});
+
+	it('redirects non-admin users to the events list', async () => {
+		render(
+			<MemoryRouter initialEntries={['/events/attendees']}>
+				<SessionProvider>
+					<CatalogProvider>
+						<Routes>
+							<Route path="/events" element={<div>Events list</div>} />
+							<Route
+								path="/events/attendees"
+								element={
+									<>
+										<SessionHarness session={staffSession} />
+										<CatalogHarness />
+										<AttendeesView />
+									</>
+								}
+							/>
+						</Routes>
+					</CatalogProvider>
+				</SessionProvider>
+			</MemoryRouter>,
+		);
+
+		expect(await screen.findByText('Events list')).toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: /Attendees/i })).not.toBeInTheDocument();
+	});
+
+	it('does not overflow body horizontally at 375px viewport', async () => {
+		Object.defineProperty(document.body, 'clientWidth', { configurable: true, value: 375 });
+		document.documentElement.style.width = '375px';
+
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Attendees' }),
+			).toBeInTheDocument();
+		});
+
+		expect(document.body.scrollWidth).toBeLessThanOrEqual(document.body.clientWidth + 1);
 	});
 });

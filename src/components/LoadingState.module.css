@@ -1,0 +1,136 @@
+.root {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	text-align: center;
+}
+
+.page {
+	flex: 1;
+	min-height: 240px;
+	padding: 32px 16px;
+}
+
+.panel {
+	width: 100%;
+	padding: 24px 16px;
+}
+
+.inline {
+	flex-direction: row;
+	justify-content: flex-start;
+	gap: 12px;
+	padding: 0;
+	text-align: left;
+}
+
+.spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid var(--color-border);
+	border-top-color: var(--color-orange);
+	border-radius: 50%;
+	animation: loadingSpin 0.8s linear infinite;
+	flex-shrink: 0;
+}
+
+.inline .spinner {
+	width: 20px;
+	height: 20px;
+	border-width: 2px;
+}
+
+.message {
+	margin: 0;
+	color: var(--color-muted);
+	font-size: 0.95rem;
+}
+
+.skeleton {
+	width: 100%;
+	display: grid;
+	gap: 12px;
+}
+
+.skeletonCards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 16px;
+	width: 100%;
+	margin-bottom: 8px;
+}
+
+.skeletonCard {
+	height: 88px;
+	border-radius: var(--radius-md);
+}
+
+.skeletonRow {
+	display: grid;
+	grid-template-columns: 2fr 1.2fr 1fr 1fr;
+	gap: 12px;
+}
+
+.skeletonCell {
+	height: 14px;
+	border-radius: 4px;
+}
+
+.skeletonBlock {
+	height: 14px;
+	border-radius: 4px;
+}
+
+.skeletonShimmer {
+	background: linear-gradient(
+		90deg,
+		var(--color-ice) 0%,
+		rgba(11, 5, 115, 0.08) 50%,
+		var(--color-ice) 100%
+	);
+	background-size: 200% 100%;
+	animation: loadingShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes loadingSpin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes loadingShimmer {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+@media (max-width: 900px) {
+	.skeletonCards {
+		grid-template-columns: 1fr;
+	}
+
+	.skeletonRow {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.spinner,
+	.skeletonShimmer {
+		animation: none;
+	}
+
+	.spinner {
+		border-top-color: var(--color-orange);
+		opacity: 0.85;
+	}
+
+	.skeletonShimmer {
+		background: var(--color-ice);
+	}
+}

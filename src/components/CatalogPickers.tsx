@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CatalogPickerSelect } from './CatalogPickerSelect';
+import { LoadingState } from './LoadingState';
 import { useDataService } from '../hooks/useDataService';
 import { useCatalogSelection } from '../state/catalogContext';
 import type { CatalogProgram } from '../types';
@@ -154,7 +155,7 @@ export function CatalogPickers() {
 	if (loading) {
 		return (
 			<section className={styles.catalogBar} aria-label="Catalog navigation">
-				<p className={styles.contextSummary}>Loading catalog…</p>
+				<LoadingState message="Loading catalog…" variant="inline" />
 			</section>
 		);
 	}

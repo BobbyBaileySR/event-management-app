@@ -8,7 +8,7 @@ description: "Task list for Catalog Metadata & Modal Forms (002-catalog-metadata
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [research.md](./research.md) · [data-model.md](./data-model.md) · [contracts/catalog-api.md](./contracts/catalog-api.md) · **001-catalog-admin complete**
 
-**Tests**: Included — [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) requires Jest + Vitest with each behaviour change.
+**Tests**: Included — [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) requires Jest + Vitest with each behaviour change.
 
 **Organization**: Backend metadata API first (Foundational), then user stories P1 → P2. Modals replace inline create forms; edit and legacy compat follow.
 

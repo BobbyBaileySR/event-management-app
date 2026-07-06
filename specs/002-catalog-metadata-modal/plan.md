@@ -39,8 +39,8 @@ Extend **001-catalog-admin** with optional **EMS catalog metadata** on Programs 
 | Security — no HubSpot write | [backend-security.mdc](../../../Backend/.cursor/rules/backend-security.mdc) | ✅ Pass — Record Storage metadata only |
 | XSS — metadata via JSX | [frontend-security.mdc](../../.cursor/rules/frontend-security.mdc) | ✅ Pass — Vitest hostile strings on new modals + tree |
 | Responsive UI | [frontend-responsive.mdc](../../.cursor/rules/frontend-responsive.mdc) | ✅ Pass — modal layout mobile/tablet/desktop |
-| Tests ship with behaviour | [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) | ✅ Pass |
-| Contract sync | [ems-api-contract-discipline](../../.cursor/rules/ems-api-contract-discipline.mdc) | ✅ Pass — [contracts/catalog-api.md](./contracts/catalog-api.md) |
+| Tests ship with behaviour | [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) | ✅ Pass |
+| Contract sync | [ems-api-contract-discipline](../../../.cursor/rules/ems-api-contract-discipline.mdc) | ✅ Pass — [contracts/catalog-api.md](./contracts/catalog-api.md) |
 | Read-first / EMS metadata | [spec.md](./spec.md), [CONTEXT.md](../../CONTEXT.md) | ✅ Pass |
 | Deploy paths | [constitution.md](../../.specify/memory/constitution.md) | ✅ Pass |
 

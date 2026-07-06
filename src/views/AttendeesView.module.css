@@ -1,7 +1,100 @@
 .view {
-	/* inherits global view spacing from layout.css */
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.view :global(.top-bar) {
+	flex-shrink: 0;
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	margin-bottom: 0;
+}
+
+.card :global(.toolbar),
+.card :global(.search-input) {
+	flex-shrink: 0;
+}
+
+.tableWrap {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.tableScroll {
+	flex: 1;
+	min-height: 200px;
+	overflow: auto;
+	max-height: none;
+	-webkit-overflow-scrolling: touch;
+}
+
+.tableScrollLoading {
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+.tableLoadingOverlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.55);
+	z-index: 1;
 }
 
 .detailPanel {
 	margin-top: 16px;
+}
+
+.pagination {
+	flex-shrink: 0;
+	margin-top: 16px;
+	margin-bottom: 0;
+}
+
+.pageSummary {
+	font-size: 0.9rem;
+	color: var(--color-muted);
+}
+
+.refreshHint {
+	font-size: 0.875rem;
+	color: var(--color-muted);
+}
+
+.colEmail,
+.colAccountManager,
+.colTrack,
+.colCompany {
+	/* visible by default */
+}
+
+@media (max-width: 900px) {
+	.colEmail,
+	.colAccountManager {
+		display: none;
+	}
+}
+
+@media (max-width: 600px) {
+	.colTrack {
+		display: none;
+	}
+}
+
+@media (max-width: 480px) {
+	.colCompany {
+		display: none;
+	}
 }

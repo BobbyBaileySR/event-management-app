@@ -134,7 +134,7 @@ Register routes in `OnHttpRouter.ts`; rules in `RouteGuard.ts`. Handler order: *
 | Backend | Jest (`node/tests/`) | Catalog utils, each route (200/401/403/404/409/422), cascade archive/unarchive, name uniqueness, RBAC split on GET |
 | Frontend | Vitest | `normalizeCatalog` mapping, picker + admin view render, XSS on dynamic names, role-gated admin actions hidden for viewer |
 
-**Rationale**: [ems-testing-discipline](../../.cursor/rules/ems-testing-discipline.mdc) — behaviour ships with tests; mock API switch in `dataService.ts` until backend deployed.
+**Rationale**: [ems-testing-discipline](../../../.cursor/rules/ems-testing-discipline.mdc) — behaviour ships with tests; mock API switch in `dataService.ts` until backend deployed.
 
 ---
 

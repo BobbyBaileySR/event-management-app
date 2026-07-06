@@ -31,3 +31,8 @@
 	resize: vertical;
 	min-height: 72px;
 }
+
+.requiredMark {
+	color: #c0392b;
+	font-weight: 700;
+}

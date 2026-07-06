@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import styles from './CheckInQrPanel.module.css';
 
@@ -32,10 +32,28 @@ function safelyStopScanner(scanner: Html5Qrcode | null): void {
 	}
 }
 
+function qrBoxSize(): number {
+	if (typeof window === 'undefined') {
+		return 220;
+	}
+
+	return Math.min(Math.max(Math.round(window.innerWidth * 0.62), 160), 280);
+}
+
 export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelProps) {
 	const readerId = useId().replace(/:/g, '');
 	const onDecodeRef = useRef(onDecode);
 	onDecodeRef.current = onDecode;
+	const [scanBoxSize, setScanBoxSize] = useState(qrBoxSize);
+
+	useEffect(() => {
+		function handleResize() {
+			setScanBoxSize(qrBoxSize());
+		}
+
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
 
 	useEffect(() => {
 		if (disabled || !document.getElementById(readerId)) {
@@ -54,7 +72,7 @@ export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelPro
 		void scanner
 			.start(
 				{ facingMode: 'environment' },
-				{ fps: 8, qrbox: { width: 220, height: 220 } },
+				{ fps: 8, qrbox: { width: scanBoxSize, height: scanBoxSize } },
 				(decodedText) => {
 					if (active) {
 						onDecodeRef.current(decodedText);
@@ -75,7 +93,7 @@ export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelPro
 			active = false;
 			safelyStopScanner(scanner);
 		};
-	}, [disabled, readerId]);
+	}, [disabled, readerId, scanBoxSize]);
 
 	return (
 		<div className={styles.panel}>

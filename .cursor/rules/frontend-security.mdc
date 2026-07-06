@@ -24,6 +24,8 @@ The session token lives in memory (`src/state/appState.tsx`). Any XSS can read i
 
 Deploy via Git only. Register OAuth origins for every hosting URL.
 
+On code changes, follow root `.cursor/rules/` for changelog, testing, TODO parking, and API contract sync.
+
 ## Deferred security work
 
-Optional hardening the user skips (CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see `.cursor/rules/ems-todo-discipline.mdc`. CSP `img-src` is tightened in `vite.config.ts` (`FE-SEC-004`); add HubSpot CDN hosts when Slice 1 renders real images.
+Optional hardening the user skips (CI Bugbot/security-review, dependency audit, etc.) must be parked in [TODO.md](../../TODO.md) — see repo root `.cursor/rules/ems-todo-discipline.mdc`. CSP `img-src` is tightened in `vite.config.ts` (`FE-SEC-004`); add HubSpot CDN hosts when Slice 1 renders real images.

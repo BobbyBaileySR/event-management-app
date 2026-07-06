@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
@@ -62,7 +63,14 @@ export function SettingsView() {
 	}
 
 	if (loading) {
-		return <div className="loading">Loading settings…</div>;
+		return (
+			<section id="view-settings">
+				<TopBar title="Settings" meta="Loading event settings…" />
+				<div className="card">
+					<LoadingState message="Loading settings…" variant="panel" skeleton="lines" skeletonRows={5} />
+				</div>
+			</section>
+		);
 	}
 
 	if (error) {

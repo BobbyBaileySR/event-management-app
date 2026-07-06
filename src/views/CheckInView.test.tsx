@@ -1,3 +1,4 @@
+import { createElement } from 'react';
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -7,6 +8,74 @@ import { SessionProvider, useSession } from '../state/appState';
 import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
 import type { Session, SliceAttendee } from '../types';
 import { CheckInView } from './CheckInView';
+
+const {
+	mockFetchSliceAttendees,
+	mockConfirmCheckIn,
+	mockCheckInScan,
+	mockDataService,
+} = vi.hoisted(() => {
+	const fetchSliceAttendees = vi.fn().mockResolvedValue({
+		attendees: [
+			{
+				contactId: 'mock-101',
+				firstName: 'Jane',
+				lastName: 'Doe',
+				email: 'jane.doe@acme.com',
+				company: 'Acme Corp',
+				accountManager: 'owner-1',
+				attendeeType: 'customer',
+				checkedIn: false,
+				checkedInAt: null,
+			},
+			{
+				contactId: 'mock-202',
+				firstName: 'Pat',
+				lastName: 'Lee',
+				email: 'pat@partner.com',
+				company: 'Partner Ltd',
+				accountManager: 'owner-2',
+				attendeeType: 'partner',
+				checkedIn: true,
+				checkedInAt: null,
+			},
+		],
+		page: 1,
+		pageSize: 50,
+		total: 2,
+	});
+	const confirmCheckIn = vi.fn().mockResolvedValue({
+		contactId: 'mock-101',
+		checkedIn: true,
+		alreadyCheckedIn: false,
+		attendeeType: 'customer',
+	});
+	const checkInScan = vi.fn().mockResolvedValue({
+		programId: 'prog-atlassian-2026',
+		eventId: 'ev-mr-2026',
+		contact: {
+			contactId: 'mock-101',
+			firstName: 'Jane',
+			lastName: 'Doe',
+			company: 'Acme Corp',
+			email: 'jane.doe@acme.com',
+			accountManager: 'owner-1',
+			attendeeType: 'customer',
+			checkedIn: false,
+		},
+	});
+
+	return {
+		mockFetchSliceAttendees: fetchSliceAttendees,
+		mockConfirmCheckIn: confirmCheckIn,
+		mockCheckInScan: checkInScan,
+		mockDataService: {
+			fetchSliceAttendees,
+			confirmCheckIn,
+			checkInScan,
+		},
+	};
+});
 
 const mockSliceAttendees: SliceAttendee[] = [
 	{
@@ -33,49 +102,17 @@ const mockSliceAttendees: SliceAttendee[] = [
 	},
 ];
 
-const mockFetchSliceAttendees = vi.fn().mockResolvedValue({
-	attendees: mockSliceAttendees,
-	page: 1,
-	pageSize: 50,
-	total: 2,
-});
-
-const mockConfirmCheckIn = vi.fn().mockResolvedValue({
-	contactId: 'mock-101',
-	checkedIn: true,
-	alreadyCheckedIn: false,
-	attendeeType: 'customer',
-});
-
-const mockCheckInScan = vi.fn().mockResolvedValue({
-	programId: 'prog-atlassian-2026',
-	eventId: 'ev-mr-2026',
-	contact: {
-		contactId: 'mock-101',
-		firstName: 'Jane',
-		lastName: 'Doe',
-		company: 'Acme Corp',
-		email: 'jane.doe@acme.com',
-		accountManager: 'owner-1',
-		attendeeType: 'customer',
-		checkedIn: false,
-	},
-});
-
 vi.mock('../hooks/useDataService', () => ({
-	useDataService: () => ({
-		fetchSliceAttendees: mockFetchSliceAttendees,
-		confirmCheckIn: mockConfirmCheckIn,
-		checkInScan: mockCheckInScan,
-	}),
+	useDataService: () => mockDataService,
 }));
 
 vi.mock('../components/CheckInQrPanel', () => ({
-	CheckInQrPanel: ({ onDecode }: { onDecode: (jwt: string) => void }) => (
-		<button type="button" onClick={() => onDecode('mock-jwt-token')}>
-			Simulate QR scan
-		</button>
-	),
+	CheckInQrPanel: ({ onDecode }: { onDecode: (jwt: string) => void }) =>
+		createElement(
+			'button',
+			{ type: 'button', onClick: () => onDecode('mock-jwt-token') },
+			'Simulate QR scan',
+		),
 }));
 
 const adminSession: Session = {
@@ -129,6 +166,7 @@ function renderCheckIn(session: Session = adminSession) {
 
 describe('CheckInView', () => {
 	beforeEach(() => {
+		vi.useRealTimers();
 		mockFetchSliceAttendees.mockClear();
 		mockConfirmCheckIn.mockClear();
 		mockCheckInScan.mockClear();
@@ -169,8 +207,22 @@ describe('CheckInView', () => {
 			).toBeInTheDocument();
 		});
 
-		expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-		expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', expect.any(Object));
+		expect(screen.getByText(/Type at least 2 characters to search registrants/i)).toBeInTheDocument();
+		expect(mockFetchSliceAttendees).not.toHaveBeenCalled();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Jane' },
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+			q: 'Jane',
+			page: 1,
+			pageSize: 200,
+		});
 
 		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
 
@@ -196,6 +248,10 @@ describe('CheckInView', () => {
 		});
 
 		renderCheckIn();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Pat' },
+		});
 
 		await waitFor(() => {
 			expect(screen.getByText('Pat Lee')).toBeInTheDocument();
@@ -281,11 +337,15 @@ describe('CheckInView', () => {
 		mockFetchSliceAttendees.mockResolvedValue({
 			attendees: [{ ...mockSliceAttendees[0]!, firstName: hostile, lastName: '' }],
 			page: 1,
-			pageSize: 50,
+			pageSize: 200,
 			total: 1,
 		});
 
 		renderCheckIn();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'img' },
+		});
 
 		await waitFor(() => {
 			expect(screen.getByText(hostile)).toBeInTheDocument();
@@ -295,13 +355,9 @@ describe('CheckInView', () => {
 	});
 
 	it('keeps the check-in layout mounted while typing in search', async () => {
-		vi.useFakeTimers({ shouldAdvanceTime: true });
-
 		renderCheckIn();
 
-		await waitFor(() => {
-			expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
-		});
+		expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
 
 		const callsBeforeSearch = mockFetchSliceAttendees.mock.calls.length;
 
@@ -315,15 +371,52 @@ describe('CheckInView', () => {
 		).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
 
-		await vi.advanceTimersByTimeAsync(300);
-
 		await waitFor(() => {
 			expect(mockFetchSliceAttendees.mock.calls.length).toBeGreaterThan(callsBeforeSearch);
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
-				q: 'Jane',
-			});
+		});
+		expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+			q: 'Jane',
+			page: 1,
+			pageSize: 200,
+		});
+	});
+
+	it('searches across the full registrant list via server-side q, not page-1 browse', async () => {
+		mockFetchSliceAttendees.mockResolvedValue({
+			attendees: [mockSliceAttendees[1]!],
+			page: 1,
+			pageSize: 200,
+			total: 1,
 		});
 
-		vi.useRealTimers();
+		renderCheckIn();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Zimmerman' },
+		});
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+				q: 'Zimmerman',
+				page: 1,
+				pageSize: 200,
+			});
+			expect(screen.getByText('Pat Lee')).toBeInTheDocument();
+		});
+	});
+
+	it('does not overflow body horizontally at 375px viewport', async () => {
+		Object.defineProperty(document.body, 'clientWidth', { configurable: true, value: 375 });
+		document.documentElement.style.width = '375px';
+
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
+			).toBeInTheDocument();
+		});
+
+		expect(document.body.scrollWidth).toBeLessThanOrEqual(document.body.clientWidth + 1);
 	});
 });

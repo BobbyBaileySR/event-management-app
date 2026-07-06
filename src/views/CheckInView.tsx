@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CheckInQrPanel } from '../components/CheckInQrPanel';
 import { EmptyState } from '../components/EmptyState';
+import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
@@ -11,6 +12,11 @@ import type { CheckInContactSummary, SliceAttendee } from '../types';
 import styles from './CheckInView.module.css';
 
 type SelectedAttendee = SliceAttendee | CheckInContactSummary;
+
+/** Server-side search runs across all registrants; require typing before fetch. */
+const CHECK_IN_MIN_SEARCH_LENGTH = 2;
+/** Backend caps pageSize at 200 — enough for typical name/company matches at the desk. */
+const CHECK_IN_SEARCH_PAGE_SIZE = 200;
 
 function attendeeName(person: { firstName: string; lastName: string }): string {
 	return `${person.firstName} ${person.lastName}`.trim();
@@ -24,18 +30,16 @@ export function CheckInView() {
 	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
-	const [loading, setLoading] = useState(true);
+	const [matchTotal, setMatchTotal] = useState(0);
 	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selected, setSelected] = useState<SelectedAttendee | null>(null);
 	const [confirming, setConfirming] = useState(false);
 	const [scanning, setScanning] = useState(false);
-	const awaitingInitialLoadRef = useRef(true);
 
 	useEffect(() => {
 		setSearchQuery('');
 		setDebouncedSearch('');
-		awaitingInitialLoadRef.current = true;
 	}, [programId, evId]);
 
 	useEffect(() => {
@@ -48,23 +52,32 @@ export function CheckInView() {
 
 	useEffect(() => {
 		if (!programId || !evId) {
-			setLoading(false);
+			return;
+		}
+
+		const query = debouncedSearch.trim();
+		if (query.length < CHECK_IN_MIN_SEARCH_LENGTH) {
+			setAttendees((current) => (current.length === 0 ? current : []));
+			setMatchTotal((current) => (current === 0 ? current : 0));
+			setRefreshing((current) => (current === false ? current : false));
+			setError((current) => (current === null ? current : null));
 			return;
 		}
 
 		let cancelled = false;
-		if (awaitingInitialLoadRef.current) {
-			setLoading(true);
-		} else {
-			setRefreshing(true);
-		}
+		setRefreshing(true);
 		setError(null);
 
 		void data
-			.fetchSliceAttendees(programId, evId, { q: debouncedSearch || undefined })
+			.fetchSliceAttendees(programId, evId, {
+				q: query,
+				page: 1,
+				pageSize: CHECK_IN_SEARCH_PAGE_SIZE,
+			})
 			.then((result) => {
 				if (!cancelled) {
 					setAttendees(result.attendees);
+					setMatchTotal(result.total);
 				}
 			})
 			.catch((err: unknown) => {
@@ -74,9 +87,7 @@ export function CheckInView() {
 			})
 			.finally(() => {
 				if (!cancelled) {
-					setLoading(false);
 					setRefreshing(false);
-					awaitingInitialLoadRef.current = false;
 				}
 			});
 
@@ -156,10 +167,6 @@ export function CheckInView() {
 		);
 	}
 
-	if (loading) {
-		return <div className="loading">Loading check-in…</div>;
-	}
-
 	if (error) {
 		return <div className="empty-state">{error}</div>;
 	}
@@ -167,36 +174,55 @@ export function CheckInView() {
 	const title =
 		programName && eventName ? `${programName} — ${eventName} — Check-in` : 'Event check-in';
 
+	const searchReady = debouncedSearch.trim().length >= CHECK_IN_MIN_SEARCH_LENGTH;
+	const resultsTruncated = searchReady && matchTotal > attendees.length;
+
 	return (
 		<section id="view-check-in" className={styles.view}>
-			<TopBar title={title} meta={`${attendees.length} registered · arrival desk`} />
+			<TopBar
+				title={title}
+				meta={
+					searchReady
+						? `${matchTotal} match${matchTotal === 1 ? '' : 'es'} · arrival desk`
+						: 'Search by name or company · arrival desk'
+				}
+			/>
 
-			<div className="grid-2">
-				<div className="card">
-					<div className="card__header">
+			<div className={styles.layout}>
+				<div className={`card ${styles.findCard}`}>
+					<div className={styles.cardHeader}>
 						<h3>Find attendee</h3>
-						{refreshing ? <span className={styles.refreshHint}>Searching…</span> : null}
+						{refreshing ? <LoadingState message="Searching…" variant="inline" /> : null}
 					</div>
 					<input
 						type="search"
 						className="search-input"
-						placeholder="Search name or company…"
+						placeholder="Search name or company (min 2 characters)…"
 						value={searchQuery}
 						onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
 						aria-label="Search attendees for check-in"
 					/>
-					<div className="table-scroll table-scroll--short">
+					{resultsTruncated ? (
+						<p className={styles.searchHint}>
+							Showing {attendees.length} of {matchTotal} matches — type more to narrow results.
+						</p>
+					) : null}
+					<div className={styles.resultsScroll}>
 						<table>
 							<thead>
 								<tr>
 									<th>Name</th>
-									<th>Company</th>
-									<th>Track</th>
-									<th aria-label="Actions" />
+									<th className={styles.colCompany}>Company</th>
+									<th className={styles.colTrack}>Track</th>
+									<th className={styles.colAction} aria-label="Actions" />
 								</tr>
 							</thead>
 							<tbody>
-								{sortedAttendees.length === 0 ? (
+								{!searchReady ? (
+									<tr>
+										<td colSpan={4}>Type at least 2 characters to search registrants.</td>
+									</tr>
+								) : sortedAttendees.length === 0 ? (
 									<tr>
 										<td colSpan={4}>No matching registrants.</td>
 									</tr>
@@ -210,9 +236,9 @@ export function CheckInView() {
 												onClick={() => selectAttendee(person)}
 											>
 												<td>{attendeeName(person)}</td>
-												<td>{person.company}</td>
-												<td>{person.attendeeType}</td>
-												<td>
+												<td className={styles.colCompany}>{person.company}</td>
+												<td className={styles.colTrack}>{person.attendeeType}</td>
+												<td className={styles.colAction}>
 													<button
 														type="button"
 														className="btn btn-outline btn-sm"
@@ -233,8 +259,8 @@ export function CheckInView() {
 					</div>
 				</div>
 
-				<div className="card card--accent">
-					<div className="card__header">
+				<div className={`card card--accent ${styles.scanCard}`}>
+					<div className={styles.cardHeader}>
 						<h3>QR scan</h3>
 					</div>
 					<CheckInQrPanel onDecode={handleQrDecode} disabled={scanning} />
