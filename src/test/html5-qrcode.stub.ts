@@ -5,9 +5,11 @@ export class Html5Qrcode {
 		return 0;
 	}
 
-	async start() {}
+	async start(): Promise<null> {
+		return null;
+	}
 
-	async stop() {}
+	async stop(): Promise<void> {}
 
 	clear() {}
 }

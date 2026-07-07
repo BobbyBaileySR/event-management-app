@@ -20,7 +20,7 @@ describe('CheckInQrPanel', () => {
 
 	it('does not start the scanner while disabled', async () => {
 		const { Html5Qrcode } = await import('html5-qrcode');
-		const startSpy = vi.spyOn(Html5Qrcode.prototype, 'start').mockResolvedValue(undefined);
+		const startSpy = vi.spyOn(Html5Qrcode.prototype, 'start').mockResolvedValue(null);
 
 		render(<CheckInQrPanel onDecode={vi.fn()} disabled />);
 
@@ -35,8 +35,8 @@ describe('CheckInQrPanel', () => {
 		const { Html5Qrcode } = await import('html5-qrcode');
 		let resolveStart: (() => void) | undefined;
 		const startSpy = vi.spyOn(Html5Qrcode.prototype, 'start').mockImplementation(() => {
-			return new Promise<void>((resolve) => {
-				resolveStart = resolve;
+			return new Promise<null>((resolve) => {
+				resolveStart = () => resolve(null);
 			});
 		});
 		const stopSpy = vi.spyOn(Html5Qrcode.prototype, 'stop').mockResolvedValue(undefined);

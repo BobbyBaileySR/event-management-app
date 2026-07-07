@@ -193,7 +193,7 @@ function CatalogSelectionBridge() {
 
 function renderCheckIn(
 	session: Session = adminSession,
-	catalog: { walkInFormUrl?: string | null; evId?: string } = {},
+	catalog: { walkInFormUrl?: string | null; evId?: string; capacity?: number | null } = {},
 ) {
 	return render(
 		<MemoryRouter>

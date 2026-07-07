@@ -76,6 +76,7 @@ function CatalogHarness() {
 			programName: 'Atlassian Event 2026',
 			eventName: 'Meeting Room',
 			walkInFormUrl: null,
+			capacity: null,
 		});
 	}, [setSelection]);
 	return null;

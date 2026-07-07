@@ -5,6 +5,9 @@ dist/
 CHANGELOG.md
 TODO.md
 
+# Accidental nested workspace copy (must not live inside Frontend repo root)
+Events Management App/
+
 # Internal security briefings (not for GitHub Pages)
 docs/security-briefing-stakeholders.md
 docs/security-briefing-technical.md
