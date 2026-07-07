@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AttendeeStatus } from '../types';
+import type { AttendeeStatus, Event } from '../types';
 import {
 	countSegment,
 	filterAttendees,
@@ -14,20 +14,21 @@ const attendees = [
 	{ name: 'Grace Hopper', email: 'grace@example.com', company: 'Navy', status: 'Checked In' as AttendeeStatus },
 ];
 
-const events = [
+const events: Event[] = [
 	{
 		id: 'evt-1',
 		name: 'London Summit',
 		date: 'Oct 15, 2026',
 		dateIso: '2026-10-15',
 		location: 'London',
-		status: 'active' as const,
+		status: 'active',
 		attendeeCount: 10,
 		capacity: 100,
 		type: 'In-person',
 		owner: 'events@adaptavist.com',
 		registrationClose: 'Oct 10, 2026',
 		hubspotId: 'HS-EVT-1',
+		description: 'Flagship customer summit.',
 	},
 	{
 		id: 'evt-2',
@@ -35,13 +36,14 @@ const events = [
 		date: 'Nov 02, 2026',
 		dateIso: '2026-11-02',
 		location: 'Virtual',
-		status: 'draft' as const,
+		status: 'draft',
 		attendeeCount: 5,
 		capacity: 50,
 		type: 'Virtual',
 		owner: 'events@adaptavist.com',
 		registrationClose: 'Nov 01, 2026',
 		hubspotId: 'HS-EVT-2',
+		description: 'Monthly technical webinar — draft.',
 	},
 ];
 
