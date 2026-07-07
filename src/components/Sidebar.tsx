@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
-import { catalogPath, eventPath, isEventScopedRoute, sliceModulePath, useActiveRoute } from '../router/navigation';
+import { catalogPath, auditPath, eventPath, isEventScopedRoute, sliceModulePath, useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
 import styles from './Sidebar.module.css';
@@ -34,12 +34,20 @@ export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 				/>
 
 				{session?.role === 'admin' ? (
-					<NavButton
-						label="Catalog admin"
-						icon="🗂️"
-						active={activeRoute === 'catalog'}
-						onClick={() => navigate(catalogPath())}
-					/>
+					<>
+						<NavButton
+							label="Catalog admin"
+							icon="🗂️"
+							active={activeRoute === 'catalog'}
+							onClick={() => navigate(catalogPath())}
+						/>
+						<NavButton
+							label="Audit log"
+							icon="📋"
+							active={activeRoute === 'audit'}
+							onClick={() => navigate(auditPath())}
+						/>
+					</>
 				) : null}
 
 				{session?.role === 'admin' && programId && evId ? (

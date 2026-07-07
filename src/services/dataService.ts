@@ -4,7 +4,6 @@ import {
 	MOCK_EVENTS,
 	MOCK_ATTENDEES,
 	MOCK_TEMPLATES,
-	MOCK_AUDIT_LOG,
 	MOCK_ANALYTICS,
 	MOCK_CAMPAIGN_METRICS,
 	MOCK_SCHEDULED_EMAILS,
@@ -12,6 +11,7 @@ import {
 	MOCK_ACTIVITY,
 	getEventById,
 	getAuditLogForEvent,
+	getMockSliceAuditLog,
 	getMockCatalog,
 	getMockSliceAttendees,
 	mockCheckInScan,
@@ -39,6 +39,7 @@ import type {
 	AnalyticsConversion,
 	AttendeesResponse,
 	AuditEntry,
+	AuditLogListResult,
 	CampaignMetrics,
 	CatalogEventRecord,
 	CatalogProgramRecord,
@@ -129,22 +130,44 @@ export async function fetchTemplates(
 	);
 }
 
+export interface AuditLogQueryOptions extends DataServiceOptions {
+	page?: number;
+	pageSize?: number;
+}
+
 export async function fetchAuditLog(
-	eventId: string | undefined,
-	options: DataServiceOptions = {},
-): Promise<{ entries: AuditEntry[] }> {
-	const { token } = options;
+	eventId?: string,
+	options: AuditLogQueryOptions = {},
+): Promise<AuditLogListResult | { entries: AuditEntry[] }> {
+	const { token, page = 1, pageSize = 50 } = options;
+
+	if (eventId !== undefined) {
+		return withMockFallback<{ entries: AuditEntry[] } | AuditLogListResult>(
+			() =>
+				mockDelay({
+					entries: getAuditLogForEvent(eventId),
+				}),
+			async () => {
+				const search = new URLSearchParams();
+				search.set('page', String(page));
+				search.set('pageSize', String(pageSize));
+				const query = search.toString();
+				const path = `/events/${encodeURIComponent(eventId)}/audit${query ? `?${query}` : ''}`;
+				return (await apiRequest(path, {}, requestOptions(token))) as AuditLogListResult;
+			},
+		);
+	}
+
 	return withMockFallback(
-		() =>
-			mockDelay({
-				entries: eventId ? getAuditLogForEvent(eventId) : MOCK_AUDIT_LOG,
-			}),
-		async () =>
-			(await apiRequest(
-				eventId ? `/events/${encodeURIComponent(eventId)}/audit` : '/audit/recent',
-				{},
-				requestOptions(token),
-			)) as { entries: AuditEntry[] },
+		() => mockDelay(getMockSliceAuditLog(page, pageSize)),
+		async () => {
+			const search = new URLSearchParams();
+			search.set('page', String(page));
+			search.set('pageSize', String(pageSize));
+			const query = search.toString();
+			const path = `/audit/recent${query ? `?${query}` : ''}`;
+			return (await apiRequest(path, {}, requestOptions(token))) as AuditLogListResult;
+		},
 	);
 }
 
@@ -556,7 +579,8 @@ export function createDataService(token?: string | null) {
 		fetchEvent: (eventId: string) => fetchEvent(eventId, options),
 		fetchAttendees: (eventId: string) => fetchAttendees(eventId, options),
 		fetchTemplates: (eventId: string) => fetchTemplates(eventId, options),
-		fetchAuditLog: (eventId?: string) => fetchAuditLog(eventId, options),
+		fetchAuditLog: (eventId?: string, query?: { page?: number; pageSize?: number }) =>
+			fetchAuditLog(eventId, { ...options, ...query }),
 		fetchAnalytics: (eventId: string) => fetchAnalytics(eventId, options),
 		fetchCampaignMetrics: (eventId: string) => fetchCampaignMetrics(eventId, options),
 		fetchScheduledEmails: (eventId: string) => fetchScheduledEmails(eventId, options),

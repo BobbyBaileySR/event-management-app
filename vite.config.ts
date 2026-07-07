@@ -78,7 +78,8 @@ export default defineConfig(async ({ mode }) => {
 		},
 		build: {
 			outDir: 'dist',
-			sourcemap: true,
+			// Slice 1.5 A7 (FE-SLICE15-001): do not publish .map files on GitHub Pages — dev HMR and Vitest keep their own source maps.
+			sourcemap: false,
 		},
 		test: {
 			environment: 'jsdom',

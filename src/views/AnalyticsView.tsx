@@ -6,6 +6,7 @@ import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
 import type { AnalyticsConversion, AuditEntry, CampaignMetrics, Event } from '../types';
+import { isAuditLogListResult } from '../types';
 import { formatDateTime } from '../utils/format';
 import styles from './AnalyticsView.module.css';
 
@@ -46,7 +47,7 @@ export function AnalyticsView() {
 				setEvent(eventResult.event);
 				setConversion(analyticsResult.conversion);
 				setMetrics(metricsResult.metrics);
-				setAuditEntries(auditResult.entries);
+				setAuditEntries(isAuditLogListResult(auditResult) ? [] : auditResult.entries);
 			})
 			.catch((err: unknown) => {
 				if (!cancelled) {
