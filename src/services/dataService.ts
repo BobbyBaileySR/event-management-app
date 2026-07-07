@@ -16,6 +16,8 @@ import {
 	getMockSliceAttendees,
 	mockCheckInScan,
 	mockConfirmCheckIn,
+	mockAdjustCapacity,
+	getMockCapacityStatus,
 	mockCreateEvent,
 	mockCreateProgram,
 	mockUpdateEvent,
@@ -26,6 +28,7 @@ import {
 	normalizeCatalogResponse,
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
+	normalizeCapacityStatusResponse,
 	normalizeEventResponse,
 	normalizeEventsResponse,
 	normalizeSliceAttendeesResponse,
@@ -42,6 +45,8 @@ import type {
 	CatalogResponse,
 	CheckInScanResponse,
 	ConfirmCheckInResponse,
+	CapacityStatus,
+	AdjustCapacityDirection,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
@@ -380,6 +385,60 @@ export async function confirmCheckIn(
 	);
 }
 
+export async function fetchCapacityStatus(
+	programId: string,
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<CapacityStatus> {
+	const { token } = options;
+	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/capacity`;
+
+	return withMockFallback(
+		() => mockDelay(getMockCapacityStatus(programId, eventId)),
+		async () =>
+			normalizeCapacityStatusResponse(
+				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function adjustCapacity(
+	programId: string,
+	eventId: string,
+	direction: AdjustCapacityDirection,
+	options: DataServiceOptions = {},
+): Promise<CapacityStatus> {
+	const { token } = options;
+	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/capacity/adjust`;
+
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(mockAdjustCapacity(programId, eventId, direction));
+			} catch (error) {
+				mapMockCapacityError(error);
+			}
+		},
+		async () =>
+			normalizeCapacityStatusResponse(
+				((await apiRequest(
+					route,
+					{ method: 'POST', body: JSON.stringify({ direction }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+function mapMockCapacityError(error: unknown): never {
+	if (error instanceof Error) {
+		if (error.message === 'capacity_at_floor' || error.message === 'capacity_at_ceiling') {
+			throw new Error(error.message);
+		}
+	}
+	throw error instanceof Error ? error : new Error('Capacity adjust failed');
+}
+
 export async function createProgram(
 	body: CreateCatalogProgramBody,
 	options: DataServiceOptions = {},
@@ -516,6 +575,10 @@ export function createDataService(token?: string | null) {
 			checkInScan(programId, eventId, jwt, options),
 		confirmCheckIn: (programId: string, eventId: string, contactId: string) =>
 			confirmCheckIn(programId, eventId, contactId, options),
+		fetchCapacityStatus: (programId: string, eventId: string) =>
+			fetchCapacityStatus(programId, eventId, options),
+		adjustCapacity: (programId: string, eventId: string, direction: AdjustCapacityDirection) =>
+			adjustCapacity(programId, eventId, direction, options),
 		createProgram: (body: CreateCatalogProgramBody) => createProgram(body, options),
 		updateProgram: (id: string, body: PatchCatalogProgramBody) => updateProgram(id, body, options),
 		createEvent: (body: CreateCatalogEventBody) => createEvent(body, options),

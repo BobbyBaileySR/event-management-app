@@ -5,6 +5,7 @@
 
 import type {
 	Attendee,
+	CapacityStatus,
 	CheckInContactSummary,
 	CheckInScanResponse,
 	ConfirmCheckInResponse,
@@ -248,5 +249,24 @@ export function normalizeConfirmCheckInResponse(response: Record<string, unknown
 		checkedIn: Boolean(response.checkedIn),
 		alreadyCheckedIn: Boolean(response.alreadyCheckedIn),
 		attendeeType: attendeeType === 'partner' ? 'partner' : attendeeType === 'customer' ? 'customer' : null,
+	};
+}
+
+export function normalizeCapacityStatusResponse(response: Record<string, unknown>): CapacityStatus {
+	const rawCapacity = response.capacity;
+	const capacity =
+		rawCapacity === null || rawCapacity === undefined
+			? null
+			: Number.isFinite(Number(rawCapacity)) && Number(rawCapacity) > 0
+				? Number(rawCapacity)
+				: null;
+
+	return {
+		programId: String(response.programId ?? ''),
+		eventId: String(response.eventId ?? ''),
+		capacity,
+		checkedInCount: Number(response.checkedInCount ?? 0),
+		departureCount: Number(response.departureCount ?? 0),
+		liveAttendance: Number(response.liveAttendance ?? 0),
 	};
 }

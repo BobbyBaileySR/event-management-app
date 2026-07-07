@@ -17,7 +17,8 @@ const PRODUCTION_CSP = [
 	"connect-src 'self' https://accounts.google.com https://www.googleapis.com https://*.gstatic.com https://event.scriptrunnerconnect.com",
 	// HubSpot CDN hosts (e.g. cdn2.hubspot.net) — add here when Slice 1 renders real asset URLs.
 	"img-src 'self' data: https://*.googleusercontent.com https://*.gstatic.com https://accounts.google.com",
-	'frame-src https://accounts.google.com',
+	// US3 walk-in iframe — must match `isAllowedHubSpotFormUrl` allowlist (NFR-004).
+	'frame-src https://accounts.google.com https://*.hubspot.com https://*.hsforms.com https://share.hsforms.com',
 ].join('; ');
 
 function injectProductionCsp(): Plugin {

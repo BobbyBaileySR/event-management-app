@@ -150,6 +150,17 @@ export interface ConfirmCheckInResponse {
 	attendeeType: 'customer' | 'partner' | null;
 }
 
+export interface CapacityStatus {
+	programId: string;
+	eventId: string;
+	capacity: number | null;
+	checkedInCount: number;
+	departureCount: number;
+	liveAttendance: number;
+}
+
+export type AdjustCapacityDirection = 'up' | 'down';
+
 export interface AttendeesResponse {
 	attendees: Attendee[];
 	page?: number;
@@ -184,6 +195,7 @@ export interface CatalogEvent {
 	date?: string;
 	location?: string;
 	capacity?: number;
+	walkInFormUrl?: string;
 }
 
 export interface CatalogProgram {
@@ -232,6 +244,7 @@ export interface CatalogEventRecord {
 	date?: string;
 	location?: string;
 	capacity?: number;
+	walkInFormUrl?: string;
 }
 
 export interface CreateCatalogProgramBody {
@@ -269,6 +282,7 @@ export interface CreateCatalogEventBody {
 	date?: string;
 	location?: string;
 	capacity?: number;
+	walkInFormUrl?: string;
 }
 
 export interface PatchCatalogEventBody {
@@ -281,4 +295,5 @@ export interface PatchCatalogEventBody {
 	date?: string | null;
 	location?: string | null;
 	capacity?: number | null;
+	walkInFormUrl?: string | null;
 }

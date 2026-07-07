@@ -5,6 +5,7 @@ import {
 	normalizeCatalogResponse,
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
+	normalizeCapacityStatusResponse,
 	normalizeEvent,
 	normalizeEventResponse,
 	normalizeEventsResponse,
@@ -436,5 +437,32 @@ describe('normalizeConfirmCheckInResponse', () => {
 		});
 
 		expect(result.attendeeType).toBeNull();
+	});
+});
+
+describe('normalizeCapacityStatusResponse', () => {
+	it('maps capacity snapshot fields', () => {
+		const result = normalizeCapacityStatusResponse({
+			programId: 'prog-1',
+			eventId: 'ev-1',
+			capacity: 100,
+			checkedInCount: 42,
+			departureCount: 3,
+			liveAttendance: 39,
+		});
+
+		expect(result).toEqual({
+			programId: 'prog-1',
+			eventId: 'ev-1',
+			capacity: 100,
+			checkedInCount: 42,
+			departureCount: 3,
+			liveAttendance: 39,
+		});
+	});
+
+	it('normalizes unset or zero capacity to null', () => {
+		expect(normalizeCapacityStatusResponse({ capacity: 0 }).capacity).toBeNull();
+		expect(normalizeCapacityStatusResponse({ capacity: null }).capacity).toBeNull();
 	});
 });

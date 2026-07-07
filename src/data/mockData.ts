@@ -11,6 +11,8 @@ import type {
 	CatalogResponse,
 	CheckInScanResponse,
 	ConfirmCheckInResponse,
+	CapacityStatus,
+	AdjustCapacityDirection,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
@@ -358,6 +360,7 @@ const INITIAL_MOCK_CATALOG: CatalogResponse = {
 					partsAttendedOption: 'Meeting Room',
 					attendanceProperty: 'atlassian_event__customer_event_attendance',
 					archived: false,
+					capacity: 100,
 				},
 				{
 					id: 'ev-vip-2026',
@@ -437,6 +440,9 @@ export function resetMockCheckInState(): void {
 		delete mockSliceAttendeesState[key];
 	}
 	Object.assign(mockSliceAttendeesState, structuredClone(INITIAL_MOCK_SLICE_ATTENDEES));
+	for (const key of Object.keys(mockDepartureCounts)) {
+		delete mockDepartureCounts[key];
+	}
 }
 
 function findMockSliceAttendee(eventId: string, contactId: string): MockSliceAttendeeEntry | undefined {
@@ -551,6 +557,69 @@ export function mockConfirmCheckIn(
 		alreadyCheckedIn: false,
 		attendeeType: attendee.attendeeType,
 	};
+}
+
+const mockDepartureCounts: Record<string, number> = {};
+
+function mockCapacityKey(programId: string, eventId: string): string {
+	return `${programId}/${eventId}`;
+}
+
+function mockEventCapacity(eventId: string): number | null {
+	for (const program of mockCatalogState.programs) {
+		const event = program.events.find((entry) => entry.id === eventId);
+		if (event?.capacity !== undefined && Number.isFinite(event.capacity) && event.capacity > 0) {
+			return event.capacity;
+		}
+	}
+	return null;
+}
+
+function mockCheckedInCount(eventId: string): number {
+	const attendees = mockSliceAttendeesState[eventId] ?? [];
+	return attendees.filter((entry) => entry.checkedIn).length;
+}
+
+function computeMockLiveAttendance(checkedInCount: number, departureCount: number): number {
+	return Math.max(0, checkedInCount - departureCount);
+}
+
+export function getMockCapacityStatus(programId: string, eventId: string): CapacityStatus {
+	const departureCount = mockDepartureCounts[mockCapacityKey(programId, eventId)] ?? 0;
+	const checkedInCount = mockCheckedInCount(eventId);
+	return {
+		programId,
+		eventId,
+		capacity: mockEventCapacity(eventId),
+		checkedInCount,
+		departureCount,
+		liveAttendance: computeMockLiveAttendance(checkedInCount, departureCount),
+	};
+}
+
+export function mockAdjustCapacity(
+	programId: string,
+	eventId: string,
+	direction: AdjustCapacityDirection,
+): CapacityStatus {
+	const key = mockCapacityKey(programId, eventId);
+	const checkedInCount = mockCheckedInCount(eventId);
+	const departureBefore = mockDepartureCounts[key] ?? 0;
+	const liveBefore = computeMockLiveAttendance(checkedInCount, departureBefore);
+
+	if (direction === 'down') {
+		if (liveBefore <= 0) {
+			throw new Error('capacity_at_floor');
+		}
+		mockDepartureCounts[key] = departureBefore + 1;
+	} else {
+		if (liveBefore >= checkedInCount) {
+			throw new Error('capacity_at_ceiling');
+		}
+		mockDepartureCounts[key] = Math.max(0, departureBefore - 1);
+	}
+
+	return getMockCapacityStatus(programId, eventId);
 }
 
 function normalizeProgramName(name: string): string {

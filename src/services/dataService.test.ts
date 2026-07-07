@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../config';
 import { MOCK_EVENTS, resetMockCheckInState } from '../data/mockData';
-import { checkInScan, confirmCheckIn, createDataService, fetchEvents, fetchSliceAttendees } from './dataService';
+import { adjustCapacity, checkInScan, confirmCheckIn, createDataService, fetchCapacityStatus, fetchEvents, fetchSliceAttendees } from './dataService';
 
 vi.mock('../api/client', () => ({
 	apiRequest: vi.fn(),
@@ -181,5 +181,71 @@ describe('confirmCheckIn mock path', () => {
 			alreadyCheckedIn: true,
 			attendeeType: 'partner',
 		});
+	});
+});
+
+describe('fetchCapacityStatus mock path', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+	const programId = 'prog-atlassian-2026';
+	const eventId = 'ev-mr-2026';
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockCheckInState();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('returns live attendance snapshot from mock seed', async () => {
+		const result = await fetchCapacityStatus(programId, eventId);
+		expect(result).toMatchObject({
+			programId,
+			eventId,
+			capacity: 100,
+			checkedInCount: 1,
+			departureCount: 0,
+			liveAttendance: 1,
+		});
+		expect(mockedApiRequest).not.toHaveBeenCalled();
+	});
+});
+
+describe('adjustCapacity mock path', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+	const programId = 'prog-atlassian-2026';
+	const eventId = 'ev-mr-2026';
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockCheckInState();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('adjusts down and up within bounds', async () => {
+		const down = await adjustCapacity(programId, eventId, 'down');
+		expect(down.liveAttendance).toBe(0);
+		expect(down.departureCount).toBe(1);
+
+		const up = await adjustCapacity(programId, eventId, 'up');
+		expect(up.liveAttendance).toBe(1);
+		expect(up.departureCount).toBe(0);
+	});
+
+	it('rejects adjust down at floor', async () => {
+		await adjustCapacity(programId, eventId, 'down');
+		await expect(adjustCapacity(programId, eventId, 'down')).rejects.toThrow('capacity_at_floor');
 	});
 });

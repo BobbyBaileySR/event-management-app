@@ -5,6 +5,8 @@ export interface CatalogSelection {
 	evId: string | null;
 	programName: string | null;
 	eventName: string | null;
+	walkInFormUrl: string | null;
+	capacity: number | null;
 }
 
 interface CatalogContextValue extends CatalogSelection {
@@ -20,6 +22,8 @@ const emptySelection: CatalogSelection = {
 	evId: null,
 	programName: null,
 	eventName: null,
+	walkInFormUrl: null,
+	capacity: null,
 };
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
