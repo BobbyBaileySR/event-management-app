@@ -133,11 +133,11 @@ When attendance property already `Yes`: `alreadyCheckedIn: true`, no HubSpot wri
 
 ---
 
-## POST `programs/{programId}/events/{eventId}/walkin` *(US3 — not implemented)*
+## Walk-in (US3) — no EMS route
 
-Walk-in form submit → create/update Contact + Parts Attended + attendance + form submission.
+Walk-in is **not** an EMS API endpoint. Staff use **Walk-in mode** on the Check-in page, which embeds the Event's HubSpot form via `walkInFormUrl` (see [catalog-event-walkin.md](./catalog-event-walkin.md)).
 
-Document when `OnWalkIn.ts` lands.
+HubSpot form configuration handles Contact create/update, Parts Attended, attendance, and form submission. EMS does not expose `POST …/walkin` (FR-015).
 
 ---
 

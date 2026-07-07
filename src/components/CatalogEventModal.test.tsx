@@ -162,4 +162,94 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		expect(document.body.scrollWidth).toBeLessThanOrEqual(document.body.clientWidth + 1);
 	});
+
+	it('includes a valid walk-in form URL on create', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+		const walkInUrl = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), walkInUrl);
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(
+			expect.objectContaining({
+				walkInFormUrl: walkInUrl,
+			}),
+		);
+	});
+
+	it('omits walkInFormUrl when the field is empty on create', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(
+			expect.not.objectContaining({
+				walkInFormUrl: expect.anything(),
+			}),
+		);
+	});
+
+	it('blocks save and shows an error for a non-HubSpot walk-in URL', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), 'https://evil.example.com/form');
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).not.toHaveBeenCalled();
+		expect(screen.getByRole('alert')).toHaveTextContent('Walk-in form URL must be a HubSpot form URL');
+	});
+
+	it('blocks save and shows an error for a non-HTTPS walk-in URL', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await user.type(
+			screen.getByLabelText('Walk-in form URL (HubSpot)'),
+			'http://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890',
+		);
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).not.toHaveBeenCalled();
+		expect(screen.getByRole('alert')).toHaveTextContent('Walk-in form URL must use HTTPS');
+	});
+
+	it('prefills walk-in URL in edit mode and clears with null on save', async () => {
+		const walkInUrl = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
+		render(
+			<CatalogEventModal
+				mode="edit"
+				open
+				programs={programs}
+				parentProgram={programs[0]}
+				event={{
+					id: 'ev-1',
+					name: 'Keynote',
+					partsAttendedOption: 'Keynote',
+					attendanceProperty: 'atlassian_event__customer_event_attendance',
+					archived: false,
+					walkInFormUrl: walkInUrl,
+				}}
+				onCancel={onCancel}
+				onSave={onSave}
+			/>,
+		);
+		const user = userEvent.setup();
+
+		expect(screen.getByLabelText('Walk-in form URL (HubSpot)')).toHaveValue(walkInUrl);
+		await user.clear(screen.getByLabelText('Walk-in form URL (HubSpot)'));
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ walkInFormUrl: null }));
+	});
 });

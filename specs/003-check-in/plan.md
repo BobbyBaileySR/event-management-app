@@ -1,70 +1,149 @@
-# Implementation Plan: Attendees & Check-in (Slice 1)
+# Implementation Plan: US3 Walk-in (003-check-in tranche)
 
-**Branch**: `003-check-in` | **Date**: 2026-07-05 | **Spec**: [spec.md](./spec.md)
+**Branch**: `003-check-in` | **Date**: 2026-07-06 | **Spec**: [spec.md](./spec.md) (US3)
 
-**Input**: Feature specification from `/specs/003-check-in/spec.md`
+**Scope**: **User Story 3 only** — HubSpot iframe walk-in on Check-in. US1 + US2 are shipped; this tranche does not change attendee read or check-in write paths.
+
+**Input**: `/speckit-plan specs/003-check-in — US3 walk-in only`
 
 ## Summary
 
-Deliver **Slice 1** attendee read + check-in write for a selected **Program + Event**: admin-only **Attendees** list, **Check-in** via name search and in-app QR scan, idempotent HubSpot attendance write via ScriptRunner. **Walk-in** deferred to a follow-on phase after SFTP and live schema smoke.
+Add **Walk-in mode** to the Check-in page: admin toggles **Check-in | Walk-in**, sees a HubSpot registration form in an **iframe** sourced from the selected Event's **`walkInFormUrl`** (configured in the Event catalog modal). HubSpot owns all post-submit mutations; EMS provides catalog field storage, URL validation, CSP `frame-src`, and the iframe shell with a staff verification hint.
 
-Build order: **Backend handlers + tests first**, then **Frontend data layer + mock**, then **views + sidebar**, then **polish + live validation**.
+**No** `OnWalkIn.ts` / `POST …/walkin` — prior deferred backend write path is **cancelled** per FR-015.
+
+**Build order**: shared URL validator → catalog field (backend + types) → Event modal field → CSP → Check-in mode switch + iframe UI → tests → quickstart §11.
 
 ## Technical Context
 
 **Language/Version**: TypeScript — ScriptRunner Connect ECMAScript 2020 + Node 20 (Jest); React 19 + Vite (Frontend)
 
-**Primary Dependencies**: `@sr-connect/record-storage` (catalog read); HubSpot contact read/write adapters; `html5-qrcode` (npm); existing `catalogContext`, `dataService`, RouteGuard
+**Primary Dependencies**: Existing catalog handlers (`Catalog.ts`, `OnPostCatalogEvent`, `OnPatchCatalogEvent`); `catalogContext` + `CatalogPickers`; `CheckInView` + `CheckInQrPanel` (unmount lifecycle); production CSP in `vite.config.ts`
 
-**Storage**: HubSpot Contacts (attendance + Parts Attended); EMS catalog in Record Storage (Event `attendanceProperty`, Program form IDs)
+**Storage**: `walkInFormUrl` on `CatalogEventRecord` (Record Storage) — optional string metadata
 
-**Testing**: Backend `Slice1Routes.test.ts`, `CheckInJwt.test.ts`, adapter tests; Frontend Vitest on views, QR panel, dataService mock path
+**Testing**: Backend catalog validation tests (new `walkInFormUrl` cases); Frontend Vitest for Event modal validation, Check-in mode switch, iframe/empty-state, URL guard, CSP constant alignment
 
-**Target Platform**: ScriptRunner Connect + GitHub Pages (UAT branch → UAT Pages)
+**Target Platform**: ScriptRunner Connect + GitHub Pages (UAT)
 
-**Constraints**: Admin-only slice routes; JWT verify server-side; handler order unchanged; deploy Backend SFTP / Frontend Git
+**Constraints**: Admin-only; HubSpot HTTPS host allowlist; no EMS walk-in write; iframe unmounted outside Walk-in mode; `USE_MOCK_API` does not gate iframe
 
 ## Constitution Check
 
-| Gate | Status |
-| :--- | :--- |
-| Security-governed write gate (schema verified before live write) | ✅ Schema doc 2026-07-05 |
-| JWT alg-pinned + Event-id match | ✅ `CheckInJwt.ts` |
-| No secrets in frontend | ✅ |
-| RBAC admin on slice routes | ✅ `RouteGuard.ts` |
-| XSS via JSX + Vitest hostile strings | ✅ view tests |
-| Contract sync | ⏳ Merge [contracts/check-in-api.md](./contracts/check-in-api.md) → `Frontend/docs/api-contract.md` |
-| Tests ship with behaviour | ✅ (partial happy-path gaps — see tasks) |
+*GATE: Must pass before implementation. Re-checked after design.*
+
+| Gate | Status | US3 notes |
+| :--- | :--- | :--- |
+| Security — no secrets in frontend | ✅ | iframe loads public HubSpot URL only |
+| Security — XSS / CSP | ✅ | `frame-src` extended for HubSpot; src allowlist matches CSP (research R-007) |
+| Security — RBAC admin on slice surfaces | ✅ | Mode switch admin + catalog context; no new public routes |
+| API contract + RBAC sync | ⏳ | Implement with `catalog-event-walkin.md` → `docs/api-contract.md`; remove `walkin` POST from contract |
+| Tests ship with behaviour | ⏳ | Catalog validation + Check-in mode Vitest required |
+| No invented HubSpot property names | ✅ | No new HubSpot properties in EMS |
+| Deferred work in TODO.md | ⏳ | Cancel/update `BE-SLICE1-004` (OnWalkIn) when implementing |
+| Walk-in does not block US1+US2 | ✅ | FR-010 — additive UI tranche |
 
 ## Project Structure
 
+### Documentation (this tranche)
+
 ```text
-Backend/scripts/
-  OnGetAttendees.ts
-  OnCheckInScan.ts
-  OnCheckIn.ts
-  Utils/CheckInJwt.ts
-  Utils/HubSpot/RegistrationAdapter.ts
-  Utils/HubSpot/CheckInAdapter.ts
-
-Backend/node/tests/
-  Slice1Routes.test.ts
-  CheckInJwt.test.ts
-
-Frontend/src/
-  views/AttendeesView.tsx
-  views/CheckInView.tsx
-  components/CheckInQrPanel.tsx
-  services/dataService.ts
-  data/mockData.ts
+specs/003-check-in/
+├── plan.md                      # This file (US3 tranche)
+├── research.md                  # Phase 0 — iframe, allowlist, no backend write
+├── data-model.md                # Phase 1 — walkInFormUrl + CheckInMode
+├── contracts/
+│   ├── catalog-event-walkin.md  # Phase 1 — catalog field contract
+│   └── check-in-api.md          # Updated — walk-in POST removed
+├── quickstart.md                # §11 Walk-in validation added
+└── tasks.md                     # Update via /speckit-tasks (not this command)
 ```
 
-## Delivery Phases
+### Source Code (US3 touch points)
 
-1. **Foundational** — types, contract, RouteGuard, normalizers, mock layer
-2. **US1** — attendee list (Backend GET + Frontend AttendeesView)
-3. **US2** — check-in (Backend scan/confirm + Frontend CheckInView + QR panel)
-4. **US3** — walk-in (deferred)
-5. **Polish** — docs, changelogs, manual QA, SFTP, live smoke
+```text
+Backend/scripts/
+  Utils/Catalog.ts               # EVENT_METADATA_KEYS + walkInFormUrl validation
+  Utils/Types.ts                 # CatalogEventRecord + bodies
+  OnPostCatalogEvent.ts          # (unchanged entry — validation in Catalog)
+  OnPatchCatalogEvent.ts
 
-See [tasks.md](./tasks.md) for the full checklist and current completion status.
+Backend/node/tests/
+  CatalogRoutes.test.ts          # walkInFormUrl valid/invalid cases (extend existing)
+
+Frontend/src/
+  types.ts                       # CatalogEvent + bodies + CatalogSelection
+  state/catalogContext.tsx       # walkInFormUrl in selection
+  components/CatalogPickers.tsx  # pass walkInFormUrl on setSelection
+  components/CatalogEventModal.tsx
+  utils/hubspotFormUrl.ts        # shared allowlist validator (new)
+  views/CheckInView.tsx          # mode switch + WalkInPanel
+  views/CheckInView.module.css
+  vite.config.ts                 # frame-src HubSpot origins
+```
+
+**Structure decision**: No new routes or views folder entry — Walk-in is a mode inside existing `#/events/check-in`.
+
+## Delivery Phases (US3)
+
+### Phase A — Shared validation + types
+
+1. Add `isAllowedHubSpotFormUrl(url: string): boolean` (Frontend `utils/hubspotFormUrl.ts`).
+2. Mirror validation in `Backend/scripts/Utils/Catalog.ts` (`validateWalkInFormUrl`).
+3. Extend `CatalogEventRecord`, API types, `CatalogEvent`, `CreateCatalogEventBody`, `PatchCatalogEventBody` on both sides.
+4. Add `walkInFormUrl` to `EVENT_METADATA_KEYS` + normalize/merge helpers (same clear-on-null pattern as `owner`).
+
+### Phase B — Catalog admin UI
+
+1. Event modal: optional **Walk-in form URL (HubSpot)** field with inline validation on save.
+2. `eventMetadataLines` — display line when set (optional polish).
+3. Backend tests: POST/PATCH accept valid URL; reject `http:`, non-HubSpot host, overlong string.
+
+### Phase C — Check-in Walk-in mode
+
+1. Extend `CatalogSelection` + `CatalogPickers` to carry `walkInFormUrl` from selected Event.
+2. `CheckInView`: `checkInMode` state; segmented control **Check-in | Walk-in** below TopBar.
+3. **Check-in mode**: existing US2 layout (unchanged).
+4. **Walk-in mode**:
+   - Persistent hint above iframe.
+   - If `walkInFormUrl` valid → `<iframe title="HubSpot walk-in form" src={url} />` full-width in card.
+   - If unset → `EmptyState` with link to `#/catalog`.
+   - If set but invalid → error message, no iframe.
+5. Reset mode to `check-in` on `programId`/`evId` change.
+6. Conditional render: `CheckInQrPanel` only in Check-in mode (stops camera).
+
+### Phase D — CSP + docs
+
+1. `vite.config.ts`: append HubSpot origins to `frame-src`.
+2. Merge `contracts/catalog-event-walkin.md` into `Frontend/docs/api-contract.md`.
+3. Remove `POST …/walkin` from api-contract and `check-in-api.md`.
+4. Update `Backend/TODO.md` — cancel `BE-SLICE1-004` OnWalkIn; note US3 is catalog + frontend only.
+
+### Phase E — Tests + QA
+
+1. Vitest: Event modal URL validation; Check-in mode toggle; iframe vs empty state; mode reset on catalog change; QR panel not mounted in Walk-in mode.
+2. Manual: quickstart **§11**.
+
+## Complexity Tracking
+
+No constitution violations requiring justification. US3 reduces scope vs prior plan (no backend write handler).
+
+| Prior plan item | Disposition |
+| :--- | :--- |
+| `OnWalkIn.ts` + `POST …/walkin` | **Cancelled** — HubSpot iframe owns writes (FR-015) |
+| `submitWalkIn` dataService | **Cancelled** |
+| EMS-native form fields | **Cancelled** — iframe per Session 2026-07-06 |
+
+## Dependencies
+
+| Dependency | Status |
+| :--- | :--- |
+| US1 Attendees (read) | ✅ Shipped — staff verify walk-in via refresh |
+| US2 Check-in | ✅ Shipped — default mode unchanged |
+| 001/002 Catalog CRUD | ✅ Shipped — extend Event metadata |
+| HubSpot form configured for Program | **External** — events team; documented in quickstart §11 |
+| SFTP + live smoke (US1/US2) | ✅ Done per tasks — US3 can proceed |
+
+## Next command
+
+Run **`/speckit-tasks specs/003-check-in — US3 walk-in only`** to replace obsolete T043–T048 (OnWalkIn tasks) with catalog + iframe task list.

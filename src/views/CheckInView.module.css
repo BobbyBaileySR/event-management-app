@@ -9,6 +9,180 @@
 	flex-shrink: 0;
 }
 
+.deskToolbar {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	flex-shrink: 0;
+	margin-bottom: 20px;
+}
+
+.capacitySection {
+	flex-shrink: 0;
+	margin: 0;
+}
+
+.capacityCard {
+	margin-bottom: 0;
+	padding: 18px 20px;
+}
+
+.capacityCountOnly {
+	margin: 0 0 8px;
+	font-size: clamp(1.125rem, 3vw, 1.35rem);
+	font-weight: 700;
+	color: var(--color-denim);
+}
+
+.capacitySetupHint {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--color-muted);
+}
+
+.capacityError {
+	margin: 0 0 8px;
+	font-size: 0.875rem;
+	color: var(--color-danger, #b00020);
+}
+
+.deskToolbar {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	flex-shrink: 0;
+	margin-bottom: 20px;
+}
+
+.modeSwitchGroup {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin-top: 24px;
+	padding-top: 20px;
+}
+
+.modeDivider {
+	height: 2px;
+	border: 0;
+	margin: 0;
+	background: var(--color-border, rgba(0, 0, 0, 0.12));
+	border-radius: 999px;
+}
+
+.modeSwitchLabel {
+	margin: 0;
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-muted);
+}
+
+.modeSwitch {
+	display: flex;
+	width: 100%;
+	flex-shrink: 0;
+	gap: 10px;
+	border: none;
+	border-radius: 0;
+	overflow: visible;
+	background: transparent;
+	box-shadow: none;
+}
+
+.modeSwitch button {
+	flex: 1;
+	min-height: 56px;
+	padding: 14px 20px;
+	border: 2px solid var(--color-border, rgba(0, 0, 0, 0.12));
+	border-radius: var(--radius-md, 8px);
+	background: var(--color-white, #fff);
+	font: inherit;
+	font-size: 1.125rem;
+	font-weight: 700;
+	cursor: pointer;
+	text-align: center;
+	box-shadow: var(--shadow-card, 0 1px 3px rgba(0, 0, 0, 0.08));
+}
+
+.modeActive {
+	border-color: var(--color-info, #0066cc) !important;
+	background: rgba(0, 102, 204, 0.1);
+	color: var(--color-denim);
+}
+
+.walkInCard {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	margin-bottom: 0;
+}
+
+.walkInHint {
+	margin: 0 0 16px;
+	font-size: 0.9375rem;
+	line-height: 1.5;
+}
+
+.walkInError {
+	margin: 0;
+	color: var(--color-danger, #b00020);
+}
+
+.walkInFrame {
+	width: 100%;
+	min-height: min(70vh, 720px);
+	border: 0;
+	border-radius: 4px;
+	background: #fff;
+}
+
+@media (max-width: 900px) {
+	.deskToolbar {
+		margin-bottom: 16px;
+	}
+
+	.modeSwitchGroup {
+		margin-top: 20px;
+		padding-top: 16px;
+	}
+
+	.capacityCard {
+		padding: 16px;
+	}
+
+	.walkInFrame {
+		min-height: min(65vh, 640px);
+	}
+}
+
+@media (max-width: 480px) {
+	.deskToolbar {
+		margin-bottom: 12px;
+	}
+
+	.modeSwitchGroup {
+		margin-top: 18px;
+		padding-top: 14px;
+		gap: 10px;
+	}
+
+	.modeSwitch button {
+		min-height: 52px;
+		font-size: 1.0625rem;
+	}
+
+	.capacityCard {
+		padding: 14px;
+	}
+
+	.walkInFrame {
+		min-height: min(58vh, 520px);
+	}
+}
+
 .layout {
 	display: grid;
 	grid-template-columns: 1fr 1fr;

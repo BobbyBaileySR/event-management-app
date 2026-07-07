@@ -11,6 +11,8 @@ const EMPTY_SELECTION = {
 	evId: null,
 	programName: null,
 	eventName: null,
+	walkInFormUrl: null,
+	capacity: null,
 } as const;
 
 export function CatalogPickers() {
@@ -52,6 +54,8 @@ export function CatalogPickers() {
 						evId: null,
 						programName: selectedProgram.name,
 						eventName: null,
+						walkInFormUrl: null,
+						capacity: null,
 					});
 					return;
 				}
@@ -67,6 +71,8 @@ export function CatalogPickers() {
 					evId: selectedEvent.id,
 					programName: selectedProgram.name,
 					eventName: selectedEvent.name,
+					walkInFormUrl: selectedEvent.walkInFormUrl ?? null,
+					capacity: selectedEvent.capacity ?? null,
 				});
 			})
 			.catch((err: unknown) => {
@@ -120,6 +126,8 @@ export function CatalogPickers() {
 			evId: null,
 			programName: program.name,
 			eventName: null,
+			walkInFormUrl: null,
+			capacity: null,
 		});
 	}
 
@@ -134,6 +142,8 @@ export function CatalogPickers() {
 				evId: null,
 				programName: activeProgram.name,
 				eventName: null,
+				walkInFormUrl: null,
+				capacity: null,
 			});
 			return;
 		}
@@ -149,6 +159,8 @@ export function CatalogPickers() {
 			evId: event.id,
 			programName: activeProgram.name,
 			eventName: event.name,
+			walkInFormUrl: event.walkInFormUrl ?? null,
+			capacity: event.capacity ?? null,
 		});
 	}
 

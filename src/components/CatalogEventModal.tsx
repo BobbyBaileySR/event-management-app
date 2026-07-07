@@ -7,6 +7,7 @@ import type {
 } from '../types';
 import { ATTENDANCE_PROPERTY_PRESETS, suggestAttendanceProperty } from '../constants/hubspot';
 import { optionalNumberForPatch, optionalTextForPatch } from '../utils/catalogMetadata';
+import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
 import styles from './CatalogEventModal.module.css';
 
 export interface CatalogEventModalProps {
@@ -29,6 +30,28 @@ interface EventFormState {
 	date: string;
 	location: string;
 	capacity: string;
+	walkInFormUrl: string;
+}
+
+function walkInFormUrlFieldError(url: string): string | null {
+	const trimmed = url.trim();
+	if (!trimmed) {
+		return null;
+	}
+	if (isAllowedHubSpotFormUrl(trimmed)) {
+		return null;
+	}
+
+	try {
+		const parsed = new URL(trimmed);
+		if (parsed.protocol !== 'https:') {
+			return 'Walk-in form URL must use HTTPS';
+		}
+	} catch {
+		return 'Walk-in form URL must use HTTPS';
+	}
+
+	return 'Walk-in form URL must be a HubSpot form URL';
 }
 
 function emptyForm(defaultProgramId = ''): EventFormState {
@@ -42,6 +65,7 @@ function emptyForm(defaultProgramId = ''): EventFormState {
 		date: '',
 		location: '',
 		capacity: '',
+		walkInFormUrl: '',
 	};
 }
 
@@ -56,6 +80,7 @@ function formFromEvent(event: CatalogEvent, programId: string): EventFormState {
 		date: event.date ?? '',
 		location: event.location ?? '',
 		capacity: event.capacity !== undefined ? String(event.capacity) : '',
+		walkInFormUrl: event.walkInFormUrl ?? '',
 	};
 }
 
@@ -83,6 +108,10 @@ function buildCreateBody(form: EventFormState): CreateCatalogEventBody {
 		if (Number.isFinite(capacity)) {
 			body.capacity = capacity;
 		}
+	}
+	const walkInFormUrl = form.walkInFormUrl.trim();
+	if (walkInFormUrl) {
+		body.walkInFormUrl = walkInFormUrl;
 	}
 	return body;
 }
@@ -114,6 +143,10 @@ function buildPatchBody(event: CatalogEvent, form: EventFormState): PatchCatalog
 	if (capacity !== undefined) {
 		body.capacity = capacity;
 	}
+	const walkInFormUrl = optionalTextForPatch(event.walkInFormUrl, form.walkInFormUrl);
+	if (walkInFormUrl !== undefined) {
+		body.walkInFormUrl = walkInFormUrl;
+	}
 
 	return body;
 }
@@ -136,6 +169,7 @@ export function CatalogEventModal({
 	const [form, setForm] = useState<EventFormState>(emptyForm());
 	const [saving, setSaving] = useState(false);
 	const [programMenuOpen, setProgramMenuOpen] = useState(false);
+	const [walkInFormUrlError, setWalkInFormUrlError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!open) {
@@ -147,6 +181,7 @@ export function CatalogEventModal({
 			setForm(emptyForm(programs[0]?.id ?? ''));
 		}
 		setProgramMenuOpen(false);
+		setWalkInFormUrlError(null);
 		if (mode === 'edit') {
 			nameInputRef.current?.focus();
 		} else {
@@ -189,6 +224,12 @@ export function CatalogEventModal({
 
 	async function handleSubmit(submitEvent: FormEvent) {
 		submitEvent.preventDefault();
+		const walkInUrlError = walkInFormUrlFieldError(form.walkInFormUrl);
+		if (walkInUrlError) {
+			setWalkInFormUrlError(walkInUrlError);
+			return;
+		}
+		setWalkInFormUrlError(null);
 		setSaving(true);
 		try {
 			if (mode === 'create') {
@@ -220,7 +261,11 @@ export function CatalogEventModal({
 		>
 			<div className={`modal ${styles.modal}`}>
 				<h3 id={titleId}>{title}</h3>
-				<form className={styles.form} onSubmit={(submitEvent) => void handleSubmit(submitEvent)}>
+				<form
+					className={styles.form}
+					noValidate
+					onSubmit={(submitEvent) => void handleSubmit(submitEvent)}
+				>
 					{mode === 'create' ? (
 						<div className={styles.programField} ref={programFieldRef}>
 							<span id={programLabelId} className={styles.programFieldLabel}>
@@ -357,6 +402,24 @@ export function CatalogEventModal({
 								setForm((current) => ({ ...current, capacity: changeEvent.target.value }))
 							}
 						/>
+					</label>
+					<label>
+						Walk-in form URL (HubSpot)
+						<input
+							type="url"
+							value={form.walkInFormUrl}
+							aria-invalid={walkInFormUrlError ? true : undefined}
+							aria-describedby={walkInFormUrlError ? `${titleId}-walk-in-url-error` : undefined}
+							onChange={(changeEvent) => {
+								setWalkInFormUrlError(null);
+								setForm((current) => ({ ...current, walkInFormUrl: changeEvent.target.value }));
+							}}
+						/>
+						{walkInFormUrlError ? (
+							<span id={`${titleId}-walk-in-url-error`} className={styles.fieldError} role="alert">
+								{walkInFormUrlError}
+							</span>
+						) : null}
 					</label>
 					<div className="modal__actions">
 						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={saving}>

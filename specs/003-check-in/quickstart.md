@@ -1,25 +1,47 @@
-# Quickstart: Attendees & Check-in validation (003)
+# Quickstart: Attendees & Check-in (003)
 
-End-to-end checks for **003-check-in** (Slice 1 attendee list + check-in). Builds on [001 quickstart](../001-catalog-admin/quickstart.md) and [002 quickstart](../002-catalog-metadata-modal/quickstart.md).
+Manual and automated validation for **Slice 1** — attendee list (US1), check-in by name search + QR (US2), and walk-in iframe (US3).
 
 **Related**: [spec.md](./spec.md) · [tasks.md](./tasks.md) · [contracts/check-in-api.md](./contracts/check-in-api.md)
+
+Builds on [001 quickstart](../001-catalog-admin/quickstart.md) and [002 quickstart](../002-catalog-metadata-modal/quickstart.md).
+
+---
+
+## Sign-off overview
+
+| Area | Gate | Notes |
+| :--- | :---: | :--- |
+| **Automated tests** | Required | §A — run before every release candidate |
+| **US1 Attendees** | Required | §B3 — live UAT with `USE_MOCK_API: false` |
+| **US2 Name check-in** | Required | §B4 — live UAT; primary check-in write path |
+| **US2 Live QR scan** | Required for Slice 1 close | §B5 — camera + Event JWT on UAT/Live device ([T060](./tasks.md)); not a blocker for name-search release |
+| **US3 Walk-in** | Required for US3 close | §B6 — HubSpot form + Attendees verification |
+| **UI / UX regression** | Required | §B7 — with live UAT sign-off |
+| **Mock-only runs** | Optional | Skip if §B3–B4 completed on UAT with live API |
+
+**Performance (accepted for Slice 1)**: first attendee load / search may take several seconds on live HubSpot — wait for spinners to clear; slowness alone is not a release blocker (see **BE-SLICE1-006** / **FE-SLICE1-005**).
 
 ---
 
 ## Prerequisites
 
-1. **001 + 002** catalog on `uat` (live `GET catalog` via ScriptRunner).
-2. **003 Backend** slice handlers SFTP-deployed: `OnGetAttendees`, `OnCheckInScan`, `OnCheckIn`, HubSpot adapters, `OnHttpRouter` route wiring.
-3. Frontend `config.ts`: **`USE_MOCK_API: false`** for release QA (ScriptRunner Connect). Use **`true`** only for offline UI iteration without Backend.
-4. Admin test account in `USER_ROLE_MAP`; viewer/staff account for RBAC checks.
-5. Catalog selection: a **live** Program + Event with known HubSpot registrants (not mock seed names unless `USE_MOCK_API: true`).
-6. ScriptRunner Parameters (live QR): `CHECKIN_JWT_PUBLIC_KEY`, `CHECKIN_JWT_ISSUER` — required before §5 live QR.
+1. **001 + 002** catalog deployed on `uat` (live `GET catalog` via ScriptRunner).
+2. **003 Backend** handlers SFTP-deployed: `OnGetAttendees`, `OnCheckInScan`, `OnCheckIn`, HubSpot adapters, `OnHttpRouter` route wiring.
+3. Frontend `config.ts`: **`USE_MOCK_API: false`** for release QA (ScriptRunner Connect). Use **`true`** only for offline UI work without Backend.
+4. **Admin** test account in `USER_ROLE_MAP`; **viewer/staff** account for RBAC checks.
+5. Catalog selection: a **live** Program + Event with known HubSpot registrants.
+6. ScriptRunner Parameters (live QR): `CHECKIN_JWT_PUBLIC_KEY`, `CHECKIN_JWT_ISSUER`.
 
-**Mock-only shortcut**: Program `prog-atlassian-2026` + Event `ev-mr-2026` seed (`Jane Doe`, `Pat Lee`) when `USE_MOCK_API: true`.
+**Mock shortcut** (`USE_MOCK_API: true`): Program `prog-atlassian-2026` + Event `ev-mr-2026` — seed contacts `Jane Doe`, `Pat Lee`.
 
 ---
 
-## 1. Backend unit tests (local)
+## A. Automated tests
+
+Run locally before manual QA or deploy.
+
+### A1. Backend
 
 ```bash
 cd Backend
@@ -27,17 +49,15 @@ npm test -- --testPathPattern="Slice1|CheckInJwt|RegistrationAdapter"
 npm run lint:fix
 ```
 
-**Expected**:
+| Suite | Covers |
+| :--- | :--- |
+| `Slice1Routes.test.ts` | 401/403 attendees; 422/503 scan; 422 confirm; idempotent confirm |
+| `CheckInJwt.test.ts` | Alg pin, expiry, event mismatch |
+| `RegistrationAdapter.test.ts` | Registrant query logic |
 
-- `Slice1Routes.test.ts` — 401/403 attendees; 422/503 scan; 422 confirm; idempotent confirm
-- `CheckInJwt.test.ts` — alg pin, expiry, event mismatch
-- `RegistrationAdapter.test.ts` — registrant query logic
+**Gap (before live cutover)**: add happy-path scan + first-time confirm tests (tasks T041–T042).
 
-**Gap (before live)**: add happy-path scan + first-time confirm tests (see tasks T041–T042).
-
----
-
-## 2. Frontend unit tests (local)
+### A2. Frontend
 
 ```bash
 cd Frontend
@@ -45,144 +65,193 @@ npm test -- Attendees CheckIn CheckInQr dataService
 npm run lint
 ```
 
-**Expected**: AttendeesView (7), CheckInView (9), LoadingState (2), CheckInQrPanel, dataService slice paths. Check-in tests must finish in &lt;10s (stable `useDataService` mock — fixed 2026-07-06).
+| Area | Covers |
+| :--- | :--- |
+| AttendeesView | Pagination, debounced search, filter, layout |
+| CheckInView | Name search, confirm, idempotent repeat, mode switch |
+| CheckInQrPanel | Scanner lifecycle, mock simulate |
+| dataService | Slice attendee/check-in API paths |
+| LoadingState | Spinner + skeleton (not text-only) |
+| Responsive smoke | ~375px overflow (Attendees + Check-in) |
+| XSS guards | Hostile strings render as text |
 
-**Automated coverage from 2026-07-06 window**: pagination, debounced search (layout stays mounted), 375px overflow smoke (Attendees + Check-in), XSS guards.
-
----
-
-## 3. Attendees list (admin)
-
-**API**: `GET /api/ems/programs/{programId}/events/{eventId}/attendees` → ScriptRunner → HubSpot (when `USE_MOCK_API: false`).
-
-1. Sign in as **admin**.
-2. Select **Program** + **Event** in catalog pickers (live catalog entries).
-3. Sidebar → **Attendees** (`#/events/attendees`).
-
-**Expected**:
-
-- Initial load shows **spinner + table skeleton** (not plain text only); TopBar stays visible.
-- Table fills available vertical space; scrolls inside the card when many rows.
-- Columns: name, company, email, account manager, track, checked-in.
-- TopBar meta shows total + range (e.g. `N registered · showing 1–50 · HubSpot live`).
-- If **N &gt; 50**: **Previous** / **Next** pagination works; range updates; table shows **Updating…** overlay and pagination reads **Loading page…** while the next page loads.
-- Search a **known live registrant** (partial name/company) → results after ~300ms pause; page stays mounted with inline **Updating…** spinner (no full-page reload).
-- Filter **Not checked in** → unchecked rows only.
-- **Performance (accepted for Slice 1)**: first load / search may take several seconds on live HubSpot — wait for spinner to clear; do not fail QA for slowness alone (see **BE-SLICE1-006** / **FE-SLICE1-005**).
-
-4. Sign in as **viewer/staff** → Attendees link hidden or route redirects to `#/events`.
-
-**Mock variant** (`USE_MOCK_API: true`): search `Jane` → Jane Doe; pagination with total 120 if seed extended.
+Check-in tests must finish in **< 10 s** (stable `useDataService` mock).
 
 ---
 
-## 4. Check-in by name search (admin)
+## B. Manual QA checklist
 
-**API**: same attendees route with `q`, `page=1`, `pageSize=200` (server-side search across registrants).
+Use **UAT** with `USE_MOCK_API: false` unless a step says otherwise. Mark each item pass/fail in the **Manual QA log** at the bottom.
 
-1. Admin + catalog context → **Check-in** (`#/events/check-in`).
-2. Before typing: table shows “Type at least 2 characters…”.
-3. Search **≥2 characters** matching a **live registrant** → select row → summary shows email, company, account manager.
-4. **Confirm check-in** → success toast; repeat → idempotent “already checked in” toast.
+### B0. Environment smoke (release gate)
 
-**Expected**:
-
-- Typing does **not** flash full-page loading; inline **Searching…** spinner while fetching.
-- QR panel stays visible while searching.
-- On mobile/tablet (~375px): QR block above search; table columns collapse; no horizontal page scroll.
-- If &gt;200 matches: hint “Showing 200 of N matches — type more to narrow results.”
-
-**Mock variant**: search `Pat` → Pat Lee; **Simulate QR scan** button visible (mock panel only).
+- [ ] Backend SFTP deploy includes `OnGetAttendees.ts`, `OnCheckInScan.ts`, `OnCheckIn.ts`, `Utils/HubSpot/HubSpotApiClient.ts` (Managed Fetch — not raw `fetch`), adapters, router.
+- [ ] ScriptRunner Parameters set: `CHECKIN_JWT_PUBLIC_KEY`, `CHECKIN_JWT_ISSUER`.
+- [ ] Frontend UAT build: `USE_MOCK_API: false`, `API_BASE_URL: '/api/ems'`.
+- [ ] No `No handler for programs/.../attendees` or `URL must start with http://` HubSpot errors on attendee load.
 
 ---
 
-## 5. Check-in by QR scan (admin)
+### B1. Shared — catalog context & RBAC
 
-**API**: `POST .../checkin/scan` with JWT body → ScriptRunner verify + HubSpot contact read.
+**API context**: all slice routes require `programId` + `eventId` from catalog pickers.
 
-> **Release gate:** Live QR (camera + real JWT) is **not required** for §8 sign-off. Name search (§4) covers the live check-in write path. Complete live QR in **§10** at end-of-Slice 1 QA (2026-07-06 — all other quickstart checks passed; QR deferred).
-
-### Live (`USE_MOCK_API: false`) — end-of-Slice 1 (§10)
-
-1. Confirm ScriptRunner Parameters set (§8 step 2).
-2. On Check-in page, allow camera → scan a **valid Event JWT** QR for the selected Program + Event.
-3. Summary card populates → **Confirm check-in** as §4.
-
-**Expected**: Scan rejects wrong-Event JWT; `503` if Parameters missing.
-
-**Why deferred:** Camera access, HTTPS origin, and physical QR codes are hard to validate on a dev laptop alone. Backend scan route + Parameters are deployed; validate end-to-end when a real device and Event JWTs are available.
-
-### Mock (`USE_MOCK_API: true`)
-
-1. Click **Simulate QR scan** → summary populates → confirm as §4.
-
-**Camera / dev laptop**: QR video may be empty if no camera — name search still works; restart Vite dev server after pulling `html5-qrcode` test-alias fix if scanner fails to load in dev.
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Sign in as **admin**. Clear Program or Event picker → navigate directly to `#/events/attendees` or `#/events/check-in`. | Empty state: *"Select a Program and Event using the catalog pickers…"* |
+| 2 | Select Program + Event → sidebar shows **Attendees** and **Check-in** links. | Links visible; routes load data for selected Event only. |
+| 3 | Sign in as **viewer/staff** with Program + Event selected. | Attendees / Check-in links hidden **or** route redirects to `#/events`. No attendee PII visible. |
+| 4 | Catalog pickers loading. | Inline spinner (*"Loading catalog…"*) while catalog fetches. |
 
 ---
 
-## 6. Catalog context gating
+### B2. US1 — Attendees list
 
-1. Clear Program or Event picker → open Attendees or Check-in directly via hash URL.
+**Route**: `#/events/attendees`  
+**API**: `GET /api/ems/programs/{programId}/events/{eventId}/attendees`
 
-**Expected**: Empty state — "Select a Program and Event using the catalog pickers…"
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Admin + Program + Event → open **Attendees**. | Spinner + **table skeleton** on first load (not plain text only). TopBar stays visible. |
+| 2 | Wait for load to complete. | Table columns: name, company, email, account manager, track, checked-in. TopBar meta shows total + range (e.g. `N registered · showing 1–50 · HubSpot live`). |
+| 3 | Desktop layout. | Table fills available vertical space; scrolls inside card when many rows. |
+| 4 | If **N > 50**: click **Next** / **Previous**. | Range updates; table shows **Updating…** overlay; pagination reads **Loading page…** while fetching. |
+| 5 | Search a **known live registrant** (partial name or company). | Results after ~300 ms debounce; page stays mounted with inline **Updating…** spinner (no full-page reload). |
+| 6 | Filter **Not checked in**. | Only unchecked rows shown. |
+| 7 | Filter **Checked in** (if any). | Only checked-in rows shown. |
 
----
-
-## 7. XSS smoke (automated + spot check)
-
-Hostile strings in attendee name/company render as **text**, not HTML (covered by Vitest; spot-check in browser if adding seed data).
-
----
-
-## 8. Live API smoke (release gate)
-
-**This is the primary sign-off path** when `USE_MOCK_API: false` (current UAT default).
-
-1. Confirm SFTP deploy: `Backend/scripts/` including `OnGetAttendees.ts`, `OnCheckInScan.ts`, `OnCheckIn.ts`, `Utils/HubSpot/HubSpotApiClient.ts` (Managed Fetch — not raw `fetch`), adapters, router.
-2. Set ScriptRunner Parameters: `CHECKIN_JWT_PUBLIC_KEY`, `CHECKIN_JWT_ISSUER`.
-3. Frontend UAT build: `USE_MOCK_API: false`, `API_BASE_URL: '/api/ems'`.
-4. Repeat **§3–§4 (live)** and **§9** against real HubSpot registrants. **§5 live QR** → **§10** (end-of-Slice 1).
-
-**Expected**: Attendee list from HubSpot; name-search confirm writes attendance property; idempotent repeat; no `No handler for programs/.../attendees` or `URL must start with http://` HubSpot errors. Live QR scan (wrong-Event JWT reject, happy path) validated separately in §10.
+**Mock variant** (`USE_MOCK_API: true`): search `Jane` → Jane Doe; pagination with extended seed (total 120 if configured).
 
 ---
 
-## 9. UI / UX regression (2026-07-06 — release gate with §8)
+### B3. US2 — Check-in by name search
 
-1. **Loading feedback**: Attendees / Events / Check-in show spinner + skeleton (not text-only) on initial load.
-2. **Responsive**: DevTools ~375px and ~768px — Check-in usable (QR first, tappable controls, no page-level horizontal scroll).
-3. **Attendees layout**: table uses full card height on desktop.
-4. **Catalog pickers**: inline spinner while catalog loads (`Loading catalog…`).
+**Route**: `#/events/check-in`  
+**API**: same attendees route with `q`, `page=1`, `pageSize=200`
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Admin + Program + Event → open **Check-in**. | Before typing: table shows *"Type at least 2 characters…"*. QR panel visible. |
+| 2 | Search **≥ 2 characters** matching a **live registrant** → select row. | Summary card shows email, company, account manager, track, checked-in state. Inline **Searching…** spinner while fetching (no full-page reload). |
+| 3 | Click **Confirm check-in** on unchecked registrant. | Success toast; HubSpot attendance updated; UI reflects checked-in. |
+| 4 | **Confirm check-in** again on same registrant. | Idempotent *"already checked in"* toast; no duplicate HubSpot write. |
+| 5 | If > 200 matches exist. | Hint: *"Showing 200 of N matches — type more to narrow results."* |
+| 6 | DevTools ~375 px width. | QR block above search; table columns collapse; no horizontal page scroll; controls tappable. |
+| 7 | DevTools ~768 px width. | Check-in layout usable; no page-level horizontal scroll. |
+
+**Mock variant** (`USE_MOCK_API: true`): search `Pat` → Pat Lee; **Simulate QR scan** button visible in QR panel.
 
 ---
 
-## 10. End-of-Slice 1 — Live QR scanner QA
+### B4. US2 — Check-in by QR scan
 
-Run **after** §8 sign-off (and ideally on a **phone/tablet** or machine with a working camera on the deployed UAT/Live origin — not localhost-only).
+**API**: `POST .../checkin/scan` (JWT body) → ScriptRunner verify + HubSpot contact read
 
-**Prerequisites**: §8 steps 1–2 done (`CHECKIN_JWT_PUBLIC_KEY`, `CHECKIN_JWT_ISSUER`); at least one **valid Event JWT** QR for the selected Program + Event.
+#### B4a. Mock (`USE_MOCK_API: true`)
 
-1. Admin + catalog context → **Check-in** on UAT/Live URL (`USE_MOCK_API: false`).
-2. Allow camera permission → QR panel shows live video feed (not blank).
-3. Scan valid Event JWT → summary card populates (name, email, company).
-4. **Confirm check-in** → success toast; HubSpot attendance updated.
-5. Scan **wrong-Event** JWT → inline error; no summary card.
-6. Repeat confirm on same registrant → idempotent “already checked in” toast.
-7. Mobile (~375px): QR block above search; scanner usable; no duplicate camera feeds on navigate away/back.
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Check-in page → click **Simulate QR scan**. | Summary card populates. |
+| 2 | **Confirm check-in** → repeat confirm. | Success toast; then idempotent *"already checked in"* toast. |
 
-**Sign-off column**: Manual QA log **§10 QR (live)**.
+#### B4b. Live (`USE_MOCK_API: false`) — Slice 1 close-out
 
-**Parked as**: **FE-SLICE1-007** / **BE-SLICE1-007** in `TODO.md`.
+Run on **UAT/Live URL** with a device that has a working camera (phone/tablet preferred — not localhost-only).
+
+**Prerequisites**: B0 Parameters set; at least one **valid Event JWT** QR for the selected Program + Event.
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Allow camera permission. | QR panel shows live video feed (not blank). |
+| 2 | Scan **valid Event JWT** for selected Program + Event. | Summary card populates (name, email, company). |
+| 3 | **Confirm check-in**. | Success toast; HubSpot attendance updated. |
+| 4 | Scan **wrong-Event** JWT. | Inline error; no summary card. Scan route returns rejection (not silent pass). |
+| 5 | Repeat confirm on same registrant. | Idempotent *"already checked in"* toast. |
+| 6 | Navigate away from Check-in and back (~375 px). | QR block above search; scanner usable; **no duplicate camera feeds**. |
+| 7 | Unset `CHECKIN_JWT_PUBLIC_KEY` (staging test only). | Scan returns `503`; not silent pass. |
+
+**Dev laptop note**: QR video may be empty without a camera — name search (B3) still validates the check-in write path. Restart Vite after pulling `html5-qrcode` test-alias fix if scanner fails to load in dev.
+
+**Tracked as**: [T060](./tasks.md) · **FE-SLICE1-007** / **BE-SLICE1-007**
+
+---
+
+### B5. US3 — Walk-in via HubSpot iframe
+
+**Scope**: Check-in **Walk-in** mode + Event `walkInFormUrl` in catalog. **No EMS walk-in POST** — HubSpot form owns writes.
+
+**Prerequisites**: B2 + B3 working; HubSpot walk-in form created and configured (Parts Attended, attendance, Program form submission — HubSpot admin responsibility); valid HubSpot form embed or share URL (HTTPS, allowlisted host).
+
+#### B5a. Catalog — `walkInFormUrl`
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Admin → **Settings** (`#/catalog`) → edit target Event. | **Walk-in form URL (HubSpot)** field visible. |
+| 2 | Set valid share/embed URL (e.g. `https://share.hsforms.com/...`) → Save. | Event saved; `GET catalog` returns `walkInFormUrl` on Event node. |
+| 3 | Enter invalid URL (non-HTTPS or non-HubSpot host) → Save. | Field error on save; backend `422`/`400` if bypassed. |
+| 4 | Clear field (PATCH `null`). | URL removed from catalog. |
+
+#### B5b. Check-in — Walk-in mode
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Admin + Program + Event (with `walkInFormUrl`) → **Check-in**. | Mode switch shows **Check-in \| Walk-in**. |
+| 2 | Select **Walk-in**. | Staff hint above iframe; HubSpot form loads in iframe; search table and QR scanner **not** visible. |
+| 3 | Switch back to **Check-in**. | US2 layout returns; iframe removed from DOM. |
+| 4 | Change Program or Event picker. | Mode resets to **Check-in**. |
+| 5 | Event with **no** `walkInFormUrl` → Walk-in mode. | Empty state with link to catalog Settings — no broken iframe. |
+| 6 | Legacy invalid URL in catalog → Walk-in mode. | Validation error shown — iframe `src` not set. |
+
+#### B5c. Form submit + Attendees verification
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | Walk-in mode → complete HubSpot form in iframe (test contact). | HubSpot thank-you / confirmation inside iframe. |
+| 2 | Open **Attendees** → refresh. | New email → new registrant in list. Existing email → contact updated, not duplicated; checked-in state per HubSpot form config. |
+
+**Note**: `USE_MOCK_API: true` still loads real HubSpot iframe when URL is set (mock does not block iframe).
+
+#### B5d. CSP (production build)
+
+| # | Steps | Expected |
+| :---: | :--- | :--- |
+| 1 | `npm run build` → inspect `index.html` CSP `frame-src`. | Includes `https://*.hubspot.com`, `https://*.hsforms.com`, `https://share.hsforms.com`. |
+| 2 | Deploy to UAT → Walk-in mode. | Iframe loads (not CSP-blocked). |
+
+---
+
+### B6. Cross-cutting UI / UX
+
+| # | Check | Expected |
+| :---: | :--- | :--- |
+| 1 | Initial load — Attendees, Events, Check-in. | Spinner + skeleton (not text-only loading). |
+| 2 | Check-in search while typing. | Layout (including QR panel) stays mounted; only table refreshes. |
+| 3 | Attendees search while typing. | Same non-blocking refresh behaviour. |
+| 4 | Responsive ~375 px and ~768 px. | Check-in usable; QR first on narrow viewports; no page-level horizontal scroll. |
+| 5 | Attendees desktop layout. | Table uses full card height. |
+
+---
+
+### B7. Security smoke
+
+| # | Check | Expected |
+| :---: | :--- | :--- |
+| 1 | Hostile strings in attendee name/company (Vitest + optional browser spot-check). | Rendered as **text**, not HTML (XSS guard). |
+| 2 | Non-admin access attempts (B1). | No attendee PII exposed. |
 
 ---
 
 ## Manual QA log
 
-| Date | Tester | §3 Attendees | §4 Name check-in | §8 Live API | §9 UI/UX | §10 QR (live) | Notes |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| 2026-07-06 | | ✅ | ✅ | ✅ | ✅ | ⬜ deferred | SFTP + Parameters done; all quickstart checks pass except live QR — see §10 |
+| Date | Tester | B0 Env | B1 Shared | B2 Attendees | B3 Name CI | B4 QR | B5 Walk-in | B6 UI/UX | Notes |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| 2026-07-06 | | ✅ | ✅ | ✅ | ✅ | ⬜ deferred | ⬜ pending | ✅ | SFTP + Parameters done; US3 walk-in QA pending |
 
-**Sign-off**: §8 + §9 required for live release (name-search check-in path). **§10 live QR** required before Slice 1 is fully closed (with walk-in when unblocked). §3–§5 mock variants optional if §8 run on UAT with `USE_MOCK_API: false`.
+**Column guide**
+
+- **B4 QR**: use **mock** ✅ if B4a passed; use **live** ✅ when B4b complete (Slice 1 close-out).
+- **Sign-off for live release (name-search path)**: B0 + B1 + B2 + B3 + B6.
+- **Sign-off for Slice 1 complete**: above + B4b live QR + B5 Walk-in.
 
 ---
 
@@ -191,13 +260,16 @@ Run **after** §8 sign-off (and ideally on a **phone/tablet** or machine with a 
 | Symptom | Likely cause |
 | :--- | :--- |
 | Full page reload on every search keystroke | Old build — need debounced search + non-blocking refresh |
-| Plain “Loading…” text only | Old build — need `LoadingState` spinner/skeleton |
+| Plain "Loading…" text only | Old build — need `LoadingState` spinner/skeleton |
 | Two QR camera feeds | Scanner not stopped on unmount — see `CheckInQrPanel` cleanup |
 | QR scanner blank in **dev** only | Restart Vite after `html5-qrcode` test-only alias fix |
 | Search returns only first 50 (live) | Old build — Attendees needs pagination; Check-in needs server `q` + `pageSize` 200 |
 | Check-in search needs 2+ characters | By design — avoids loading full roster on open |
 | Slow attendee load (live) | Expected Slice 1 — full HubSpot join per request; not a release blocker |
 | `URL must start with http://` (live) | `HubSpotApiClient` not using ScriptRunner Managed Fetch — redeploy `HubSpotApiClient.ts` |
-| Search returns full list | Mock not filtering — `getMockSliceAttendees` must receive `q` |
+| Search returns full list (mock) | Mock not filtering — `getMockSliceAttendees` must receive `q` |
 | `503` on scan (live) | JWT public key not in ScriptRunner Parameters |
 | Attendees 404 (live) | Slice handlers not SFTP-deployed yet |
+| Walk-in iframe blank (UAT) | CSP `frame-src` missing HubSpot origins — rebuild + redeploy Frontend |
+| Walk-in iframe blank (dev) | Dev server has no production CSP — check URL allowlist and HubSpot form URL |
+| HubSpot form submits but no Attendee row | HubSpot form/workflows not setting Parts Attended + Program form leg — fix in HubSpot, not EMS |

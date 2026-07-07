@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CheckInQrPanel } from '../components/CheckInQrPanel';
+import { CapacityBar } from '../components/CapacityBar';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
@@ -8,10 +9,12 @@ import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
-import type { CheckInContactSummary, SliceAttendee } from '../types';
+import type { AdjustCapacityDirection, CapacityStatus, CheckInContactSummary, SliceAttendee } from '../types';
+import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
 import styles from './CheckInView.module.css';
 
 type SelectedAttendee = SliceAttendee | CheckInContactSummary;
+type CheckInMode = 'check-in' | 'walk-in';
 
 /** Server-side search runs across all registrants; require typing before fetch. */
 const CHECK_IN_MIN_SEARCH_LENGTH = 2;
@@ -22,11 +25,33 @@ function attendeeName(person: { firstName: string; lastName: string }): string {
 	return `${person.firstName} ${person.lastName}`.trim();
 }
 
+function walkInUrlRenderError(url: string): string | null {
+	const trimmed = url.trim();
+	if (!trimmed) {
+		return null;
+	}
+	if (isAllowedHubSpotFormUrl(trimmed)) {
+		return null;
+	}
+
+	try {
+		const parsed = new URL(trimmed);
+		if (parsed.protocol !== 'https:') {
+			return 'Walk-in form URL must use HTTPS';
+		}
+	} catch {
+		return 'Walk-in form URL must use HTTPS';
+	}
+
+	return 'Walk-in form URL must be a HubSpot form URL';
+}
+
 export function CheckInView() {
 	const { session } = useSession();
 	const { showToast } = useToast();
 	const data = useDataService();
-	const { programId, evId, programName, eventName } = useCatalogSelection();
+	const { programId, evId, programName, eventName, walkInFormUrl } = useCatalogSelection();
+	const [checkInMode, setCheckInMode] = useState<CheckInMode>('check-in');
 	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -36,11 +61,42 @@ export function CheckInView() {
 	const [selected, setSelected] = useState<SelectedAttendee | null>(null);
 	const [confirming, setConfirming] = useState(false);
 	const [scanning, setScanning] = useState(false);
+	const [capacityStatus, setCapacityStatus] = useState<CapacityStatus | null>(null);
+	const [capacityLoading, setCapacityLoading] = useState(false);
+	const [capacityError, setCapacityError] = useState<string | null>(null);
+	const [capacityAdjusting, setCapacityAdjusting] = useState(false);
+
+	const loadCapacityStatus = useCallback(async () => {
+		if (!programId || !evId) {
+			setCapacityStatus(null);
+			setCapacityError(null);
+			return;
+		}
+
+		setCapacityLoading(true);
+		setCapacityError(null);
+		try {
+			const status = await data.fetchCapacityStatus(programId, evId);
+			setCapacityStatus(status);
+		} catch (err: unknown) {
+			setCapacityStatus(null);
+			setCapacityError(err instanceof Error ? err.message : 'Failed to load capacity');
+		} finally {
+			setCapacityLoading(false);
+		}
+	}, [data, evId, programId]);
 
 	useEffect(() => {
 		setSearchQuery('');
 		setDebouncedSearch('');
+		setCheckInMode('check-in');
+		setCapacityStatus(null);
+		setCapacityError(null);
 	}, [programId, evId]);
+
+	useEffect(() => {
+		void loadCapacityStatus();
+	}, [loadCapacityStatus]);
 
 	useEffect(() => {
 		const handle = window.setTimeout(() => {
@@ -146,10 +202,27 @@ export function CheckInView() {
 				),
 			);
 			setSelected((current) => (current ? { ...current, checkedIn: true } : null));
+			await loadCapacityStatus();
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Check-in failed', 'error');
 		} finally {
 			setConfirming(false);
+		}
+	}
+
+	async function handleAdjustCapacity(direction: AdjustCapacityDirection) {
+		if (!programId || !evId) {
+			return;
+		}
+
+		setCapacityAdjusting(true);
+		try {
+			const status = await data.adjustCapacity(programId, evId, direction);
+			setCapacityStatus(status);
+		} catch (err: unknown) {
+			showToast(err instanceof Error ? err.message : 'Capacity adjust failed', 'error');
+		} finally {
+			setCapacityAdjusting(false);
 		}
 	}
 
@@ -176,18 +249,118 @@ export function CheckInView() {
 
 	const searchReady = debouncedSearch.trim().length >= CHECK_IN_MIN_SEARCH_LENGTH;
 	const resultsTruncated = searchReady && matchTotal > attendees.length;
+	const trimmedWalkInUrl = walkInFormUrl?.trim() ?? '';
+	const walkInUrlError = trimmedWalkInUrl ? walkInUrlRenderError(trimmedWalkInUrl) : null;
+	const walkInIframeSrc =
+		checkInMode === 'walk-in' && trimmedWalkInUrl && !walkInUrlError ? trimmedWalkInUrl : null;
 
 	return (
 		<section id="view-check-in" className={styles.view}>
 			<TopBar
 				title={title}
 				meta={
-					searchReady
-						? `${matchTotal} match${matchTotal === 1 ? '' : 'es'} · arrival desk`
-						: 'Search by name or company · arrival desk'
+					checkInMode === 'walk-in'
+						? 'Walk-in registration · HubSpot form'
+						: searchReady
+							? `${matchTotal} match${matchTotal === 1 ? '' : 'es'} · arrival desk`
+							: 'Search by name or company · arrival desk'
 				}
 			/>
 
+			<div className={styles.deskToolbar}>
+				{capacityLoading ? (
+					<LoadingState message="Loading capacity…" variant="inline" />
+				) : capacityStatus ? (
+					capacityStatus.capacity && capacityStatus.capacity > 0 ? (
+						<div className={`card ${styles.capacityCard} ${styles.capacitySection}`}>
+							<CapacityBar
+								variant="live"
+								value={capacityStatus.liveAttendance}
+								capacity={capacityStatus.capacity}
+								checkedInCount={capacityStatus.checkedInCount}
+								onAdjust={(direction) => void handleAdjustCapacity(direction)}
+								adjusting={capacityAdjusting}
+							/>
+						</div>
+					) : (
+						<div className={`card ${styles.capacityCard} ${styles.capacitySection}`}>
+							<p className={styles.capacityCountOnly}>
+								{capacityStatus.liveAttendance} checked in on site
+							</p>
+							<p className={styles.capacitySetupHint}>
+								Set Event capacity in Catalog admin to monitor room fill percentage.
+							</p>
+						</div>
+					)
+				) : capacityError ? (
+					<div className={`card ${styles.capacityCard} ${styles.capacitySection}`}>
+						<p className={styles.capacityError}>Capacity unavailable: {capacityError}</p>
+						<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadCapacityStatus()}>
+							Retry
+						</button>
+					</div>
+				) : null}
+
+				<div className={styles.modeSwitchGroup}>
+					<div className={styles.modeDivider} role="separator" aria-hidden="true" />
+					<p className={styles.modeSwitchLabel} id="check-in-mode-label">
+						Desk mode
+					</p>
+					<div
+						className={styles.modeSwitch}
+						role="radiogroup"
+						aria-labelledby="check-in-mode-label"
+					>
+						<button
+							type="button"
+							role="radio"
+							aria-checked={checkInMode === 'check-in'}
+							className={checkInMode === 'check-in' ? styles.modeActive : undefined}
+							onClick={() => setCheckInMode('check-in')}
+						>
+							Check-in
+						</button>
+						<button
+							type="button"
+							role="radio"
+							aria-checked={checkInMode === 'walk-in'}
+							className={checkInMode === 'walk-in' ? styles.modeActive : undefined}
+							onClick={() => setCheckInMode('walk-in')}
+						>
+							Walk-in
+						</button>
+					</div>
+				</div>
+			</div>
+
+			{checkInMode === 'walk-in' ? (
+				walkInIframeSrc ? (
+					<div className={`card ${styles.walkInCard}`}>
+						<p className={styles.walkInHint}>
+							After the guest submits the HubSpot form, open <strong>Attendees</strong> and refresh to
+							confirm they appear in the registrant list.
+						</p>
+						<iframe
+							title="HubSpot walk-in form"
+							src={walkInIframeSrc}
+							className={styles.walkInFrame}
+						/>
+					</div>
+				) : walkInUrlError ? (
+					<div className={`card ${styles.walkInCard}`}>
+						<p className={styles.walkInError} role="alert">
+							{walkInUrlError}. Update the Walk-in form URL in catalog Settings before using walk-in
+							registration.
+						</p>
+					</div>
+				) : (
+					<EmptyState
+						viewId="view-check-in-walk-in-empty"
+						message="No walk-in form URL is configured for this Event. An admin can set the Walk-in form URL (HubSpot) in catalog Settings."
+						action={{ label: 'Open catalog Settings', to: '/catalog' }}
+					/>
+				)
+			) : (
 			<div className={styles.layout}>
 				<div className={`card ${styles.findCard}`}>
 					<div className={styles.cardHeader}>
@@ -303,6 +476,7 @@ export function CheckInView() {
 					)}
 				</div>
 			</div>
+			)}
 		</section>
 	);
 }

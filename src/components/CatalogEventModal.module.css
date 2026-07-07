@@ -32,6 +32,13 @@
 	min-height: 72px;
 }
 
+.fieldError {
+	margin: 0;
+	font-size: 0.8rem;
+	font-weight: 400;
+	color: #b42318;
+}
+
 .readOnlyProgram {
 	margin: 0;
 	font-size: 0.9rem;

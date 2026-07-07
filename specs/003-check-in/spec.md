@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-05
 
-**Status**: In progress
+**Status**: Clarified (US3 walk-in — ready for plan)
 
 **Input**: User description: "Slice 1 attendee list and check-in — registered attendees for a Program + Event; staff check-in via QR scan, name search, and (later) walk-in; admin-only; first HubSpot write path."
 
@@ -21,6 +21,18 @@
 - Q: Should search refetch the whole page or keep check-in layout mounted? → A: **Keep layout mounted** — debounce search (~300ms); full-page loader only on initial load or Program/Event change.
 - Q: Does mock API need to honour search query params? → A: **Yes** — `getMockSliceAttendees` must filter by `q` and `checkedIn` so local dev matches live API behaviour.
 - Q: Is walk-in in Slice 1 MVP? → A: **Defer until after SFTP** — name search + QR + confirm ship first; walk-in is US3 (separate phase).
+
+### Session 2026-07-06 (US3 walk-in)
+
+- Q: How should walk-in form fields be rendered? → A: **HubSpot form embedded in an `<iframe>`** — not EMS-native fields; HubSpot owns the form UX and submission.
+- Q: Where is the walk-in form URL configured? → A: **Event catalog modal** — each Event record holds the HubSpot form embed/page URL (`walkInFormUrl`); admin sets it when creating or editing an Event.
+- Q: How does staff enter walk-in mode on Check-in? → A: **Default view unchanged** (name search + QR + attendee table). A **mode switch** (segmented control: **Check-in | Walk-in**) toggles to walk-in view.
+- Q: What does walk-in view show? → A: **Walk-in view only** — hides attendee table and QR scanner; shows the HubSpot form iframe full-width in the check-in card. Switching back restores the default check-in layout.
+- Q: After iframe form submit, how is attendance recorded? → A: **HubSpot-only** — HubSpot form configuration / workflows set Parts Attended, attended, and form submission. EMS provides iframe shell only; **no `POST …/walkin` backend route** and no EMS-side attendance write for walk-in.
+- Q: What should staff see in Walk-in mode besides the iframe? → A: **Persistent hint above iframe** — static EMS copy instructing staff to verify the person in **Attendees** after HubSpot form submit (manual refresh; no postMessage detection).
+- Q: Which URLs should `walkInFormUrl` accept? → A: **HubSpot hosts only** — HTTPS URLs whose host matches allowlist (`*.hubspot.com`, `*.hsforms.com`, `share.hsforms.com`); reject others at Event modal save and at iframe render.
+- Q: Should Walk-in behave differently when `USE_MOCK_API: true`? → A: **Same as live** — Walk-in loads `walkInFormUrl` from catalog when set; mock API flag does not affect iframe behaviour (mock applies to EMS attendee/check-in routes only).
+- Q: Should backend validate `walkInFormUrl` on catalog write? → A: **Frontend + backend** — Same HubSpot HTTPS host allowlist on Event POST/PATCH; reject invalid URL with `400`.
 
 ---
 
@@ -69,20 +81,23 @@ Check-in writes the Event's **`attendanceProperty`** on the HubSpot Contact to `
 
 ---
 
-### User Story 3 — Walk-in registration and check-in (Priority: P2)
+### User Story 3 — Walk-in via HubSpot form embed (Priority: P2)
 
-An **admin** cannot find a person in the registered list. They open a **walk-in form** whose fields mirror the Program's public HubSpot registration form. On submit, EMS creates or updates the Contact (match by **email**), sets Parts Attended + attendance, records a form submission, and marks checked in — in one staff-mediated action.
+An **admin** on the **Check-in** page switches from the default **Check-in** mode to **Walk-in** mode. The page hides the attendee search table and QR scanner and shows a **HubSpot registration form** embedded in an **iframe**, loaded from the selected Event's **`walkInFormUrl`** (configured in the Event catalog modal). Staff complete the form in HubSpot's native UI. **HubSpot alone** handles Contact create/update, Parts Attended, attendance, and form submission via form configuration and workflows — EMS does not proxy or duplicate those writes.
 
-**Why this priority**: Required for on-site edge cases; depends on HubSpot write scopes and form field mapping.
+**Why this priority**: Required for on-site edge cases; iframe defers field discovery and write logic to HubSpot (see [CONTEXT.md](../../CONTEXT.md) Walk-in).
 
-**Independent Test**: Walk-in with new email → Contact created + checked in; walk-in with existing email → Contact updated + checked in.
+**Independent Test**: Admin sets `walkInFormUrl` on an Event → opens Check-in → switches to Walk-in → iframe loads HubSpot form → staff submit valid form → HubSpot thank-you appears in iframe → person appears in Attendees after staff refresh (HubSpot registration rules satisfied).
 
 **Acceptance Scenarios**:
 
-1. **Given** no search match, **When** staff complete the walk-in form with valid required fields, **Then** the person is checked in and appears in the attendee list on refresh.
-2. **Given** an email matching an existing Contact, **When** staff submit walk-in, **Then** that Contact is updated (not duplicated).
+1. **Given** an admin with Program + Event selected and a valid `walkInFormUrl`, **When** they switch to Walk-in mode, **Then** the iframe loads that URL, a **persistent hint** appears above the iframe (verify in Attendees after submit), and the search table + QR scanner are not visible.
+2. **Given** Walk-in mode, **When** staff switch back to Check-in mode, **Then** the default layout (search + QR + table) returns and the iframe is unmounted (no background HubSpot load).
+3. **Given** an Event with no `walkInFormUrl`, **When** staff switch to Walk-in mode, **Then** they see an empty state with guidance to set the URL in catalog Settings (not a broken iframe).
+4. **Given** a walk-in form submission in HubSpot (new email), **When** staff refresh Attendees, **Then** the person appears in the registered list for that Event (HubSpot-side registration rules satisfied).
+5. **Given** a walk-in form submission (existing email), **When** staff refresh Attendees, **Then** the existing Contact is updated — not duplicated — and reflects checked-in state per HubSpot form configuration.
 
-*(Deferred post-SFTP — see [tasks.md](./tasks.md) Phase 6.)*
+*(Implementation tranche — see [tasks.md](./tasks.md) Phase 5.)*
 
 ---
 
@@ -91,9 +106,13 @@ An **admin** cannot find a person in the registered list. They open a **walk-in 
 - Catalog context missing → empty state with link to select Program/Event.
 - Camera unavailable (dev laptop, permission denied) → QR panel empty; name search still works.
 - React StrictMode / scanner lifecycle → no duplicate cameras or uncaught stop errors.
-- Mock mode → search and checked-in filters behave like live API query params.
+- Mock mode → search and checked-in filters behave like live API query params; Walk-in iframe loads real HubSpot URL from catalog (unaffected by `USE_MOCK_API`).
 - JWT verify misconfiguration (`CHECKIN_JWT_PUBLIC_KEY` unset) → `503` on scan route, not silent pass.
 - Hostile attendee strings → rendered as text (XSS guard).
+- Event missing `walkInFormUrl` → Walk-in mode shows catalog setup guidance; Check-in mode unaffected.
+- Invalid or non-HubSpot `walkInFormUrl` → rejected at catalog save; if legacy invalid value exists, Walk-in mode shows validation error (do not load iframe).
+- Switching Check-in ↔ Walk-in → QR scanner stopped on leave Walk-in (same lifecycle rules as US2); iframe removed from DOM when not in Walk-in mode.
+- CSP `frame-src` must allow HubSpot embed origins (production build) — see NFR-004.
 
 ---
 
@@ -111,12 +130,19 @@ An **admin** cannot find a person in the registered list. They open a **walk-in 
 - **FR-008**: Search MUST debounce; MUST NOT unmount the check-in layout on each keystroke.
 - **FR-009**: Mock layer MUST honour attendee query filters (`q`, `checkedIn`).
 - **FR-010**: Walk-in (US3) MUST NOT block release of US1 + US2.
+- **FR-011**: Event catalog records MUST support optional **`walkInFormUrl`** (HTTPS HubSpot form embed or share URL), editable in the Event modal (create + edit); cleared via PATCH `null` like other optional metadata. URL MUST pass HubSpot host allowlist validation (`*.hubspot.com`, `*.hsforms.com`, `share.hsforms.com`) on **frontend save and backend POST/PATCH**; invalid URLs MUST be rejected with a field error / `400`.
+- **FR-012**: Check-in page MUST default to **Check-in mode** (US2 layout). MUST expose a **mode switch** (segmented control: Check-in | Walk-in) visible only when Program + Event are selected and user is **admin**.
+- **FR-013**: **Walk-in mode** MUST render a **persistent staff hint** above the iframe (e.g. “After submit, check Attendees to confirm registration”) and the HubSpot form iframe only (no attendee table, no QR scanner). **Check-in mode** MUST NOT render the walk-in iframe or hint.
+- **FR-014**: Walk-in iframe MUST use the selected Event's `walkInFormUrl` as `src`. If unset, show empty state — do not load a fallback URL.
+- **FR-015**: Walk-in MUST NOT add an EMS backend write route (`POST …/walkin` / `OnWalkIn.ts`). All walk-in HubSpot mutations are owned by the embedded form and HubSpot configuration.
+- **FR-016**: Walk-in iframe behaviour MUST NOT depend on `USE_MOCK_API`; when `walkInFormUrl` is set, load the real HubSpot embed in mock and live environments alike.
 
 ### Non-Functional / Security
 
 - **NFR-001**: No JWT private key or HubSpot tokens in frontend.
-- **NFR-002**: Check-in and attendee mutations MUST be audited (actor, resource, outcome).
+- **NFR-002**: Check-in and attendee mutations MUST be audited (actor, resource, outcome). Walk-in iframe submissions are **not** EMS mutations — no EMS audit entry for HubSpot form submit.
 - **NFR-003**: QR library MUST be npm dependency (`html5-qrcode`), not CDN script tag.
+- **NFR-004**: Production CSP MUST allow HubSpot form embed in `frame-src` (e.g. `https://*.hubspot.com`, `https://*.hsforms.com`, `https://share.hsforms.com`) without widening `script-src` or `connect-src` beyond existing rules. `walkInFormUrl` allowlist MUST align with CSP `frame-src`.
 
 ---
 
@@ -127,12 +153,15 @@ An **admin** cannot find a person in the registered list. They open a **walk-in 
 - **SC-003**: Non-admin never sees attendee PII or check-in modules.
 - **SC-004**: Backend route tests cover auth failures and primary error paths; happy-path scan/confirm covered before live cutover.
 - **SC-005**: Manual QA in [quickstart.md](./quickstart.md) passes on UAT with mock API; live smoke passes after SFTP + `USE_MOCK_API: false`.
+- **SC-006**: Admin can switch Check-in ↔ Walk-in on the Check-in page; Walk-in loads the Event's HubSpot form iframe when `walkInFormUrl` is set.
+- **SC-007**: Invalid `walkInFormUrl` values are rejected by Event modal and catalog API (backend `400`).
 
 ---
 
 ## Out of Scope
 
 - QR **generation** for pre-event emails (HubSpot workflow — future).
-- Walk-in (US3) in first check-in release tranche (tracked separately).
+- EMS-native walk-in form fields (replaced by HubSpot iframe per Session 2026-07-06).
+- EMS backend walk-in write route (`OnWalkIn.ts`, `POST …/walkin`) — HubSpot form owns writes (Session 2026-07-06).
 - Legacy `#/events/:eventId` mock routes — catalog context is source of truth.
-- Public registration website changes.
+- Public registration website changes (EMS embeds existing HubSpot form URL only).
