@@ -6,7 +6,7 @@ Parked work, optional hardening, and deferred decisions for the static EMS UI.
 
 **AI agents:** When the user skips or defers work, add an entry here (see `../.cursor/rules/ems-todo-discipline.mdc`).
 
-> **Last updated:** 2026-07-07 (PM — Slice 1.5 A8 audit viewer)
+> **Last updated:** 2026-07-07 (PM — Slice 1.5 Tier A complete; Tier B next)
 
 ---
 
@@ -19,7 +19,7 @@ Code and automated tests are **complete**. Only these gates remain before full S
 | **X-008** / **FE-SLICE1-009** / **BE-SLICE1-008** | Walk-in form **B5c** — Attendees row + checked-in after HubSpot submit | Events/HubSpot team (form workflow config) | `003` quickstart **B5c** |
 | **X-009** / **FE-CAP-001** / **BE-CAP-001** | Capacity manual QA + SFTP deploy + live smoke | HubSpot UAT access (**FE-INFRA-003** / **BE-INFRA-003**) | `004` quickstart **T043–T044** |
 
-Everything else in Slice 1 is shipped or explicitly parked below. **Slice 1.5 Tier A** can start while waiting on the above.
+Everything else in Slice 1 is shipped or explicitly parked below. **Slice 1.5 Tier A** is complete (see [specs/slice-1.5-tier-a/signoff-checklist.md](specs/slice-1.5-tier-a/signoff-checklist.md)). **Tier B** is next when prioritised.
 
 ## How to use
 
@@ -49,15 +49,15 @@ Enough for InfoSec / leadership sign-off with queryable evidence (“who viewed 
 
 | Step | Gate | TODO IDs | Owner | Status |
 | :---: | :--- | :--- | :---: | :---: |
-| A1 | **Registrant eligibility on check-in confirm** (server-side) | BE-SLICE15-001 | Backend | ⬜ |
-| A2 | **PII read audit** (`GET attendees`; optional scan summary) | BE-SLICE15-002 | Backend | ⬜ |
-| A3 | **Program ↔ event validation** on all slice routes | BE-SLICE15-003 | Backend | ⬜ |
-| A4 | **Rate limit `GET attendees`** | BE-SLICE15-004 | Backend | ⬜ |
-| A5 | **Field-level catalog PATCH audit** (before/after) | BE-SLICE15-005 | Backend | ⬜ |
+| A1 | **Registrant eligibility on check-in confirm** (server-side) | BE-SLICE15-001 | Backend | ✅ |
+| A2 | **PII read audit** (`GET attendees`; optional scan summary) | BE-SLICE15-002 | Backend | ✅ |
+| A3 | **Program ↔ event validation** on all slice routes | BE-SLICE15-003 | Backend | ✅ |
+| A4 | **Rate limit `GET attendees`** | BE-SLICE15-004 | Backend | ✅ |
+| A5 | **Field-level catalog PATCH audit** (before/after) | BE-SLICE15-005 | Backend | ✅ |
 | A6 | **CI security review on PRs** | FE-SEC-002, BE-SEC-002 | Both | ✅ |
 | A7 | **Disable production source maps** | FE-SLICE15-001 | Frontend | ✅ |
 | A8 | **Audit API + minimal viewer** | BE-SLICE15-006, FE-SLICE15-002 | Both | ✅ |
-| A9 | **Tier A sign-off checklist** (quickstart / ops doc) | X-SLICE15-001 | Both | ⬜ |
+| A9 | **Tier A sign-off checklist** (quickstart / ops doc) | X-SLICE15-001 | Both | ✅ |
 
 | ID | Item | Status | Slice | Also affects | Notes |
 | :--- | :--- | :---: | :--- | :--- | :--- |
@@ -189,9 +189,8 @@ Delivery is by **vertical slice**. Slice 1 = catalog + attendees + check-in ([AD
 
 | ID | Item | Status | Phase | Owner | Notes |
 | :--- | :--- | :---: | :--- | :--- | :--- |
-| X-001 | **Version control + CI security gates** | in progress | Pre–Phase 1 | Both | **Done:** steps 1, 3, 5, 9 (git, `npm audit` CI, ESLint XSS, test CI). **Remaining:** step 2 (Bugbot). |
+| X-001 | **Version control + CI security gates** | done | Pre–Phase 1 | Both | Steps 1–10 complete. Step 2 via manual PR security review (A6). |
 | X-002 | **Cloudflare Access** | planned | Slice 1.5B | Both | **Slice 1.5 Tier B step B4.** See FE-OPS-004 / Backend `X-002`. |
-| X-SLICE15-001 | **Tier A sign-off checklist** | planned | 1.5 | Both | Extend `specs/003-check-in/quickstart.md` or ops doc: verify registrant guard, PII read audit, rate limits, audit viewer, FE-SEC-002 enabled. |
 | X-SLICE15-002 | **External penetration test or security review** | planned | 1.5B | Both | Vendor engagement; report reusable for InfoSec / vendor questionnaires. Process — not a code task. |
 | X-SLICE15-003 | **Ops runbooks** — quarterly access review, incident response, Live Parameters checklist | planned | 1.5B | Both | `USER_ROLE_MAP` review cadence; who to contact on session compromise; UAT vs Live Parameter drift check before each event. |
 | X-003 | **`api-contract.md` + `rbac.md` sync discipline** | in progress | Pre–Phase 1 | Both | Always-on AI rule: `../.cursor/rules/ems-api-contract-discipline.mdc`. **Foundation step 8 done** — ongoing per new route. |
@@ -233,6 +232,7 @@ Delivery is by **vertical slice**. Slice 1 = catalog + attendees + check-in ([AD
 | FE-TECH-006 | Catalog modal focus trap | 2026-07-07 | `useModalFocusTrap` on Program/Event modals — Tab cycle, Esc dismiss, return focus. |
 | FE-SLICE15-001 | Disable production source maps | 2026-07-07 | `vite.config.ts` — `build.sourcemap: false`; dev HMR and Vitest unchanged. Slice 1.5 Tier A step A7. |
 | FE-SLICE15-002 | Audit viewer UI (`#/audit`) | 2026-07-07 | `AuditView` + sidebar link; `GET audit/recent` via `fetchAuditLog`; admin-only; no PII beyond actor email. Pairs **BE-SLICE15-006**. Slice 1.5 Tier A step A8. |
+| X-SLICE15-001 | Tier A sign-off checklist | 2026-07-07 | [specs/slice-1.5-tier-a/signoff-checklist.md](specs/slice-1.5-tier-a/signoff-checklist.md) — A1–A9 complete; UAT → Live PR #7. |
 | FE-TEST-001 | Vitest + React Testing Library + jsdom | 2026-07-03 | `vite.config.ts` test block + `src/test/setup.ts`. |
 | FE-TEST-002 | Unit tests for pure logic | 2026-07-03 | `normalizeApi`, `dataService`, `navigation`, `format`. Optional follow-up: `appState`, `eventModules`. |
 | FE-TEST-003 | XSS render tests | 2026-07-03 | All 8 module views + `RoutePlaceholder`. Optional follow-up: `LoginView`. |

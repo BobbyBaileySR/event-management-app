@@ -8,6 +8,11 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-07
 
+### Slice 1.5 Tier A — step A9: sign-off checklist
+
+- **`specs/slice-1.5-tier-a/signoff-checklist.md`**: Tier A complete (A1–A9) — gate table, deploy evidence (UAT + Live PR #7), CI/test counts, security review summary, optional smoke checks, approvals.
+- **`TODO.md`**: **X-SLICE15-001** done; Tier A table A1–A9 all ✅; **X-001** Foundation gates complete.
+
 ### Slice 1.5 Tier A — step A6: PR security review (Bugbot fallback)
 
 - **`.github/pull_request_template.md`**: EMS security checklist on every PR.
