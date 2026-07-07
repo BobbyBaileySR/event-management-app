@@ -142,7 +142,7 @@ export async function fetchAuditLog(
 	const { token, page = 1, pageSize = 50 } = options;
 
 	if (eventId !== undefined) {
-		return withMockFallback(
+		return withMockFallback<{ entries: AuditEntry[] } | AuditLogListResult>(
 			() =>
 				mockDelay({
 					entries: getAuditLogForEvent(eventId),

@@ -5,6 +5,7 @@ import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import type { AuditLogEntry } from '../types';
+import { isAuditLogListResult } from '../types';
 import { formatAuditMetadata, formatAuditResource } from '../utils/auditDisplay';
 import { capitalizeStatus, formatDateTime } from '../utils/format';
 import styles from './AuditView.module.css';
@@ -34,7 +35,7 @@ export function AuditView() {
 		void data
 			.fetchAuditLog(undefined, { page, pageSize: DEFAULT_PAGE_SIZE })
 			.then((result) => {
-				if (!cancelled) {
+				if (!cancelled && isAuditLogListResult(result)) {
 					setEntries(result.entries);
 					setPage(result.page);
 					setPageSize(result.pageSize);
