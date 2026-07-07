@@ -2,7 +2,7 @@
 
 Ubiquitous language for Adaptavist EMS. **Glossary only** — no implementation, API shapes, or storage choices. See `docs/hubspot-schema.md`, `docs/api-contract.md`, and `docs/decisions/` for technical detail.
 
-> **Last updated:** 2026-07-05 (HubSpot schema verified — dual Parts Attended tracks, attendance properties, multi-form Programs)
+> **Last updated:** 2026-07-07 (Slice 3 — public registration grilling)
 
 ---
 
@@ -103,9 +103,105 @@ Default staff flow: choose a **Program** (e.g. “Atlassian Event 2026”), then
 
 **Staff EMS** — Adaptavist-only UI (Google sign-in, ScriptRunner session). Used by the events team to view attendees, check-in, email ops, analytics. **Not** the public-facing registration website.
 
-**Public registration** — Open webpage and HubSpot forms where **customers** sign up. Technology and hosting for this channel are **not decided** (manual site, generated page, HubSpot-hosted, etc.). May be optional per Program (“white glove” programs may skip mass outreach).
+**Public registration** — Open webpage and HubSpot forms where **Contacts** sign up. **Slice 3** — pages are **built and hosted in HubSpot** (landing pages, forms, optional Breeze AI in HubSpot admin). EMS **does not** host or generate public pages; it stores **public registration page URLs**, shows them in the **Registration panel**, and links staff to HubSpot admin to edit. May be optional per Program (“white glove” programs may skip mass outreach).
 
-*Boundary for Phase 1 — to be confirmed: which parts of the ideal pre/during/post flow live in staff EMS vs HubSpot vs other tooling.*
+---
+
+## Slice 2 (email dispatch)
+
+Staff send HubSpot **marketing email templates** to audiences scoped to a **Program + Event** — immediately or on a **schedule**. Includes ad-hoc sends, multiple schedules per Event, a **dispatch log** (who received what), and attendee filtering by past dispatches. **No EMS template builder** — templates are chosen from HubSpot only. **`admin` role only** (same gate as attendee list and check-in). Delivered as its own vertical slice after Slice 1.
+
+_Avoid_: “Campaign” as the primary EMS term (HubSpot overload) — prefer **Email dispatch**.
+
+---
+
+## Slice 3 (public registration)
+
+Staff link EMS to **HubSpot-hosted** registration landing pages for a **Program** — page creation (manual or **Breeze** in HubSpot admin) stays **outside** EMS. Slice 3 adds a **Registration panel** in staff EMS: resolved public URL, EMS **registration publish state**, copy link, and **Open in HubSpot** — no page builder. Form IDs remain on the Program catalog record (`hubspotFormIds`); **one public URL per Program** even when multiple form IDs exist (extra IDs are alternate/legacy forms, not separate public pages). Optional **Event override URL** when one part needs its own landing page. Distinct from **walk-in form URL** (staff-only HubSpot embed on Check-in). Separate vertical slice from Slice 2.
+
+_Avoid_: Treating Slice 3 as EMS-hosted signup pages or Breeze integration inside EMS.
+
+---
+
+## Public registration page URL
+
+The published HubSpot **landing page** where **Contacts** sign up for a **Program**. Stored on the **Program** catalog record; an **Event** may override with its own URL when that part needs a separate page. **Resolved registration URL** for staff UI: Event override if set, otherwise Program default. One URL per Program scope — multiple Program **form IDs** do not imply multiple public pages.
+
+_Avoid_: Conflating with **walk-in form URL** (staff Check-in iframe) or raw HubSpot form embed/share links.
+
+---
+
+## Registration publish state
+
+Whether staff treat public registration as **draft** or **published**. **EMS-owned** — staff set it when configuring URLs; EMS does not infer it from HubSpot. Lives on the **Program**; an **Event** with an override URL has its **own** publish state (independent of Program). Governs what the **Registration panel** shows and whether “copy registration link” is offered for that resolved URL. HubSpot remains where pages are actually published.
+
+_Avoid_: Mirroring HubSpot page publish APIs in Slice 3; using Event catalog `status` (active/draft/cancelled) as a proxy for registration openness.
+
+---
+
+## Registration panel
+
+Slice 3 staff UI section (under Event **Settings**) for the selected **Program + Event**: **resolved registration URL**, **registration publish state**, **copy link**, and **Open in HubSpot** (HubSpot admin page editor — **derived from the public URL** where HubSpot allows; no separate admin URL field in Slice 3). **`admin` role only** — non-admins do not see the panel or registration controls. Admins may edit URL and publish state **inline** on the panel; catalog Program/Event modals stay in sync. Does not build or host pages.
+
+_Avoid_: “Registration settings” as a standalone top-level app — stays under event context; “Open in HubSpot” opening the public Contact-facing page as the only action.
+
+---
+
+## Walk-in form URL
+
+Staff-only HubSpot form embed URL on each **Event** (`walkInFormUrl`) — used in Check-in **Walk-in** mode iframe. **Not** the public registration landing page; different URL by design (Slice 3 vs 003 check-in).
+
+---
+
+## Email dispatch
+
+A single staff-initiated send (or scheduled send) of one HubSpot marketing template to a **dispatch audience**, scoped to a **Program + Event**. Every dispatch has a **staff-entered name** (no format rules) and a **system-generated id** for search, filter, and log correlation. Covers both **send now** and **scheduled** dispatches once they run.
+
+_Avoid_: “Campaign” (HubSpot marketing term), “blast” (informal).
+
+---
+
+## Dispatch audience
+
+Who receives an **Email dispatch** for a given **Program + Event**. Two scopes — **registered attendees** (in EMS) or **HubSpot contact segment** (beyond that scope):
+
+**Registered attendees (EMS)** — audience is drawn only from **Registered attendees** for that Event. Staff use **first-class EMS filters and selection**: all registered, checked-in / not checked-in, search, and **manual multi-select** on the **Attendee list**. No HubSpot segment required.
+
+**HubSpot contact segment** — when the audience must go **beyond** registered attendees for that Event. Staff pick a **HubSpot-defined segment** only; EMS does not accept free-text lists or ad-hoc Contact queries.
+
+Segment-based sends may include Contacts who are **not** registered attendees for that Event — staff must understand that when picking a segment.
+
+---
+
+## HubSpot contact segment (dispatch audience)
+
+A HubSpot **CRM → Segments** entry (verified in Adaptavist portal: **Active** and **Static** both exist) that staff attach as a **dispatch audience** when recipients are not limited to **Registered attendees** for the Event. Staff **choose by segment name** in EMS; EMS keeps the HubSpot **segment id** for sends and log correlation — ids are not shown in routine UI. Membership is evaluated in HubSpot at send time (Active segments refresh by rules; Static membership is fixed until updated in HubSpot).
+
+_Avoid_: “List” as the primary EMS label — use **segment**; exposing raw HubSpot ids in the picker.
+
+---
+
+## HubSpot marketing email template
+
+A **marketing email template** maintained in HubSpot (confirmed available in Adaptavist portal). Staff **choose by template name** in EMS for an **Email dispatch**; EMS keeps the HubSpot **template id** for send — ids are not shown in routine UI. EMS does not create or edit template content.
+
+_Avoid_: Building templates in EMS; showing raw template ids in the picker.
+
+---
+
+## Scheduled dispatch
+
+An **Email dispatch** queued to run at a future time. Multiple scheduled dispatches may exist per **Event**. Staff may **fully edit** or **cancel** a scheduled dispatch until processing **starts** (when the ScriptRunner cron picks it up). Once processing has started, **edit and cancel are blocked** — the dispatch runs to completion. The UI should **warn** when a dispatch is approaching its send window that editing and cancelling will soon be locked. After run, the dispatch is immutable and appears in the **Dispatch log**. Send times align to **15-minute intervals** (`:00`, `:15`, `:30`, `:45`) because processing runs on a ScriptRunner scheduled trigger.
+
+**Timezone:** staff **choose the timezone** for each scheduled dispatch (e.g. `Europe/London`) so local event time is explicit; the UI converts to the stored instant accordingly.
+
+---
+
+## Dispatch log
+
+The staff-facing record of **Email dispatches** for an **Event** — ad-hoc and scheduled (after they run) — including template, dispatch name/id, actor, time, audience summary, and **per-Contact** outcome. For Slice 2, per-Contact outcome is **`sent`** (successfully handed off to HubSpot) — bounces and delivery detail are out of scope. Staff use the log to answer “what went out for this Event?” and to **filter the Attendee list** by which dispatches a Contact received (or did not receive).
+
+_Avoid_: Relying on HubSpot marketing UI alone as the only send history for EMS-initiated dispatches.
 
 ---
 
@@ -129,6 +225,8 @@ A **separate application** historically handled QR generation for registrants an
 
 **QR generation (pre-event email):** **not confirmed for Phase 1.** Likely **HubSpot** (workflow/email) produces QR images or links; EMS may **control or trigger** that flow later — out of scope until decided. Phase 1 EMS scope is **scan, validate, display summary, check-in write** only.
 
+**QR capacity (2026-07-07 QA):** check-in JWTs are **long** (~550–800+ chars). QR encoders must store the **entire** token. Tools that cap at ~400 characters produce scannable codes that fail verify (`invalid_checkin_signature`). See `docs/hubspot-schema.md` § QR payload size and `Frontend/TODO.md` **FE-QR-GEN-001** before building ticket/email QR generation.
+
 **On scan (in EMS):** staff scan the QR in the EMS check-in module → EMS calls ScriptRunner → SRC validates the JWT, loads the Contact, and returns a **fixed summary** for staff (same fields for every Event): **name, company, email, account manager** *(HubSpot property names — see `hubspot-schema.md`)*. Staff confirm identity, then press **check-in**; SRC **writes back to HubSpot** to mark attendance.
 
 This flow is **staff-mediated** (scan → review → button), not customer self-service check-in without staff action.
@@ -147,7 +245,7 @@ Confirming a **Contact** as physically/virtually present at an **Event**. Staff 
 
 For **pre-registered** contacts, check-in **only** updates attended/checked-in in HubSpot; registration is unchanged.
 
-**RBAC:** attendee list, check-in actions (QR confirm, name search confirm, walk-in submit), and catalog admin all require the **`admin`** role. Other roles do not see attendee PII or check-in modules in Phase 1.
+**RBAC:** attendee list, check-in actions (QR confirm, name search confirm, walk-in submit), **email dispatch** (Slice 2), and catalog admin all require the **`admin`** role. Other roles do not see attendee PII, check-in, or email modules until a future role split.
 
 **Duplicate check-in:** **idempotent** — if the Contact’s attendance property is already `Yes`, show **“already checked in”**; do not write HubSpot again.
 
@@ -184,7 +282,7 @@ First shipped slice (stakeholder priority): **B**
 2. **During the event:** staff **check-in** in EMS via QR scan (camera in-app), name search, or walk-in — with updates **written back to HubSpot**. Replaces the former separate QR check-in app.  
 3. **Catalog admin:** events team **self-service** in EMS (Settings) to create/update **Programs** and **Events** (form IDs, Parts Attended mapping) — **`admin` role only** (viewers/operators use catalog read-only via navigation).
 
-Deferred from Phase 1: public registration webpage, second registration wave / form UX fix, automated email sequences (confirmation, KBYG, **QR email generation**), post-event feedback, capacity/live exit tracking.
+**Slice 1 shipped.** **Slice 2:** email dispatch, schedules, dispatch log (see **Slice 2 (email dispatch)**). **Slice 3:** HubSpot-hosted public registration pages (see **Slice 3 (public registration)**). Still deferred: second registration wave / form UX fix, post-event feedback, opens/clicks analytics dashboard, **QR email generation** in EMS.
 
 *QR JWT minting for registrant emails — **not confirmed**; likely HubSpot-driven, possible future EMS control.*
 

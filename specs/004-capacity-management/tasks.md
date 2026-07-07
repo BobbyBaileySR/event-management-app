@@ -28,9 +28,9 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 **Purpose**: Confirm prerequisites before capacity work
 
-- [ ] T001 Confirm **003-check-in** US1+US2 working (`specs/004-capacity-management/quickstart.md` §Prerequisites — attendees + confirm check-in mock or live)
-- [ ] T002 Confirm catalog Event **`capacity`** field editable and returned on `GET catalog` (001/002 — Catalog admin Event modal)
-- [ ] T003 [P] Review design artifacts in `specs/004-capacity-management/` (spec, plan, research, data-model, contract)
+- [X] T001 Confirm **003-check-in** US1+US2 working (`specs/004-capacity-management/quickstart.md` §Prerequisites — attendees + confirm check-in mock or live)
+- [X] T002 Confirm catalog Event **`capacity`** field editable and returned on `GET catalog` (001/002 — Catalog admin Event modal)
+- [X] T003 [P] Review design artifacts in `specs/004-capacity-management/` (spec, plan, research, data-model, contract)
 
 ---
 
@@ -42,24 +42,24 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 ### Backend foundation
 
-- [ ] T004 Add `CapacityStatusResponse`, `AdjustCapacityBody`, `CapacityStateRecord` in `Backend/scripts/Utils/Types.ts`
-- [ ] T005 Implement Record Storage read/write in `Backend/scripts/Utils/CapacityStore.ts` (key `ems-capacity-{programId}--{eventId}`)
-- [ ] T006 Implement `computeLiveAttendance` + `validateAdjustBounds` in `Backend/scripts/Utils/Capacity.ts`
-- [ ] T007 Implement `handleGetCapacityStatus` (catalog capacity + adapter checked-in total + departureCount) in `Backend/scripts/OnGetCapacityStatus.ts`
-- [ ] T008 Implement `handleAdjustCapacity` (direction up/down, bounds, audit `capacity.adjust`) in `Backend/scripts/OnAdjustCapacity.ts`
-- [ ] T009 Wire GET `…/capacity` + POST `…/capacity/adjust` in `Backend/scripts/OnHttpRouter.ts`
-- [ ] T010 Add admin-only capacity routes to `Backend/scripts/Utils/RouteGuard.ts`
-- [ ] T011 [P] Add GET capacity route tests (401/403/200 shape) in `Backend/node/tests/CapacityRoutes.test.ts`
+- [X] T004 Add `CapacityStatusResponse`, `AdjustCapacityBody`, `CapacityStateRecord` in `Backend/scripts/Utils/Types.ts`
+- [X] T005 Implement Record Storage read/write in `Backend/scripts/Utils/CapacityStore.ts` (key `ems-capacity-{programId}--{eventId}`)
+- [X] T006 Implement `computeLiveAttendance` + `validateAdjustBounds` in `Backend/scripts/Utils/Capacity.ts`
+- [X] T007 Implement `handleGetCapacityStatus` (catalog capacity + adapter checked-in total + departureCount) in `Backend/scripts/OnGetCapacityStatus.ts`
+- [X] T008 Implement `handleAdjustCapacity` (direction up/down, bounds, audit `capacity.adjust`) in `Backend/scripts/OnAdjustCapacity.ts`
+- [X] T009 Wire GET `…/capacity` + POST `…/capacity/adjust` in `Backend/scripts/OnHttpRouter.ts`
+- [X] T010 Add admin-only capacity routes to `Backend/scripts/Utils/RouteGuard.ts`
+- [X] T011 [P] Add GET capacity route tests (401/403/200 shape) in `Backend/node/tests/CapacityRoutes.test.ts`
 
 ### Frontend foundation
 
-- [ ] T012 [P] Add `CapacityStatus`, `AdjustCapacityDirection` in `Frontend/src/types.ts`
-- [ ] T013 [P] Add `normalizeCapacityStatusResponse` in `Frontend/src/utils/normalizeApi.ts`
-- [ ] T014 [P] Merge contract from `specs/004-capacity-management/contracts/capacity-api.md` into `Frontend/docs/api-contract.md`
-- [ ] T015 [P] Add capacity route RBAC rows in `Frontend/docs/rbac.md`
-- [ ] T016 Add `fetchCapacityStatus`, `adjustCapacity` in `Frontend/src/services/dataService.ts`
-- [ ] T017 [P] Add mock departure map + `getMockCapacityStatus` + `mockAdjustCapacity` in `Frontend/src/data/mockData.ts`
-- [ ] T018 [P] Add `normalizeCapacityStatusResponse` tests in `Frontend/src/utils/normalizeApi.test.ts`
+- [X] T012 [P] Add `CapacityStatus`, `AdjustCapacityDirection` in `Frontend/src/types.ts`
+- [X] T013 [P] Add `normalizeCapacityStatusResponse` in `Frontend/src/utils/normalizeApi.ts`
+- [X] T014 [P] Merge contract from `specs/004-capacity-management/contracts/capacity-api.md` into `Frontend/docs/api-contract.md`
+- [X] T015 [P] Add capacity route RBAC rows in `Frontend/docs/rbac.md`
+- [X] T016 Add `fetchCapacityStatus`, `adjustCapacity` in `Frontend/src/services/dataService.ts`
+- [X] T017 [P] Add mock departure map + `getMockCapacityStatus` + `mockAdjustCapacity` in `Frontend/src/data/mockData.ts`
+- [X] T018 [P] Add `normalizeCapacityStatusResponse` tests in `Frontend/src/utils/normalizeApi.test.ts`
 
 **Checkpoint**: `fetchCapacityStatus` + `adjustCapacity` work in mock mode via `createDataService`
 
@@ -73,17 +73,17 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Add capacity indicator load + admin gate tests in `Frontend/src/views/CheckInView.test.tsx`
-- [ ] T020 [P] [US1] Add mock `fetchCapacityStatus` path tests in `Frontend/src/services/dataService.test.ts`
+- [X] T019 [P] [US1] Add capacity indicator load + admin gate tests in `Frontend/src/views/CheckInView.test.tsx`
+- [X] T020 [P] [US1] Add mock `fetchCapacityStatus` path tests in `Frontend/src/services/dataService.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T021 [P] [US1] Extend `CatalogSelection` with optional `capacity` in `Frontend/src/state/catalogContext.tsx`
-- [ ] T022 [US1] Pass `capacity` from selected Event on all `setSelection` paths in `Frontend/src/components/CatalogPickers.tsx`
-- [ ] T023 [US1] Fetch capacity snapshot on mount and `programId`/`evId` change in `Frontend/src/views/CheckInView.tsx`
-- [ ] T024 [US1] Render `CapacityBar` with live/capacity/on-site labels when `capacity > 0` in `Frontend/src/views/CheckInView.tsx`
-- [ ] T025 [US1] Show count-only hint (no false 0% bar) when capacity unset/zero per FR-006 in `Frontend/src/views/CheckInView.tsx`
-- [ ] T026 [US1] Refetch capacity snapshot after successful `confirmCheckIn` in `Frontend/src/views/CheckInView.tsx`
+- [X] T021 [P] [US1] Extend `CatalogSelection` with optional `capacity` in `Frontend/src/state/catalogContext.tsx`
+- [X] T022 [US1] Pass `capacity` from selected Event on all `setSelection` paths in `Frontend/src/components/CatalogPickers.tsx`
+- [X] T023 [US1] Fetch capacity snapshot on mount and `programId`/`evId` change in `Frontend/src/views/CheckInView.tsx`
+- [X] T024 [US1] Render `CapacityBar` with live/capacity/on-site labels when `capacity > 0` in `Frontend/src/views/CheckInView.tsx`
+- [X] T025 [US1] Show count-only hint (no false 0% bar) when capacity unset/zero per FR-006 in `Frontend/src/views/CheckInView.tsx`
+- [X] T026 [US1] Refetch capacity snapshot after successful `confirmCheckIn` in `Frontend/src/views/CheckInView.tsx`
 
 **Checkpoint**: Live count visible on Check-in; updates after check-in — mock mode (quickstart §3, §5 partial)
 
@@ -97,15 +97,15 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add tier boundary tests in `Frontend/src/utils/capacityTier.test.ts`
-- [ ] T028 [P] [US2] Add tier label + CSS class tests in `Frontend/src/components/CapacityBar.test.tsx`
+- [X] T027 [P] [US2] Add tier boundary tests in `Frontend/src/utils/capacityTier.test.ts`
+- [X] T028 [P] [US2] Add tier label + CSS class tests in `Frontend/src/components/CapacityBar.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [P] [US2] Implement `getCapacityTier` + `getFillPercent` in `Frontend/src/utils/capacityTier.ts`
-- [ ] T030 [US2] Add tier colour tokens and label styles in `Frontend/src/components/CapacityBar.module.css`
-- [ ] T031 [US2] Extend `CapacityBar` with tier prop, on-site copy, and bar fill cap at 100% in `Frontend/src/components/CapacityBar.tsx`
-- [ ] T032 [US2] Pass tier from `capacityTier` helpers in `Frontend/src/views/CheckInView.tsx`
+- [X] T029 [P] [US2] Implement `getCapacityTier` + `getFillPercent` in `Frontend/src/utils/capacityTier.ts`
+- [X] T030 [US2] Add tier colour tokens and label styles in `Frontend/src/components/CapacityBar.module.css`
+- [X] T031 [US2] Extend `CapacityBar` with tier prop, on-site copy, and bar fill cap at 100% in `Frontend/src/components/CapacityBar.tsx`
+- [X] T032 [US2] Pass tier from `capacityTier` helpers in `Frontend/src/views/CheckInView.tsx`
 
 **Checkpoint**: Visual tiers identifiable at 75% and 90% (SC-003)
 
@@ -119,16 +119,16 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Add ±1 disabled-state tests in `Frontend/src/components/CapacityBar.test.tsx`
-- [ ] T034 [P] [US3] Add mock adjust integration tests in `Frontend/src/views/CheckInView.test.tsx`
-- [ ] T035 [P] [US3] Extend adjust route tests (floor, ceiling, persistence) in `Backend/node/tests/CapacityRoutes.test.ts`
+- [X] T033 [P] [US3] Add ±1 disabled-state tests in `Frontend/src/components/CapacityBar.test.tsx`
+- [X] T034 [P] [US3] Add mock adjust integration tests in `Frontend/src/views/CheckInView.test.tsx`
+- [X] T035 [P] [US3] Extend adjust route tests (floor, ceiling, persistence) in `Backend/node/tests/CapacityRoutes.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Add paired +1/−1 controls with disabled rules to `Frontend/src/components/CapacityBar.tsx`
-- [ ] T037 [US3] Wire `adjustCapacity` handler + optimistic/refetch on success in `Frontend/src/views/CheckInView.tsx`
-- [ ] T038 [US3] Keep capacity indicator above Check-in/Walk-in mode switch when US3 mode exists in `Frontend/src/views/CheckInView.tsx`
-- [ ] T039 [US3] Add responsive ±1 control layout in `Frontend/src/views/CheckInView.module.css` (NFR-003)
+- [X] T036 [US3] Add paired +1/−1 controls with disabled rules to `Frontend/src/components/CapacityBar.tsx`
+- [X] T037 [US3] Wire `adjustCapacity` handler + optimistic/refetch on success in `Frontend/src/views/CheckInView.tsx`
+- [X] T038 [US3] Keep capacity indicator above Check-in/Walk-in mode switch when US3 mode exists in `Frontend/src/views/CheckInView.tsx`
+- [X] T039 [US3] Add responsive ±1 control layout in `Frontend/src/views/CheckInView.module.css` (NFR-003)
 
 **Checkpoint**: ±1 adjust works mock mode; HubSpot checked-in unchanged (quickstart §4)
 
@@ -138,11 +138,11 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 **Purpose**: Docs, regression, deploy, live validation
 
-- [ ] T040 [P] Add 004 capacity entries to `Frontend/CHANGELOG.md` and `Backend/CHANGELOG.md`
-- [ ] T041 [P] Park multi-day Event capacity reset policy in `Frontend/TODO.md` if not implemented (plan R-008)
-- [ ] T042 Run `Backend/npm test` + `npm run lint:fix` and `Frontend/npm run check:quick`
-- [ ] T043 Execute manual QA in `specs/004-capacity-management/quickstart.md` §3–§10 — sign-off checklist
-- [ ] T044 SFTP deploy capacity handlers (`OnGetCapacityStatus`, `OnAdjustCapacity`, `CapacityStore`, router) + live smoke with `USE_MOCK_API: false`
+- [X] T040 [P] Add 004 capacity entries to `Frontend/CHANGELOG.md` and `Backend/CHANGELOG.md`
+- [X] T041 [P] Park multi-day Event capacity reset policy in `Frontend/TODO.md` if not implemented (plan R-008)
+- [X] T042 Run `Backend/npm test` + `npm run lint:fix` and `Frontend/npm run check:quick`
+- [ ] T043 Execute manual QA in `specs/004-capacity-management/quickstart.md` §3–§10 — sign-off checklist — **blocked:** **FE-CAP-001** / **X-009** (HubSpot UAT access; avoid Live data)
+- [ ] T044 SFTP deploy capacity handlers (`OnGetCapacityStatus`, `OnAdjustCapacity`, `CapacityStore`, router) + live smoke with `USE_MOCK_API: false` — **blocked:** **BE-CAP-001** / **X-009**
 
 ---
 
@@ -199,11 +199,11 @@ Task: "Add mock capacity handlers in mockData.ts"
 
 ### Incremental delivery
 
-1. Setup + Foundational → API ready
-2. US1 → live count on Check-in (MVP)
-3. US2 → 75%/90% tiers
-4. US3 → ±1 adjust + persistence
-5. Polish → SFTP + live smoke
+1. Setup + Foundational → API ready ✅
+2. US1 → live count on Check-in (MVP) ✅
+3. US2 → 75%/90% tiers ✅
+4. US3 → ±1 adjust + persistence ✅
+5. Polish → T040–T042 ✅; T043–T044 blocked on UAT
 
 ### Suggested single-developer order
 
@@ -237,6 +237,13 @@ T001 → T003 → T004 → T010 → T011 → T012 → T018 → T016 → T017 →
 
 ---
 
-## Next command
+## Status (2026-07-07)
 
-Run **`/speckit-implement`** (or implement Phase 2 manually), starting at **T001**.
+**Implementation complete** — T001–T042 ✅ (153 Frontend + 134 Backend tests passing).
+
+**Blocked on external setup:**
+
+- **T043** — full manual QA → **FE-CAP-001** / **X-009** (HubSpot UAT access)
+- **T044** — SFTP deploy + live smoke → **BE-CAP-001** / **X-009**
+
+**Next:** Slice **1.5** Tier A hardening, or mock-only capacity QA (quickstart §3–§6) while waiting on UAT.

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type {
 	CatalogEvent,
 	CatalogProgram,
@@ -6,6 +6,7 @@ import type {
 	PatchCatalogEventBody,
 } from '../types';
 import { ATTENDANCE_PROPERTY_PRESETS, suggestAttendanceProperty } from '../constants/hubspot';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalNumberForPatch, optionalTextForPatch } from '../utils/catalogMetadata';
 import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
 import styles from './CatalogEventModal.module.css';
@@ -161,6 +162,7 @@ export function CatalogEventModal({
 	onSave,
 }: CatalogEventModalProps) {
 	const titleId = useId();
+	const dialogRef = useRef<HTMLDivElement>(null);
 	const programLabelId = useId();
 	const programListboxId = useId();
 	const programTriggerRef = useRef<HTMLButtonElement>(null);
@@ -170,6 +172,16 @@ export function CatalogEventModal({
 	const [saving, setSaving] = useState(false);
 	const [programMenuOpen, setProgramMenuOpen] = useState(false);
 	const [walkInFormUrlError, setWalkInFormUrlError] = useState<string | null>(null);
+
+	const handleEscape = useCallback(() => {
+		if (programMenuOpen) {
+			setProgramMenuOpen(false);
+			return;
+		}
+		onCancel();
+	}, [onCancel, programMenuOpen]);
+
+	useModalFocusTrap({ open, containerRef: dialogRef, onEscape: handleEscape });
 
 	useEffect(() => {
 		if (!open) {
@@ -201,20 +213,12 @@ export function CatalogEventModal({
 			}
 		}
 
-		function handleEscape(keyEvent: KeyboardEvent) {
-			if (keyEvent.key === 'Escape') {
-				setProgramMenuOpen(false);
-			}
-		}
-
 		document.addEventListener('mousedown', handlePointerDown);
 		document.addEventListener('touchstart', handlePointerDown);
-		document.addEventListener('keydown', handleEscape);
 
 		return () => {
 			document.removeEventListener('mousedown', handlePointerDown);
 			document.removeEventListener('touchstart', handlePointerDown);
-			document.removeEventListener('keydown', handleEscape);
 		};
 	}, [programMenuOpen]);
 
@@ -259,7 +263,7 @@ export function CatalogEventModal({
 				}
 			}}
 		>
-			<div className={`modal ${styles.modal}`}>
+			<div ref={dialogRef} className={`modal ${styles.modal}`}>
 				<h3 id={titleId}>{title}</h3>
 				<form
 					className={styles.form}

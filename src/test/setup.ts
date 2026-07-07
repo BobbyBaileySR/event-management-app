@@ -25,3 +25,11 @@ vi.mock('html5-qrcode', () => ({
 		PAUSED: 2,
 	},
 }));
+
+class MockResizeObserver {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+}
+
+vi.stubGlobal('ResizeObserver', MockResizeObserver);

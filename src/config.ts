@@ -55,4 +55,3 @@ export const CONFIG: EmsConfig = {
 	CELEBRATION_THEME_EMAIL: 'kjohnston@adaptavist.com',
 	CELEBRATION_TOAST_MESSAGE: 'Just for you',
 };
-``

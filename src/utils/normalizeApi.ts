@@ -157,6 +157,7 @@ function normalizeCatalogEvent(raw: Record<string, unknown>): CatalogEvent {
 		date: copyOptionalString(raw, 'date'),
 		location: copyOptionalString(raw, 'location'),
 		capacity: copyOptionalNumber(raw, 'capacity'),
+		walkInFormUrl: copyOptionalString(raw, 'walkInFormUrl'),
 	};
 }
 

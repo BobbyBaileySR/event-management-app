@@ -6,7 +6,7 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
-import { countSegment, filterAttendees } from '../data/mockData';
+import { countSegment, filterAttendees } from '../utils/listFilters';
 import { useDataService } from '../hooks/useDataService';
 import { eventPath, useActiveRoute } from '../router/navigation';
 import type { Attendee, EmailTemplate, Event, ScheduledEmail } from '../types';

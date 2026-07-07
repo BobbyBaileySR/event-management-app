@@ -4,22 +4,22 @@
 
 .reader {
 	width: 100%;
-	min-height: min(60vw, 280px);
-	max-height: 320px;
+	max-width: 100%;
 	aspect-ratio: 1;
 	border-radius: 8px;
 	overflow: hidden;
 	background: rgba(0, 0, 0, 0.04);
 }
 
+.reader :global(video) {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+	object-fit: cover;
+}
+
 .hint {
 	margin: 8px 0 0;
 	font-size: 0.875rem;
 	opacity: 0.8;
-}
-
-@media (max-width: 900px) {
-	.reader {
-		min-height: min(70vw, 300px);
-	}
 }

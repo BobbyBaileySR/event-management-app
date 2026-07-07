@@ -15,6 +15,8 @@ vi.mock('../hooks/useDataService', () => ({
 	useDataService: () => mockDataService,
 }));
 
+const WALK_IN_URL = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
+
 const catalogFixture = {
 	programs: [
 		{
@@ -36,6 +38,7 @@ const catalogFixture = {
 					partsAttendedOption: 'Meeting Room',
 					attendanceProperty: 'atlassian_event__customer_event_attendance',
 					archived: false,
+					walkInFormUrl: WALK_IN_URL,
 				},
 			],
 		},
@@ -52,12 +55,28 @@ function CatalogRefreshBridge() {
 	return null;
 }
 
+function CatalogSelectionProbe() {
+	const { walkInFormUrl } = useCatalogSelection();
+	return <p data-testid="walk-in-url">{walkInFormUrl ?? ''}</p>;
+}
+
 function renderPickers() {
 	triggerCatalogRefresh = null;
 	return render(
 		<CatalogProvider>
 			<CatalogRefreshBridge />
 			<CatalogPickers />
+		</CatalogProvider>,
+	);
+}
+
+function renderPickersWithProbe() {
+	triggerCatalogRefresh = null;
+	return render(
+		<CatalogProvider>
+			<CatalogRefreshBridge />
+			<CatalogPickers />
+			<CatalogSelectionProbe />
 		</CatalogProvider>,
 	);
 }
@@ -104,6 +123,40 @@ describe('CatalogPickers', () => {
 
 		expect(screen.getByRole('listbox')).toBeInTheDocument();
 		expect(screen.getByRole('option', { name: 'Meeting Room' })).toBeInTheDocument();
+	});
+
+	it('sets walkInFormUrl on catalog selection when Event has a walk-in URL', async () => {
+		renderPickersWithProbe();
+		await screen.findByRole('button', { name: 'Program: Select Program' });
+		await chooseProgram('<img onerror=alert(1)> Summit');
+		await chooseEvent('Meeting Room');
+
+		expect(await screen.findByTestId('walk-in-url')).toHaveTextContent(WALK_IN_URL);
+	});
+
+	it('updates walkInFormUrl after catalog refresh', async () => {
+		renderPickersWithProbe();
+		await screen.findByRole('button', { name: 'Program: Select Program' });
+		await chooseProgram('<img onerror=alert(1)> Summit');
+		await chooseEvent('VIP');
+		expect(screen.getByTestId('walk-in-url')).toHaveTextContent('');
+
+		mockFetchCatalog.mockResolvedValue({
+			programs: [
+				{
+					...catalogFixture.programs[0],
+					events: catalogFixture.programs[0].events.map((event) =>
+						event.id === 'ev-1' ? { ...event, walkInFormUrl: WALK_IN_URL } : event,
+					),
+				},
+			],
+		});
+
+		triggerCatalogRefresh?.();
+
+		await waitFor(() => {
+			expect(screen.getByTestId('walk-in-url')).toHaveTextContent(WALK_IN_URL);
+		});
 	});
 
 	it('clears selection when the selected Event disappears after catalog refresh', async () => {

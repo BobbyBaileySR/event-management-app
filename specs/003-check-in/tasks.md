@@ -162,7 +162,7 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 
 - [X] T070 Run `Backend/npm test` and `npm run lint:fix` after US3 backend changes
 - [X] T071 Run `Frontend/npm run check:quick` after US3 frontend changes
-- [ ] T072 Execute manual QA in `specs/003-check-in/quickstart.md` **B5** — update Manual QA log (B5 Walk-in column)
+- [ ] T072 Execute manual QA in `specs/003-check-in/quickstart.md` **B5** — update Manual QA log (B5 Walk-in column) — **partial 2026-07-07:** B5a/b/d ✅; **B5c blocked** → **FE-SLICE1-009** / **X-008**
 
 **Checkpoint**: Walk-in mode usable on UAT — iframe loads when URL set; catalog rejects invalid URLs; B5 sign-off complete.
 
@@ -183,7 +183,7 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 - [X] T057 Set ScriptRunner Parameters `CHECKIN_JWT_PUBLIC_KEY` + `CHECKIN_JWT_ISSUER`
 - [X] T058 Live smoke: `USE_MOCK_API: false` on UAT — quickstart **B0** (+ **B6** UI/UX gate); B4 live QR excluded (see T060)
 - [X] T059 [P] Git push Frontend `uat` → UAT Pages — committed locally (`f7c9f4d`); **push pending** (run `git push origin uat` to trigger deploy)
-- [ ] T060 **End-of-Slice 1** — live QR scanner QA per `quickstart.md` **B4b** (camera + Event JWT on UAT/Live device); pairs **FE-SLICE1-007** / **BE-SLICE1-007**
+- [X] T060 **End-of-Slice 1** — live QR scanner QA per `quickstart.md` **B4b** (camera + Event JWT on UAT/Live device); pairs **FE-SLICE1-007** / **BE-SLICE1-007** — **pass 2026-07-07**
 
 ---
 
@@ -196,7 +196,7 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 - **US1 (Phase 3)**: Depends on Phase 2 — attendee list MVP
 - **US2 (Phase 4)**: Depends on Phase 2; shares `fetchSliceAttendees` with US1
 - **US3 (Phase 5)**: Depends on US1 + US2 shipped — **unblocked** (iframe tranche; no EMS walk-in write)
-- **Polish (Phase 6)**: US1 + US2 mock-complete; live gates (T056–T058) done; T060 QR + T059 push remain
+- **Polish (Phase 6)**: Code complete; T060 QR ✅; T072 B5c blocked (**X-008**)
 
 ### User Story Dependencies
 
@@ -221,22 +221,22 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 ### US1 + US2 (shipped)
 
 1. Phase 1–4: Setup + Foundational + Attendees + Check-in (T001–T042) ✅
-2. Phase 6 polish + SFTP + live smoke (T049–T058) ✅ except T059 push + T060 live QR
-3. **STOP and VALIDATE**: quickstart **B2–B4a** mock ✅; **B0 + B6** live ✅
+2. Phase 6 polish + SFTP + live smoke (T049–T060) ✅
+3. **STOP and VALIDATE**: quickstart **B2–B4b**, **B0 + B6** live ✅
 
-### US3 walk-in tranche (current)
+### US3 walk-in tranche (shipped except B5c)
 
-1. Phase A: URL validator + catalog types (T043–T048)
-2. Phase B: Event modal field (T061–T062)
-3. Phase C: Check-in mode switch + iframe UI (T063–T065)
-4. Phase D: CSP + contract sync + TODO (T066–T069)
-5. Phase E: Regression + quickstart **B5** (T070–T072)
-6. **STOP and VALIDATE**: B5 Walk-in sign-off before marking US3 complete
+1. Phases A–E (T043–T071) ✅
+2. **Remaining:** T072 **B5c** — HubSpot form → Attendees (**FE-SLICE1-009** / **X-008**)
 
-### Remaining Slice 1 gates
+### Slice 1 close-out
 
-- T059: push Frontend `uat` to trigger Pages deploy
-- T060: live QR scanner QA (**B4b**) — **FE-SLICE1-007** (orthogonal to US3)
+| Gate | Status |
+| :--- | :---: |
+| B0–B4, B6–B7 | ✅ |
+| B5 Walk-in (B5a/b/d) | ✅ |
+| B5c HubSpot submit → Attendees | ⬜ blocked |
+| 004 capacity live QA | ⬜ blocked (**X-009**) |
 
 ---
 
@@ -249,10 +249,10 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 | US1 Attendees (P1) | T019–T026 | 8 | 0 |
 | US2 Check-in (P1) | T027–T042 | 17 | 0 |
 | US3 Walk-in (P2) | T043–T048, T061–T072 | 15 | 1 |
-| Polish | T049–T060 | 10 | 2 |
-| **Total** | T001–T072 | **67** | **5** |
+| Polish | T049–T060 | 12 | 0 |
+| **Total** | T001–T072 | **68** | **1** |
 
-**Slice 1 US1 + US2**: complete (mock + live smoke). **US3 walk-in**: Phases A–D + regression (T043–T071) complete; **T072** B5 manual QA pending. **Slice 1 close-out**: T059 push + T060 live QR remain.
+**Slice 1 US1 + US2 + US3 code**: complete. **Open:** T072 B5c (HubSpot team). **Cross-slice:** 004 capacity live QA (**X-009**).
 
 ---
 
@@ -264,7 +264,7 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 - Attendees pagination UI ✅; table flex height ✅; responsive Check-in/Attendees ✅; `LoadingState` spinner/skeletons ✅
 - HubSpot Managed Fetch fix (`HubSpotApiClient.ts`) ✅; Check-in Vitest hang fix (stable mock) ✅
 - **Performance (deferred):** live attendee load is slow — full HubSpot join per request; review after schema meeting → **BE-SLICE1-006** / **FE-SLICE1-005**
-- **QR (live):** deferred to **B4b** / **FE-SLICE1-007** — not a B0 release blocker (2026-07-06 QA)
+- **QR (live):** **B4b** pass 2026-07-07 — **FE-SLICE1-007** / **BE-SLICE1-007** archived
 - Contract source of truth for edits: `specs/003-check-in/contracts/` → merge to gitignored `Frontend/docs/api-contract.md`
 - **US3 (2026-07-06)**: HubSpot iframe walk-in — no `OnWalkIn.ts` / `POST …/walkin`; `walkInFormUrl` on Event catalog; CSP `frame-src` must match URL allowlist (NFR-004)
 - **US3 task refresh**: T043–T048 replaced obsolete backend write tasks; T061–T072 cover modal, Check-in UI, CSP, docs, QA

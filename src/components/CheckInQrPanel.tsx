@@ -32,27 +32,38 @@ function safelyStopScanner(scanner: Html5Qrcode | null): void {
 	}
 }
 
-function qrBoxSize(): number {
-	if (typeof window === 'undefined') {
-		return 220;
-	}
-
-	return Math.min(Math.max(Math.round(window.innerWidth * 0.62), 160), 280);
+/** Size the scan region from the live viewfinder, not the viewport. */
+export function qrBoxDimensions(
+	viewfinderWidth: number,
+	viewfinderHeight: number,
+): { width: number; height: number } {
+	const limit = Math.min(viewfinderWidth, viewfinderHeight);
+	const size = Math.max(Math.min(Math.floor(limit * 0.75), 280), 160);
+	return { width: size, height: size };
 }
 
 export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelProps) {
 	const readerId = useId().replace(/:/g, '');
+	const readerRef = useRef<HTMLDivElement>(null);
 	const onDecodeRef = useRef(onDecode);
 	onDecodeRef.current = onDecode;
-	const [scanBoxSize, setScanBoxSize] = useState(qrBoxSize);
+	const [readerWidth, setReaderWidth] = useState(0);
 
 	useEffect(() => {
-		function handleResize() {
-			setScanBoxSize(qrBoxSize());
+		const element = readerRef.current;
+		if (!element) {
+			return;
 		}
 
-		window.addEventListener('resize', handleResize);
-		return () => window.removeEventListener('resize', handleResize);
+		const observer = new ResizeObserver((entries) => {
+			const width = Math.round(entries[0]?.contentRect.width ?? 0);
+			if (width > 0) {
+				setReaderWidth((current) => (current === width ? current : width));
+			}
+		});
+
+		observer.observe(element);
+		return () => observer.disconnect();
 	}, []);
 
 	useEffect(() => {
@@ -72,7 +83,7 @@ export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelPro
 		void scanner
 			.start(
 				{ facingMode: 'environment' },
-				{ fps: 8, qrbox: { width: scanBoxSize, height: scanBoxSize } },
+				{ fps: 8, qrbox: qrBoxDimensions },
 				(decodedText) => {
 					if (active) {
 						onDecodeRef.current(decodedText);
@@ -93,11 +104,16 @@ export function CheckInQrPanel({ onDecode, disabled = false }: CheckInQrPanelPro
 			active = false;
 			safelyStopScanner(scanner);
 		};
-	}, [disabled, readerId, scanBoxSize]);
+	}, [disabled, readerId, readerWidth]);
 
 	return (
 		<div className={styles.panel}>
-			<div id={readerId} className={styles.reader} aria-label="QR code scanner" />
+			<div
+				ref={readerRef}
+				id={readerId}
+				className={styles.reader}
+				aria-label="QR code scanner"
+			/>
 			{disabled ? <p className={styles.hint}>Processing scan…</p> : null}
 		</div>
 	);

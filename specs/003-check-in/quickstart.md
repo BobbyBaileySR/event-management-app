@@ -172,6 +172,36 @@ Run on **UAT/Live URL** with a device that has a working camera (phone/tablet pr
 
 **Dev laptop note**: QR video may be empty without a camera — name search (B3) still validates the check-in write path. Restart Vite after pulling `html5-qrcode` test-alias fix if scanner fails to load in dev.
 
+#### B4b — generating a test QR (manual JWT)
+
+Slice 1 does not mint QRs in-app. For live B4b QA, sign a JWT (ScriptRunner + `CHECKIN_JWT_PUBLIC_KEY` / private key pair), then encode the **full** token string in a QR.
+
+**Requirements**
+
+- QR payload = **raw JWT only** (starts with `eyJ`; no `Signed JWT token:` prefix, no URL wrapper, no quotes).
+- RS256 JWT is typically **~550–800+ characters**. Many web QR generators **silently truncate at ~400 chars** — scan then fails with `invalid_checkin_signature` even when console/API fetch with the full token succeeds.
+- After scan, confirm Network `checkin/scan` request body `jwt` length matches ScriptRunner log length (e.g. 558 === 558, not 400).
+
+**Recommended tools** (no character cap):
+
+```bash
+pip3 install --user 'qrcode[pil]'
+python3 -c "
+import qrcode
+jwt = '''PASTE_FULL_JWT_HERE'''
+print('JWT length:', len(jwt))
+qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+qr.add_data(jwt)
+qr.make(fit=True)
+qr.make_image().save('checkin-qr.png')
+print('Saved checkin-qr.png')
+"
+```
+
+Or: `brew install qrencode` then `qrencode -o ~/Desktop/checkin-qr.png -s 10 'PASTE_FULL_JWT'`.
+
+**Future product work**: registrant-email QR generation must meet the same capacity rules — see **FE-QR-GEN-001** / **BE-QR-GEN-001** and `docs/hubspot-schema.md` § QR payload size.
+
 **Tracked as**: [T060](./tasks.md) · **FE-SLICE1-007** / **BE-SLICE1-007**
 
 ---
@@ -246,12 +276,14 @@ Run on **UAT/Live URL** with a device that has a working camera (phone/tablet pr
 | Date | Tester | B0 Env | B1 Shared | B2 Attendees | B3 Name CI | B4 QR | B5 Walk-in | B6 UI/UX | Notes |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | 2026-07-06 | | ✅ | ✅ | ✅ | ✅ | ⬜ deferred | ⬜ pending | ✅ | SFTP + Parameters done; US3 walk-in QA pending |
+| 2026-07-07 | | ✅ | ✅ | ✅ | ✅ | ✅ live | ⬜ partial | ✅ | ✅ | B5: iframe/mode switch ✅; **B5c** Attendees after HubSpot submit blocked on events/HubSpot team → **FE-SLICE1-009** |
 
 **Column guide**
 
-- **B4 QR**: use **mock** ✅ if B4a passed; use **live** ✅ when B4b complete (Slice 1 close-out).
-- **Sign-off for live release (name-search path)**: B0 + B1 + B2 + B3 + B6.
-- **Sign-off for Slice 1 complete**: above + B4b live QR + B5 Walk-in.
+- **B4 QR**: **live** ✅ when B4b complete (2026-07-07).
+- **Sign-off for live release (name-search path)**: B0 + B1 + B2 + B3 + B6 + B7.
+- **Sign-off for Slice 1 complete**: above + B4b live QR + B5 Walk-in (**B5c** pending HubSpot team → **X-008**).
+- **Cross-slice**: 004 capacity live QA blocked → **X-009**.
 
 ---
 
@@ -269,6 +301,8 @@ Run on **UAT/Live URL** with a device that has a working camera (phone/tablet pr
 | `URL must start with http://` (live) | `HubSpotApiClient` not using ScriptRunner Managed Fetch — redeploy `HubSpotApiClient.ts` |
 | Search returns full list (mock) | Mock not filtering — `getMockSliceAttendees` must receive `q` |
 | `503` on scan (live) | JWT public key not in ScriptRunner Parameters |
+| `invalid_checkin_signature` on scan but same JWT works in console/API | QR **truncated** (~400 char cap in generator) — regenerate with `qrcode` / `qrencode`; compare `jwt.length` in Network vs ScriptRunner log |
+| `500` / `Unexpected token` parsing JWT header | Malformed token in request (extra leading char e.g. `PeyJ`, wrong paste, or truncated segment) |
 | Attendees 404 (live) | Slice handlers not SFTP-deployed yet |
 | Walk-in iframe blank (UAT) | CSP `frame-src` missing HubSpot origins — rebuild + redeploy Frontend |
 | Walk-in iframe blank (dev) | Dev server has no production CSP — check URL allowlist and HubSpot form URL |

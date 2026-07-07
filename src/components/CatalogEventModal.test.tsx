@@ -149,11 +149,18 @@ describe('CatalogEventModal', () => {
 		expect(screen.getByRole('listbox')).toBeInTheDocument();
 		await user.keyboard('{Escape}');
 		expect(screen.queryByRole('listbox')).toBeNull();
+		expect(onCancel).not.toHaveBeenCalled();
 
 		await user.click(screen.getByRole('button', { name: 'Program' }));
 		expect(screen.getByRole('listbox')).toBeInTheDocument();
 		await user.click(document.body);
 		expect(screen.queryByRole('listbox')).toBeNull();
+	});
+
+	it('dismisses on Escape when the Program menu is closed', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		await userEvent.setup().keyboard('{Escape}');
+		expect(onCancel).toHaveBeenCalled();
 	});
 
 	it('does not overflow body horizontally at 375px viewport', () => {

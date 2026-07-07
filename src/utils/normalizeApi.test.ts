@@ -220,6 +220,7 @@ describe('normalizeCatalogResponse', () => {
 	});
 
 	it('passes through optional Event metadata fields', () => {
+		const walkInFormUrl = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
 		const result = normalizeCatalogResponse({
 			programs: [
 				{
@@ -237,6 +238,7 @@ describe('normalizeCatalogResponse', () => {
 							owner: 'Events Team',
 							date: '2026-09-02',
 							capacity: 12.5,
+							walkInFormUrl,
 						},
 					],
 				},
@@ -247,6 +249,7 @@ describe('normalizeCatalogResponse', () => {
 			owner: 'Events Team',
 			date: '2026-09-02',
 			capacity: 12.5,
+			walkInFormUrl,
 		});
 	});
 

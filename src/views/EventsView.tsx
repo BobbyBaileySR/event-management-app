@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { filterEventsByStatus, getPortfolioStats, searchEvents } from '../data/mockData';
+import { filterEventsByStatus, getPortfolioStats, searchEvents } from '../utils/listFilters';
 import { useDataService } from '../hooks/useDataService';
 import type { Event, EventStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';

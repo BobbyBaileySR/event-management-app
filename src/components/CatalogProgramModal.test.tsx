@@ -109,6 +109,12 @@ describe('CatalogProgramModal', () => {
 		expect(onCancel).toHaveBeenCalled();
 	});
 
+	it('dismisses on Escape', async () => {
+		render(<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />);
+		await userEvent.setup().keyboard('{Escape}');
+		expect(onCancel).toHaveBeenCalled();
+	});
+
 	it('does not overflow body horizontally at 375px viewport', () => {
 		Object.defineProperty(document.body, 'clientWidth', { configurable: true, value: 375 });
 		document.documentElement.style.width = '375px';

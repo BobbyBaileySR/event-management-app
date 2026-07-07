@@ -159,6 +159,20 @@ Verify colour + text distinguish tiers without reading exact fraction (SC-003).
 
 ---
 
+## Manual QA log
+
+| Date | Tester | §1–§2 Auto | §3 Indicator | §4 ±1 adjust | §5 Check-in | §6 Tiers | §7 No capacity | §8 RBAC | §9 Walk-in | §10 Live | Notes |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| 2026-07-07 | | ✅ | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ blocked | T001–T042 ✅; **T043–T044** blocked → **FE-CAP-001** / **X-009** |
+
+**Column guide**
+
+- **§1–§2**: automated — `npm test` (Capacity + CheckIn + capacityTier + dataService).
+- **Mock sign-off (interim)**: §3–§6 with `USE_MOCK_API: true` — no HubSpot writes.
+- **Full sign-off**: above + §4–§5 live + §10 — requires UAT SFTP deploy (**BE-CAP-001**).
+
+---
+
 ## Sign-off
 
 - [ ] SC-001 — indicator visible within 2s on Check-in open

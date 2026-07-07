@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { CatalogProgram, CreateCatalogProgramBody, PatchCatalogProgramBody } from '../types';
 import { parseFormIdsInput, formatFormIdsInput } from '../constants/hubspot';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalTextForPatch } from '../utils/catalogMetadata';
 import styles from './CatalogProgramModal.module.css';
 
@@ -109,9 +110,16 @@ function buildPatchBody(program: CatalogProgram, form: ProgramFormState): PatchC
 
 export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: CatalogProgramModalProps) {
 	const titleId = useId();
+	const dialogRef = useRef<HTMLDivElement>(null);
 	const firstFieldRef = useRef<HTMLInputElement>(null);
 	const [form, setForm] = useState<ProgramFormState>(emptyForm);
 	const [saving, setSaving] = useState(false);
+
+	const handleEscape = useCallback(() => {
+		onCancel();
+	}, [onCancel]);
+
+	useModalFocusTrap({ open, containerRef: dialogRef, onEscape: handleEscape });
 
 	useEffect(() => {
 		if (!open) {
@@ -153,7 +161,7 @@ export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: C
 				}
 			}}
 		>
-			<div className={`modal ${styles.modal}`}>
+			<div ref={dialogRef} className={`modal ${styles.modal}`}>
 				<h3 id={titleId}>{title}</h3>
 				<form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
 					<label>

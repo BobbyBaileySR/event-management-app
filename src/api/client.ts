@@ -13,8 +13,6 @@ export class ApiError extends Error {
 export interface ApiRequestConfig {
 	/** Bearer session token, when the caller has an authenticated session. */
 	token?: string | null;
-	/** Bypass the mock short-circuit (used by auth routes that must reach the backend). */
-	skipMock?: boolean;
 }
 
 /** Split logical path from query — X-EMS-Route must be path-only; query belongs on the listener URL. */
@@ -40,7 +38,7 @@ export async function apiRequest<T = unknown>(
 	options: RequestInit = {},
 	requestConfig: ApiRequestConfig = {},
 ): Promise<T | null> {
-	const { token, skipMock = false } = requestConfig;
+	const { token } = requestConfig;
 	const headers = new Headers(options.headers ?? {});
 	if (!headers.has('Content-Type') && options.body) {
 		headers.set('Content-Type', 'application/json');
@@ -48,10 +46,6 @@ export async function apiRequest<T = unknown>(
 
 	if (token) {
 		headers.set('Authorization', `Bearer ${token}`);
-	}
-
-	if (CONFIG.USE_MOCK_API && !skipMock) {
-		throw new ApiError('Mock API handled by service layer', 0);
 	}
 
 	if (!CONFIG.API_BASE_URL) {

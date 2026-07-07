@@ -44,11 +44,10 @@ export async function exchangeGoogleToken(googleIdToken: string): Promise<Sessio
 		return mockExchange(googleIdToken);
 	}
 
-	const result = await apiRequest<Session>(
-		'/auth/exchange',
-		{ method: 'POST', body: JSON.stringify({ idToken: googleIdToken }) },
-		{ skipMock: true },
-	);
+	const result = await apiRequest<Session>('/auth/exchange', {
+		method: 'POST',
+		body: JSON.stringify({ idToken: googleIdToken }),
+	});
 	if (!result) {
 		throw new Error('Auth exchange returned no session');
 	}
@@ -58,7 +57,7 @@ export async function exchangeGoogleToken(googleIdToken: string): Promise<Sessio
 export async function logoutRequest(session: Session | null): Promise<void> {
 	if (!CONFIG.USE_MOCK_AUTH && session?.token) {
 		try {
-			await apiRequest('/auth/logout', { method: 'POST' }, { skipMock: true, token: session.token });
+			await apiRequest('/auth/logout', { method: 'POST' }, { token: session.token });
 		} catch {
 			// Always clear the local session even if server revoke fails.
 		}
