@@ -103,6 +103,25 @@ describe('Sidebar slice links', () => {
 		expect(screen.getByText('Atlassian Event 2026 — Meeting Room')).toBeInTheDocument();
 	});
 
+	it('shows Audit log for admin users', () => {
+		renderSidebar({ session: adminSession });
+
+		expect(screen.getByRole('button', { name: /Audit log/i })).toBeInTheDocument();
+	});
+
+	it('hides Audit log for non-admin users', () => {
+		renderSidebar({ session: staffSession });
+
+		expect(screen.queryByRole('button', { name: /Audit log/i })).not.toBeInTheDocument();
+	});
+
+	it('navigates to audit path when Audit log is clicked', () => {
+		renderSidebar({ path: '/audit' });
+
+		fireEvent.click(screen.getByRole('button', { name: /Audit log/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/audit');
+	});
+
 	it('hides Attendees and Check-in for admin when catalog selection is incomplete', () => {
 		renderSidebar({ session: adminSession });
 
