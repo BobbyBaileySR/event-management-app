@@ -4,6 +4,7 @@ import type {
 	AnalyticsConversion,
 	Attendee,
 	AuditEntry,
+	AuditLogEntry,
 	CampaignMetrics,
 	CatalogEvent,
 	CatalogProgram,
@@ -207,6 +208,65 @@ export const MOCK_AUDIT_LOG: AuditEntry[] = [
     },
 ];
 
+export const MOCK_SLICE_AUDIT_LOG: AuditLogEntry[] = [
+	{
+		id: 'req-checkin-beta',
+		timestamp: '2026-07-07T12:00:00.000Z',
+		action: 'checkin.confirm',
+		actor: 'admin@adaptavist.com',
+		eventId: 'ev-mr-2026',
+		resourceType: 'catalog_event',
+		resourceId: 'ev-mr-2026',
+		outcome: 'success',
+		metadata: { programId: 'prog-atlassian-2026', alreadyCheckedIn: false },
+	},
+	{
+		id: 'req-attendees-alpha',
+		timestamp: '2026-07-07T11:00:00.000Z',
+		action: 'attendees.list',
+		actor: 'admin@adaptavist.com',
+		eventId: 'ev-mr-2026',
+		resourceType: 'catalog_event',
+		resourceId: 'ev-mr-2026',
+		outcome: 'success',
+		metadata: { programId: 'prog-atlassian-2026', page: 1, pageSize: 50, resultCount: 12, queryPresent: false },
+	},
+	{
+		id: 'req-program-create',
+		timestamp: '2026-07-07T10:00:00.000Z',
+		action: 'catalog.program.create',
+		actor: 'events@adaptavist.com',
+		eventId: null,
+		resourceType: 'catalog_program',
+		resourceId: 'prog-atlassian-2026',
+		outcome: 'success',
+	},
+	{
+		id: 'req-program-update',
+		timestamp: '2026-07-06T16:30:00.000Z',
+		action: 'catalog.program.update',
+		actor: 'events@adaptavist.com',
+		eventId: null,
+		resourceType: 'catalog_program',
+		resourceId: 'prog-atlassian-2026',
+		outcome: 'success',
+		metadata: {
+			previous: { location: 'London' },
+			next: { location: 'London, UK' },
+		},
+	},
+	{
+		id: 'req-auth-exchange',
+		timestamp: '2026-07-06T09:00:00.000Z',
+		action: 'auth.exchange',
+		actor: 'admin@adaptavist.com',
+		eventId: null,
+		resourceType: 'session',
+		resourceId: 'sess-mock-001',
+		outcome: 'success',
+	},
+];
+
 export const MOCK_ANALYTICS: Record<string, AnalyticsConversion> = {
     'evt-london-q3': { checkedIn: 45, registered: 98, cancelled: 7 },
     'evt-tech-webinar': { checkedIn: 0, registered: 85, cancelled: 0 },
@@ -283,6 +343,25 @@ export function getEventById(eventId: string): Event | undefined {
 
 export function getAuditLogForEvent(eventId: string, entries: AuditEntry[] = MOCK_AUDIT_LOG): AuditEntry[] {
     return entries.filter((entry) => entry.eventId === eventId);
+}
+
+export function getMockSliceAuditLog(page = 1, pageSize = 50): {
+	entries: AuditLogEntry[];
+	page: number;
+	pageSize: number;
+	total: number;
+} {
+	const sorted = [...MOCK_SLICE_AUDIT_LOG].sort(
+		(left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
+	);
+	const total = sorted.length;
+	const start = (page - 1) * pageSize;
+	return {
+		entries: sorted.slice(start, start + pageSize),
+		page,
+		pageSize,
+		total,
+	};
 }
 
 const INITIAL_MOCK_CATALOG: CatalogResponse = {

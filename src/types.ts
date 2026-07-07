@@ -58,6 +58,46 @@ export interface AuditEntry {
 	outcome: string;
 }
 
+/** Scalar or nested metadata on Slice 1.5 audit log rows — no attendee PII. */
+export interface AuditMetadata {
+	[key: string]: AuditMetadataValue;
+}
+
+export type AuditMetadataValue =
+	| string
+	| number
+	| boolean
+	| string[]
+	| AuditMetadata
+	| null;
+
+/** Row from `GET audit/recent` and `GET events/{id}/audit`. */
+export interface AuditLogEntry {
+	id: string;
+	timestamp: string;
+	action: string;
+	actor: string;
+	eventId: string | null;
+	resourceType: string;
+	resourceId: string;
+	outcome: string;
+	metadata?: AuditMetadata;
+}
+
+export interface AuditLogListResult {
+	entries: AuditLogEntry[];
+	page: number;
+	pageSize: number;
+	total: number;
+}
+
+/** Distinguishes Slice 1.5 paginated audit API from legacy email-dispatch mock rows. */
+export function isAuditLogListResult(
+	result: AuditLogListResult | { entries: AuditEntry[] },
+): result is AuditLogListResult {
+	return 'page' in result;
+}
+
 export interface AnalyticsConversion {
 	checkedIn: number;
 	registered: number;
