@@ -2,12 +2,84 @@
 	margin-bottom: 16px;
 }
 
+.header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
 .labels {
 	display: flex;
+	flex: 1;
 	justify-content: space-between;
-	margin-bottom: 8px;
+	gap: 12px;
 	font-size: 0.9rem;
 	color: var(--color-muted);
+}
+
+.live {
+	margin-bottom: 0;
+}
+
+.liveLabel {
+	margin: 0 0 8px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--color-muted);
+}
+
+.liveHeader {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 8px;
+}
+
+.liveCount {
+	margin: 0;
+	min-width: 0;
+	line-height: 1.1;
+}
+
+.liveValue {
+	font-size: clamp(2rem, 6vw, 2.75rem);
+	font-weight: 700;
+	color: var(--color-denim);
+	letter-spacing: -0.03em;
+}
+
+.liveMeta {
+	font-size: clamp(1rem, 3vw, 1.25rem);
+	font-weight: 600;
+	color: var(--color-muted);
+}
+
+.livePct {
+	flex-shrink: 0;
+	font-size: clamp(1.5rem, 4vw, 2rem);
+	font-weight: 700;
+	color: var(--color-denim);
+	line-height: 1;
+}
+
+.tierLabel {
+	margin: 0 0 10px;
+	font-size: 0.9375rem;
+	font-weight: 700;
+}
+
+.live .tierLabel {
+	display: inline-flex;
+	align-items: center;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.05);
 }
 
 .track {
@@ -17,8 +89,86 @@
 	overflow: hidden;
 }
 
+.live .track {
+	height: 14px;
+	margin-bottom: 4px;
+}
+
 .fill {
 	height: 100%;
 	background: var(--color-orange);
 	border-radius: 999px;
+	transition: width 0.2s ease;
+}
+
+.controls {
+	display: flex;
+	gap: 10px;
+	margin-top: 12px;
+}
+
+.live .controls {
+	margin-top: 16px;
+}
+
+.adjustBtn {
+	flex: 1;
+	min-height: 48px;
+	padding: 10px 14px;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.adjustBtnSymbol {
+	font-size: 1.25rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.adjustBtnHint {
+	font-size: 0.75rem;
+	font-weight: 600;
+	opacity: 0.8;
+}
+
+.tier-normal .fill {
+	background: var(--color-orange);
+}
+
+.tier-normal .tierLabel {
+	color: var(--color-muted);
+}
+
+.tier-caution .fill {
+	background: var(--color-info, #0066cc);
+}
+
+.tier-caution .tierLabel {
+	color: var(--color-info, #0066cc);
+	background: rgba(0, 102, 204, 0.1);
+}
+
+.tier-critical .fill,
+.tier-over .fill {
+	background: var(--color-danger, #b00020);
+}
+
+.tier-critical .tierLabel,
+.tier-over .tierLabel {
+	color: var(--color-danger, #b00020);
+	background: rgba(176, 0, 32, 0.1);
+}
+
+@media (max-width: 480px) {
+	.liveHeader {
+		align-items: center;
+	}
+
+	.controls {
+		width: 100%;
+	}
+
+	.controls :global(.btn) {
+		flex: 1;
+	}
 }
