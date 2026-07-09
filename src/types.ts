@@ -416,6 +416,8 @@ export interface CreateEmailDispatchBody {
 	scheduledAtUtc: string | null;
 	timezone: string | null;
 	idempotencyKey: string;
+	/** Required when recipientCountPlanned >= largeSendThreshold (FR-010). */
+	largeSendConfirmed?: true;
 }
 
 export interface CreateEmailDispatchResponse {
@@ -431,6 +433,7 @@ export interface EmailDispatchListItem {
 	dispatchName: string;
 	templateName: string;
 	audienceSummary: string;
+	audience?: DispatchAudienceRequest;
 	status: DispatchStatus;
 	scheduledAtUtc: string | null;
 	timezone: string | null;
@@ -475,4 +478,6 @@ export interface PatchEmailDispatchBody {
 	audience: DispatchAudienceRequest;
 	scheduledAtUtc: string | null;
 	timezone: string | null;
+	/** Required when recipientCountPlanned >= largeSendThreshold (FR-010). */
+	largeSendConfirmed?: true;
 }

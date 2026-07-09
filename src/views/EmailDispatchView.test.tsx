@@ -23,6 +23,13 @@ const mockTemplates = {
 	templates: [{ id: '123456789', name: '48-hour reminder', description: 'Marketing Hub' }],
 };
 
+const mockSegments = {
+	segments: [
+		{ id: '987', name: 'VIP prospects', kind: 'active' as const },
+		{ id: '654', name: 'Static invite list', kind: 'static' as const },
+	],
+};
+
 const mockPreview = vi.fn().mockResolvedValue({ recipientCount: 2 });
 const mockCreateEmailDispatch = vi.fn().mockResolvedValue({
 	dispatchId: 'dsp-new-001',
@@ -71,7 +78,7 @@ const mockFetchSliceAttendees = vi.fn().mockResolvedValue({
 const mockDataService = {
 	fetchEmailLimits: vi.fn().mockResolvedValue(mockEmailLimits),
 	fetchEmailTemplates: vi.fn().mockResolvedValue(mockTemplates),
-	fetchEmailSegments: vi.fn().mockResolvedValue({ segments: [] }),
+	fetchEmailSegments: vi.fn().mockResolvedValue(mockSegments),
 	fetchSliceAttendees: mockFetchSliceAttendees,
 	previewEmailDispatch: mockPreview,
 	createEmailDispatch: mockCreateEmailDispatch,
@@ -171,6 +178,7 @@ describe('EmailDispatchView', () => {
 		mockFetchEmailDispatches.mockClear();
 		mockDataService.fetchEmailLimits.mockClear();
 		mockDataService.fetchEmailTemplates.mockClear();
+		mockDataService.fetchEmailSegments.mockClear();
 		mockFetchSliceAttendees.mockClear();
 	});
 
@@ -265,6 +273,60 @@ describe('EmailDispatchView', () => {
 			expect(screen.getByTestId('recipient-preview')).toHaveTextContent('2 recipients');
 		});
 		expect(mockPreview).toHaveBeenCalled();
+	});
+
+	it('loads HubSpot segments and shows segment name picker', async () => {
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(mockDataService.fetchEmailSegments).toHaveBeenCalledWith(programId, eventId);
+		});
+
+		fireEvent.click(screen.getByRole('radio', { name: /hubspot segment/i }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('segment-picker')).toBeInTheDocument();
+		});
+		expect(screen.getByRole('option', { name: /VIP prospects \(Active\)/i })).toBeInTheDocument();
+		expect(screen.getByRole('option', { name: /Static invite list \(Static\)/i })).toBeInTheDocument();
+	});
+
+	it('previews and sends with hubspot_segment audience', async () => {
+		mockPreview.mockResolvedValue({ recipientCount: 24 });
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByRole('radio', { name: /hubspot segment/i })).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole('radio', { name: /hubspot segment/i }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('recipient-preview')).toHaveTextContent('24 recipients');
+		});
+		expect(mockPreview).toHaveBeenCalledWith(
+			programId,
+			eventId,
+			expect.objectContaining({
+				audience: { type: 'hubspot_segment', segmentId: '987' },
+			}),
+		);
+
+		fireEvent.change(screen.getByLabelText(/dispatch name/i), {
+			target: { value: 'VIP segment send' },
+		});
+		fireEvent.click(screen.getByRole('button', { name: /send now/i }));
+
+		await waitFor(() => {
+			expect(mockCreateEmailDispatch).toHaveBeenCalledWith(
+				programId,
+				eventId,
+				expect.objectContaining({
+					dispatchName: 'VIP segment send',
+					audience: { type: 'hubspot_segment', segmentId: '987' },
+				}),
+			);
+		});
 	});
 
 	it('sends with checked-in audience when selected', async () => {
@@ -370,7 +432,7 @@ describe('EmailDispatchView', () => {
 				programId,
 				eventId,
 				'dsp-detail',
-				expect.objectContaining({ page: 1 }),
+				expect.objectContaining({ page: 1, pageSize: 25 }),
 			);
 		});
 		expect(screen.getByText('jane.doe@acme.com')).toBeInTheDocument();
@@ -409,5 +471,129 @@ describe('EmailDispatchView', () => {
 			expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
 		});
 		expect(document.querySelector('img[src="x"]')).toBeNull();
+	});
+
+	it('lists scheduled dispatches with lock warning banner', async () => {
+		mockDataService.fetchEmailDispatches.mockImplementation((_programId, _eventId, query) => {
+			if (query?.view === 'scheduled') {
+				return Promise.resolve({
+					dispatches: [
+						{
+							dispatchId: 'dsp-lock',
+							dispatchName: 'Soon send',
+							templateName: '48-hour reminder',
+							audienceSummary: 'All registered (2)',
+							audience: { type: 'registered_all' },
+							status: 'pending',
+							scheduledAtUtc: new Date(Date.now() + 10 * 60_000).toISOString(),
+							timezone: 'Europe/London',
+							recipientCountPlanned: 2,
+							recipientCountSent: 0,
+							createdBy: 'admin@adaptavist.com',
+							createdAt: '2026-10-01T10:00:00.000Z',
+							lockWarning: true,
+						},
+					],
+					page: 1,
+					pageSize: 50,
+					total: 1,
+				});
+			}
+			return Promise.resolve({ dispatches: [], page: 1, pageSize: 50, total: 0 });
+		});
+
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByRole('tab', { name: /scheduled/i })).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByRole('tab', { name: /scheduled/i }));
+
+		await waitFor(() => {
+			expect(screen.getByTestId('schedule-lock-warning')).toBeInTheDocument();
+		});
+		expect(screen.getByText('Soon send')).toBeInTheDocument();
+		expect(screen.getByTestId('dispatch-lock-badge')).toHaveTextContent(/locking soon/i);
+	});
+
+	it('schedules a dispatch from the compose tab', async () => {
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText(/dispatch name/i)).toBeInTheDocument();
+		});
+
+		fireEvent.change(screen.getByLabelText(/dispatch name/i), {
+			target: { value: 'QA scheduled send' },
+		});
+		fireEvent.click(screen.getByRole('radio', { name: /schedule for later/i }));
+		fireEvent.click(screen.getByRole('button', { name: /^Schedule$/i }));
+
+		await waitFor(() => {
+			expect(mockCreateEmailDispatch).toHaveBeenCalledWith(
+				programId,
+				eventId,
+				expect.objectContaining({
+					dispatchName: 'QA scheduled send',
+					scheduledAtUtc: expect.any(String),
+					timezone: expect.any(String),
+				}),
+			);
+		});
+		expect(screen.getByText(/dispatch scheduled/i)).toBeInTheDocument();
+	});
+
+	it('cancels a scheduled dispatch from the scheduled tab', async () => {
+		mockDataService.fetchEmailDispatches.mockImplementation((_programId, _eventId, query) => {
+			if (query?.view === 'scheduled') {
+				return Promise.resolve({
+					dispatches: [
+						{
+							dispatchId: 'dsp-cancel-me',
+							dispatchName: 'Cancel me',
+							templateName: '48-hour reminder',
+							audienceSummary: 'All registered (2)',
+							audience: { type: 'registered_all' },
+							status: 'pending',
+							scheduledAtUtc: '2026-12-15T08:00:00.000Z',
+							timezone: 'Europe/London',
+							recipientCountPlanned: 2,
+							recipientCountSent: 0,
+							createdBy: 'admin@adaptavist.com',
+							createdAt: '2026-10-01T10:00:00.000Z',
+						},
+					],
+					page: 1,
+					pageSize: 50,
+					total: 1,
+				});
+			}
+			return Promise.resolve({ dispatches: [], page: 1, pageSize: 50, total: 0 });
+		});
+		mockDataService.cancelEmailDispatch = vi.fn().mockResolvedValue({
+			dispatchId: 'dsp-cancel-me',
+			status: 'cancelled',
+		});
+
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByRole('tab', { name: /scheduled/i })).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByRole('tab', { name: /scheduled/i }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: /^Cancel$/i })).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('dialog')).toBeInTheDocument();
+		});
+		fireEvent.click(screen.getByRole('button', { name: /cancel dispatch/i }));
+
+		await waitFor(() => {
+			expect(mockDataService.cancelEmailDispatch).toHaveBeenCalledWith(programId, eventId, 'dsp-cancel-me');
+		});
 	});
 });

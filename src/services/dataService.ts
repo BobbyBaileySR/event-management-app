@@ -364,7 +364,14 @@ export async function fetchCatalog(options: FetchCatalogOptions = {}): Promise<C
 export async function fetchSliceAttendees(
 	programId: string,
 	eventId: string,
-	query: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number } = {},
+	query: {
+		checkedIn?: boolean;
+		q?: string;
+		page?: number;
+		pageSize?: number;
+		dispatchId?: string;
+		dispatchFilter?: 'received' | 'not_received';
+	} = {},
 	options: DataServiceOptions = {},
 ): Promise<SliceAttendeesResponse> {
 	const { token } = options;
@@ -380,6 +387,10 @@ export async function fetchSliceAttendees(
 	}
 	if (query.pageSize) {
 		search.set('pageSize', String(query.pageSize));
+	}
+	if (query.dispatchId && query.dispatchFilter) {
+		search.set('dispatchId', query.dispatchId);
+		search.set('dispatchFilter', query.dispatchFilter);
 	}
 	const suffix = search.toString() ? `?${search}` : '';
 	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/attendees${suffix}`;
@@ -864,7 +875,14 @@ export function createDataService(token?: string | null) {
 		fetchSliceAttendees: (
 			programId: string,
 			eventId: string,
-			query?: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number },
+			query?: {
+				checkedIn?: boolean;
+				q?: string;
+				page?: number;
+				pageSize?: number;
+				dispatchId?: string;
+				dispatchFilter?: 'received' | 'not_received';
+			},
 		) => fetchSliceAttendees(programId, eventId, query, options),
 		checkInScan: (programId: string, eventId: string, jwt: string) =>
 			checkInScan(programId, eventId, jwt, options),

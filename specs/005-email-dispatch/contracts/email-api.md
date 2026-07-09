@@ -157,6 +157,7 @@ Create **send now** or **scheduled** dispatch (FR-006). Accepts immediately; pro
 | `scheduledAtUtc` | `null` = send now; else future instant on 15-min grid |
 | `timezone` | Required when scheduled; IANA string |
 | `idempotencyKey` | Required UUID; duplicate within TTL returns same job |
+| `largeSendConfirmed` | Required `true` when `recipientCountPlanned >= largeSendThreshold` (FR-010) |
 
 ### Response `200`
 
@@ -178,7 +179,11 @@ Scheduled pending response uses `"status": "pending"`.
 | :--- | ---: | :--- |
 | `rate_limited` | 429 | Hourly dispatch cap exceeded |
 | `validation_error` | 400 | Past schedule, off 15-min grid, zero recipients |
+| `large_send_confirmation_required` | 400 | Audience at/above threshold without `largeSendConfirmed: true` |
+| `idempotency_in_progress` | 409 | Idempotency key reserved but job not yet persisted |
 | `forbidden` | 403 | Non-admin |
+
+**Job fields (server):** `largeSendConfirmed: true` persisted on create/patch when operator confirms, with `largeSendConfirmedAtCount` binding confirmation to the preview count. PATCH without re-confirmation clears both fields. Queue re-checks live audience count at processing and fails the job if threshold is met without valid confirmation or live count exceeds the confirmed count.
 
 ---
 
@@ -265,7 +270,7 @@ Dispatch detail + paginated recipients (FR-012).
 
 ## PATCH `programs/{programId}/events/{eventId}/email/dispatches/{dispatchId}`
 
-Full edit of **`pending`** scheduled dispatch (FR-008). Same body shape as POST create (minus `idempotencyKey`).
+Full edit of **`pending`** scheduled dispatch (FR-008). Same body shape as POST create (minus `idempotencyKey`); includes optional `largeSendConfirmed` when audience meets threshold.
 
 ### Response `200`
 
@@ -276,6 +281,7 @@ Updated dispatch summary (same fields as list item).
 | Code | HTTP | When |
 | :--- | ---: | :--- |
 | `dispatch_locked` | 409 | Status is `processing` or terminal |
+| `large_send_confirmation_required` | 400 | Audience at/above threshold without `largeSendConfirmed: true` |
 | `dispatch_not_found` | 404 | Unknown id |
 
 ---
@@ -323,6 +329,8 @@ Requires both params together. Filters **Registered attendees** only.
 | Code | HTTP | When |
 | :--- | ---: | :--- |
 | `dispatch_locked` | 409 | Edit/cancel while processing |
+| `large_send_confirmation_required` | 400 | Audience at/above threshold without confirmation |
+| `idempotency_in_progress` | 409 | Idempotency key reserved without persisted job |
 | `template_not_found` | 404 | Stale template id |
 | `segment_not_found` | 404 | Stale segment id |
 | `hubspot_send_failed` | 502 | Job-level HubSpot error (job may partial complete) |

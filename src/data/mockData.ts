@@ -38,6 +38,7 @@ import type {
 	SliceAttendeesResponse,
 } from '../types';
 import { CONFIG } from '../config';
+import { assertScheduleFields } from '../utils/emailSchedule';
 
 /**
  * Sample mock data for EMS PoC — replaced by ScriptRunner API in Phase 2+.
@@ -494,7 +495,14 @@ function decodeCheckInJwtPayload(jwt: string): { contactId?: string; sub?: strin
 export function getMockSliceAttendees(
 	_programId: string,
 	eventId: string,
-	query: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number } = {},
+	query: {
+		checkedIn?: boolean;
+		q?: string;
+		page?: number;
+		pageSize?: number;
+		dispatchId?: string;
+		dispatchFilter?: 'received' | 'not_received';
+	} = {},
 ): SliceAttendeesResponse {
 	const attendees = mockSliceAttendeesState[eventId];
 	const pageSize = query.pageSize ?? 50;
@@ -505,6 +513,17 @@ export function getMockSliceAttendees(
 	}
 
 	let filtered = attendees;
+
+	if (query.dispatchId && query.dispatchFilter) {
+		const recipients = mockEmailRecipientsState[query.dispatchId] ?? [];
+		const sentContactIds = new Set(
+			recipients.filter((row) => row.outcome === 'sent').map((row) => row.contactId),
+		);
+		filtered = filtered.filter((entry) => {
+			const received = sentContactIds.has(entry.contactId);
+			return query.dispatchFilter === 'received' ? received : !received;
+		});
+	}
 
 	if (query.checkedIn !== undefined) {
 		filtered = filtered.filter((entry) => entry.checkedIn === query.checkedIn);
@@ -871,6 +890,11 @@ const MOCK_SEGMENT_RECIPIENT_COUNTS: Record<string, number> = {
 	'654': 8,
 };
 
+const MOCK_SEGMENT_MEMBER_EMAILS: Record<string, string[]> = {
+	'987': ['vip1@example.com', 'vip2@example.com', 'vip3@example.com'],
+	'654': ['static1@example.com', 'static2@example.com'],
+};
+
 const INITIAL_MOCK_EMAIL_DISPATCHES: MockEmailDispatchRecord[] = [
 	{
 		dispatchId: 'dsp-completed-001',
@@ -1008,16 +1032,17 @@ function buildMockAudienceSummary(eventId: string, audience: DispatchAudienceReq
 }
 
 function toListItem(record: MockEmailDispatchRecord): EmailDispatchListItem {
-	const { programId: _programId, eventId: _eventId, templateId: _templateId, audience: _audience, completedAt: _completedAt, ...item } =
+	const { programId: _programId, eventId: _eventId, templateId: _templateId, audience, completedAt: _completedAt, ...item } =
 		record;
+	const listItem: EmailDispatchListItem = { ...item, audience };
 	if (record.status === 'pending' && record.scheduledAtUtc) {
 		const scheduledMs = new Date(record.scheduledAtUtc).getTime();
 		const minutesUntil = (scheduledMs - Date.now()) / 60_000;
 		if (minutesUntil <= 15 && minutesUntil >= 0) {
-			return { ...item, lockWarning: true };
+			return { ...listItem, lockWarning: true };
 		}
 	}
-	return item;
+	return listItem;
 }
 
 export function getMockEmailLimits(_programId: string, _eventId: string): EmailDispatchLimits {
@@ -1063,7 +1088,14 @@ function buildMockRecipients(
 	sentAt: string,
 ): DispatchRecipientRow[] {
 	if (audience.type === 'hubspot_segment') {
-		return [];
+		const emails = MOCK_SEGMENT_MEMBER_EMAILS[audience.segmentId] ?? [];
+		return emails.map((email, index) => ({
+			dispatchId,
+			contactId: `segment-${audience.segmentId}-${index + 1}`,
+			email,
+			outcome: 'sent',
+			sentAt,
+		}));
 	}
 	return resolveMockRegisteredAttendees(eventId, audience).map((attendee) => ({
 		dispatchId,
@@ -1104,6 +1136,20 @@ export function mockCreateEmailDispatch(
 	});
 	if (preview.recipientCount <= 0) {
 		throw new Error('validation_error');
+	}
+
+	if (
+		preview.recipientCount >= CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD &&
+		body.largeSendConfirmed !== true
+	) {
+		throw new Error('large_send_confirmation_required');
+	}
+
+	if (body.scheduledAtUtc !== null) {
+		if (!body.timezone) {
+			throw new Error('validation_error');
+		}
+		assertScheduleFields(body.scheduledAtUtc, body.timezone);
 	}
 
 	const template = MOCK_EMAIL_DISPATCH_TEMPLATES.find((entry) => entry.id === body.templateId);
@@ -1235,6 +1281,18 @@ export function mockUpdateEmailDispatch(
 	if (preview.recipientCount <= 0) {
 		throw new Error('validation_error');
 	}
+
+	if (
+		preview.recipientCount >= CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD &&
+		body.largeSendConfirmed !== true
+	) {
+		throw new Error('large_send_confirmation_required');
+	}
+
+	if (!body.scheduledAtUtc || !body.timezone) {
+		throw new Error('validation_error');
+	}
+	assertScheduleFields(body.scheduledAtUtc, body.timezone);
 
 	record.dispatchName = body.dispatchName.trim();
 	record.templateId = body.templateId;

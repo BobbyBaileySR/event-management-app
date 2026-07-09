@@ -332,6 +332,9 @@ function normalizeEmailDispatchListItem(raw: Record<string, unknown>): EmailDisp
 	if (raw.lockWarning === true) {
 		item.lockWarning = true;
 	}
+	if (raw.audience && typeof raw.audience === 'object') {
+		item.audience = raw.audience as EmailDispatchListItem['audience'];
+	}
 	return item;
 }
 

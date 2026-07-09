@@ -96,7 +96,8 @@
 	cursor: pointer;
 }
 
-.manualPicker {
+.manualPicker,
+.segmentPicker {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
@@ -173,6 +174,100 @@
 .detailMeta,
 .detailCount {
 	margin: 0;
+	color: var(--color-muted);
+	font-size: 0.9rem;
+}
+
+.detailPagination {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.detailPageSummary {
+	font-size: 0.9rem;
+	color: var(--color-muted);
+}
+
+.sendModeFieldset {
+	border: 1px solid var(--color-border, #e2e8f0);
+	border-radius: 8px;
+	padding: 16px;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.scheduleFields {
+	display: grid;
+	gap: 12px;
+}
+
+.minuteGrid {
+	border: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.minuteOptions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.minuteOption {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 44px;
+	padding: 0 10px;
+	border: 1px solid var(--color-border, #e2e8f0);
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.lockWarningBanner {
+	margin: 0;
+	padding: 12px 14px;
+	border-radius: 8px;
+	background: #fff4e5;
+	color: #7a4d00;
+	font-weight: 600;
+}
+
+.lockBadge {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: #fff4e5;
+	color: #7a4d00;
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+
+.rowActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.editModal {
+	max-width: min(36rem, calc(100vw - 2rem));
+}
+
+.editTitle {
+	margin: 0 0 8px;
+}
+
+.editMeta {
+	margin: 0 0 16px;
 	color: var(--color-muted);
 	font-size: 0.9rem;
 }
