@@ -5,14 +5,26 @@
 
 import type {
 	Attendee,
+	CancelEmailDispatchResponse,
 	CapacityStatus,
 	CheckInContactSummary,
 	CheckInScanResponse,
 	ConfirmCheckInResponse,
+	CreateEmailDispatchResponse,
+	DispatchRecipientRow,
+	EmailDispatchDetailResponse,
+	EmailDispatchLimits,
+	EmailDispatchListItem,
+	EmailDispatchListResponse,
+	EmailPreviewResponse,
+	EmailSegmentsListResponse,
+	EmailTemplatesListResponse,
 	Event,
 	CatalogEvent,
 	CatalogProgram,
 	CatalogResponse,
+	HubSpotSegmentOption,
+	MarketingTemplateOption,
 	SliceAttendeesResponse,
 } from '../types';
 
@@ -269,5 +281,149 @@ export function normalizeCapacityStatusResponse(response: Record<string, unknown
 		checkedInCount: Number(response.checkedInCount ?? 0),
 		departureCount: Number(response.departureCount ?? 0),
 		liveAttendance: Number(response.liveAttendance ?? 0),
+	};
+}
+
+function normalizeMarketingTemplate(raw: Record<string, unknown>): MarketingTemplateOption {
+	return {
+		id: String(raw.id ?? ''),
+		name: String(raw.name ?? ''),
+		description: copyOptionalString(raw, 'description'),
+	};
+}
+
+function normalizeHubSpotSegment(raw: Record<string, unknown>): HubSpotSegmentOption {
+	const kind = raw.kind;
+	return {
+		id: String(raw.id ?? ''),
+		name: String(raw.name ?? ''),
+		kind: kind === 'static' ? 'static' : 'active',
+	};
+}
+
+function normalizeDispatchStatus(value: unknown): EmailDispatchListItem['status'] {
+	const status = String(value ?? 'pending');
+	if (
+		status === 'pending' ||
+		status === 'processing' ||
+		status === 'completed' ||
+		status === 'failed' ||
+		status === 'cancelled'
+	) {
+		return status;
+	}
+	return 'pending';
+}
+
+function normalizeEmailDispatchListItem(raw: Record<string, unknown>): EmailDispatchListItem {
+	const item: EmailDispatchListItem = {
+		dispatchId: String(raw.dispatchId ?? ''),
+		dispatchName: String(raw.dispatchName ?? ''),
+		templateName: String(raw.templateName ?? ''),
+		audienceSummary: String(raw.audienceSummary ?? ''),
+		status: normalizeDispatchStatus(raw.status),
+		scheduledAtUtc: raw.scheduledAtUtc === null || raw.scheduledAtUtc === undefined ? null : String(raw.scheduledAtUtc),
+		timezone: raw.timezone === null || raw.timezone === undefined ? null : String(raw.timezone),
+		recipientCountPlanned: Number(raw.recipientCountPlanned ?? 0),
+		recipientCountSent: Number(raw.recipientCountSent ?? 0),
+		createdBy: String(raw.createdBy ?? ''),
+		createdAt: String(raw.createdAt ?? ''),
+	};
+	if (raw.lockWarning === true) {
+		item.lockWarning = true;
+	}
+	if (raw.audience && typeof raw.audience === 'object') {
+		item.audience = raw.audience as EmailDispatchListItem['audience'];
+	}
+	return item;
+}
+
+function normalizeDispatchRecipient(raw: Record<string, unknown>): DispatchRecipientRow {
+	return {
+		dispatchId: String(raw.dispatchId ?? ''),
+		contactId: String(raw.contactId ?? ''),
+		email: String(raw.email ?? ''),
+		outcome: 'sent',
+		sentAt: String(raw.sentAt ?? ''),
+	};
+}
+
+export function normalizeEmailLimitsResponse(response: Record<string, unknown>): EmailDispatchLimits {
+	return {
+		dispatchLimitPerHour: Number(response.dispatchLimitPerHour ?? 10),
+		dispatchUsedThisHour: Number(response.dispatchUsedThisHour ?? 0),
+		largeSendThreshold: Number(response.largeSendThreshold ?? 50),
+	};
+}
+
+export function normalizeEmailTemplatesResponse(response: Record<string, unknown>): EmailTemplatesListResponse {
+	const templates = Array.isArray(response.templates) ? response.templates : [];
+	return {
+		templates: templates.map((row) => normalizeMarketingTemplate(row as Record<string, unknown>)),
+	};
+}
+
+export function normalizeEmailSegmentsResponse(response: Record<string, unknown>): EmailSegmentsListResponse {
+	const segments = Array.isArray(response.segments) ? response.segments : [];
+	return {
+		segments: segments.map((row) => normalizeHubSpotSegment(row as Record<string, unknown>)),
+	};
+}
+
+export function normalizeEmailPreviewResponse(response: Record<string, unknown>): EmailPreviewResponse {
+	return {
+		recipientCount: Number(response.recipientCount ?? 0),
+	};
+}
+
+export function normalizeCreateEmailDispatchResponse(response: Record<string, unknown>): CreateEmailDispatchResponse {
+	return {
+		dispatchId: String(response.dispatchId ?? ''),
+		status: normalizeDispatchStatus(response.status),
+		recipientCountPlanned: Number(response.recipientCountPlanned ?? 0),
+		scheduledAtUtc:
+			response.scheduledAtUtc === null || response.scheduledAtUtc === undefined ? null : String(response.scheduledAtUtc),
+		timezone: response.timezone === null || response.timezone === undefined ? null : String(response.timezone),
+	};
+}
+
+export function normalizeEmailDispatchListResponse(response: Record<string, unknown>): EmailDispatchListResponse {
+	const dispatches = Array.isArray(response.dispatches) ? response.dispatches : [];
+	return {
+		dispatches: dispatches.map((row) => normalizeEmailDispatchListItem(row as Record<string, unknown>)),
+		page: Number(response.page ?? 1),
+		pageSize: Number(response.pageSize ?? 50),
+		total: Number(response.total ?? dispatches.length),
+	};
+}
+
+export function normalizeEmailDispatchDetailResponse(response: Record<string, unknown>): EmailDispatchDetailResponse {
+	const dispatchRaw = response.dispatch;
+	const dispatch =
+		dispatchRaw && typeof dispatchRaw === 'object'
+			? normalizeEmailDispatchListItem(dispatchRaw as Record<string, unknown>)
+			: normalizeEmailDispatchListItem({});
+	const completedAt =
+		dispatchRaw && typeof dispatchRaw === 'object'
+			? (dispatchRaw as Record<string, unknown>).completedAt === null ||
+				(dispatchRaw as Record<string, unknown>).completedAt === undefined
+				? null
+				: String((dispatchRaw as Record<string, unknown>).completedAt)
+			: null;
+	const recipients = Array.isArray(response.recipients) ? response.recipients : [];
+
+	return {
+		dispatch: { ...dispatch, completedAt },
+		recipients: recipients.map((row) => normalizeDispatchRecipient(row as Record<string, unknown>)),
+		page: Number(response.page ?? 1),
+		pageSize: Number(response.pageSize ?? 50),
+		total: Number(response.total ?? recipients.length),
+	};
+}
+
+export function normalizeCancelEmailDispatchResponse(response: Record<string, unknown>): CancelEmailDispatchResponse {
+	return {
+		dispatchId: String(response.dispatchId ?? ''),
+		status: 'cancelled',
 	};
 }

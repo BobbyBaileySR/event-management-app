@@ -6,6 +6,7 @@ import type {
 	AuditEntry,
 	AuditLogEntry,
 	CampaignMetrics,
+	CancelEmailDispatchResponse,
 	CatalogEvent,
 	CatalogProgram,
 	CatalogResponse,
@@ -15,14 +16,29 @@ import type {
 	AdjustCapacityDirection,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
+	CreateEmailDispatchBody,
+	CreateEmailDispatchResponse,
+	DispatchAudienceRequest,
+	DispatchRecipientRow,
+	EmailDispatchDetailResponse,
+	EmailDispatchLimits,
+	EmailDispatchListItem,
+	EmailDispatchListResponse,
+	EmailPreviewRequestBody,
+	EmailPreviewResponse,
+	EmailSegmentsListResponse,
+	EmailTemplatesListResponse,
 	PatchCatalogEventBody,
 	PatchCatalogProgramBody,
+	PatchEmailDispatchBody,
 	EmailTemplate,
 	Event,
 	ScheduledEmail,
 	SliceAttendee,
 	SliceAttendeesResponse,
 } from '../types';
+import { CONFIG } from '../config';
+import { assertScheduleFields } from '../utils/emailSchedule';
 
 /**
  * Sample mock data for EMS PoC — replaced by ScriptRunner API in Phase 2+.
@@ -479,7 +495,14 @@ function decodeCheckInJwtPayload(jwt: string): { contactId?: string; sub?: strin
 export function getMockSliceAttendees(
 	_programId: string,
 	eventId: string,
-	query: { checkedIn?: boolean; q?: string; page?: number; pageSize?: number } = {},
+	query: {
+		checkedIn?: boolean;
+		q?: string;
+		page?: number;
+		pageSize?: number;
+		dispatchId?: string;
+		dispatchFilter?: 'received' | 'not_received';
+	} = {},
 ): SliceAttendeesResponse {
 	const attendees = mockSliceAttendeesState[eventId];
 	const pageSize = query.pageSize ?? 50;
@@ -490,6 +513,17 @@ export function getMockSliceAttendees(
 	}
 
 	let filtered = attendees;
+
+	if (query.dispatchId && query.dispatchFilter) {
+		const recipients = mockEmailRecipientsState[query.dispatchId] ?? [];
+		const sentContactIds = new Set(
+			recipients.filter((row) => row.outcome === 'sent').map((row) => row.contactId),
+		);
+		filtered = filtered.filter((entry) => {
+			const received = sentContactIds.has(entry.contactId);
+			return query.dispatchFilter === 'received' ? received : !received;
+		});
+	}
 
 	if (query.checkedIn !== undefined) {
 		filtered = filtered.filter((entry) => entry.checkedIn === query.checkedIn);
@@ -828,4 +862,462 @@ export function mockUpdateEvent(id: string, patch: PatchCatalogEventBody): Catal
 		return event;
 	}
 	throw new Error('event_not_found');
+}
+
+// --- Email dispatch (Slice 2 mock) ---
+
+interface MockEmailDispatchRecord extends EmailDispatchListItem {
+	programId: string;
+	eventId: string;
+	templateId: string;
+	audience: DispatchAudienceRequest;
+	completedAt: string | null;
+}
+
+const MOCK_EMAIL_DISPATCH_TEMPLATES: EmailTemplatesListResponse['templates'] = [
+	{ id: '123456789', name: '48-hour reminder', description: 'Marketing Hub' },
+	{ id: 'tpl-invite', name: 'Initial Invitation', description: 'Marketing Hub — first touch' },
+	{ id: 'tpl-qr', name: 'QR Ticket Dispatch', description: 'Marketing Hub — event entry' },
+];
+
+const MOCK_EMAIL_SEGMENTS: EmailSegmentsListResponse['segments'] = [
+	{ id: '987', name: 'VIP prospects', kind: 'active' },
+	{ id: '654', name: 'Static invite list', kind: 'static' },
+];
+
+const MOCK_SEGMENT_RECIPIENT_COUNTS: Record<string, number> = {
+	'987': 24,
+	'654': 8,
+};
+
+const MOCK_SEGMENT_MEMBER_EMAILS: Record<string, string[]> = {
+	'987': ['vip1@example.com', 'vip2@example.com', 'vip3@example.com'],
+	'654': ['static1@example.com', 'static2@example.com'],
+};
+
+const INITIAL_MOCK_EMAIL_DISPATCHES: MockEmailDispatchRecord[] = [
+	{
+		dispatchId: 'dsp-completed-001',
+		dispatchName: 'Meeting Room reminder',
+		programId: 'prog-atlassian-2026',
+		eventId: 'ev-mr-2026',
+		templateId: '123456789',
+		templateName: '48-hour reminder',
+		audience: { type: 'registered_all' },
+		audienceSummary: 'All registered (2)',
+		status: 'completed',
+		scheduledAtUtc: null,
+		timezone: null,
+		recipientCountPlanned: 2,
+		recipientCountSent: 2,
+		createdBy: 'admin@adaptavist.com',
+		createdAt: '2026-10-01T10:00:00.000Z',
+		completedAt: '2026-10-01T10:02:00.000Z',
+	},
+	{
+		dispatchId: 'dsp-scheduled-001',
+		dispatchName: 'VIP invite wave 1',
+		programId: 'prog-atlassian-2026',
+		eventId: 'ev-mr-2026',
+		templateId: '123456789',
+		templateName: '48-hour reminder',
+		audience: { type: 'hubspot_segment', segmentId: '987' },
+		audienceSummary: 'Segment: VIP prospects (Active)',
+		status: 'pending',
+		scheduledAtUtc: '2026-12-15T08:00:00.000Z',
+		timezone: 'Europe/London',
+		recipientCountPlanned: 24,
+		recipientCountSent: 0,
+		createdBy: 'admin@adaptavist.com',
+		createdAt: '2026-10-01T11:00:00.000Z',
+		completedAt: null,
+	},
+];
+
+const INITIAL_MOCK_EMAIL_RECIPIENTS: Record<string, DispatchRecipientRow[]> = {
+	'dsp-completed-001': [
+		{
+			dispatchId: 'dsp-completed-001',
+			contactId: 'mock-101',
+			email: 'jane.doe@acme.com',
+			outcome: 'sent',
+			sentAt: '2026-10-01T10:01:30.000Z',
+		},
+		{
+			dispatchId: 'dsp-completed-001',
+			contactId: 'mock-202',
+			email: 'pat@partner.com',
+			outcome: 'sent',
+			sentAt: '2026-10-01T10:01:45.000Z',
+		},
+	],
+};
+
+const mockEmailDispatchesState: MockEmailDispatchRecord[] = structuredClone(INITIAL_MOCK_EMAIL_DISPATCHES);
+const mockEmailRecipientsState: Record<string, DispatchRecipientRow[]> = structuredClone(INITIAL_MOCK_EMAIL_RECIPIENTS);
+const mockEmailIdempotencyKeys = new Map<string, string>();
+let mockEmailDispatchesCreatedThisHour = 0;
+
+export function resetMockEmailDispatchState(): void {
+	mockEmailDispatchesState.length = 0;
+	mockEmailDispatchesState.push(...structuredClone(INITIAL_MOCK_EMAIL_DISPATCHES));
+	for (const key of Object.keys(mockEmailRecipientsState)) {
+		delete mockEmailRecipientsState[key];
+	}
+	Object.assign(mockEmailRecipientsState, structuredClone(INITIAL_MOCK_EMAIL_RECIPIENTS));
+	mockEmailIdempotencyKeys.clear();
+	mockEmailDispatchesCreatedThisHour = 0;
+}
+
+function emailDispatchKey(programId: string, eventId: string): string {
+	return `${programId}:${eventId}`;
+}
+
+function findMockEmailDispatch(programId: string, eventId: string, dispatchId: string): MockEmailDispatchRecord | undefined {
+	return mockEmailDispatchesState.find(
+		(entry) => entry.programId === programId && entry.eventId === eventId && entry.dispatchId === dispatchId,
+	);
+}
+
+function listMockEmailDispatches(programId: string, eventId: string): MockEmailDispatchRecord[] {
+	return mockEmailDispatchesState.filter((entry) => entry.programId === programId && entry.eventId === eventId);
+}
+
+function resolveMockRegisteredAttendees(eventId: string, audience: DispatchAudienceRequest): SliceAttendee[] {
+	const attendees = mockSliceAttendeesState[eventId] ?? [];
+	if (audience.type === 'registered_all') {
+		return attendees;
+	}
+	if (audience.type === 'registered_checked_in') {
+		return attendees.filter((entry) => entry.checkedIn);
+	}
+	if (audience.type === 'registered_not_checked_in') {
+		return attendees.filter((entry) => !entry.checkedIn);
+	}
+	if (audience.type === 'registered_manual') {
+		const ids = new Set(audience.contactIds);
+		return attendees.filter((entry) => ids.has(entry.contactId));
+	}
+	return [];
+}
+
+function resolveMockAudienceCount(eventId: string, audience: DispatchAudienceRequest): number {
+	if (audience.type === 'hubspot_segment') {
+		return MOCK_SEGMENT_RECIPIENT_COUNTS[audience.segmentId] ?? 0;
+	}
+	return resolveMockRegisteredAttendees(eventId, audience).length;
+}
+
+function buildMockAudienceSummary(eventId: string, audience: DispatchAudienceRequest): string {
+	const count = resolveMockAudienceCount(eventId, audience);
+	if (audience.type === 'registered_all') {
+		return `All registered (${count})`;
+	}
+	if (audience.type === 'registered_checked_in') {
+		return `Checked in only (${count})`;
+	}
+	if (audience.type === 'registered_not_checked_in') {
+		return `Not checked in (${count})`;
+	}
+	if (audience.type === 'registered_manual') {
+		return `Manual selection (${count})`;
+	}
+	if (audience.type !== 'hubspot_segment') {
+		return `Audience (${count})`;
+	}
+	const segment = MOCK_EMAIL_SEGMENTS.find((entry) => entry.id === audience.segmentId);
+	const label = segment?.name ?? 'Segment';
+	const kindLabel = segment?.kind === 'static' ? 'Static' : 'Active';
+	return `Segment: ${label} (${kindLabel})`;
+}
+
+function toListItem(record: MockEmailDispatchRecord): EmailDispatchListItem {
+	const { programId: _programId, eventId: _eventId, templateId: _templateId, audience, completedAt: _completedAt, ...item } =
+		record;
+	const listItem: EmailDispatchListItem = { ...item, audience };
+	if (record.status === 'pending' && record.scheduledAtUtc) {
+		const scheduledMs = new Date(record.scheduledAtUtc).getTime();
+		const minutesUntil = (scheduledMs - Date.now()) / 60_000;
+		if (minutesUntil <= 15 && minutesUntil >= 0) {
+			return { ...listItem, lockWarning: true };
+		}
+	}
+	return listItem;
+}
+
+export function getMockEmailLimits(_programId: string, _eventId: string): EmailDispatchLimits {
+	return {
+		dispatchLimitPerHour: 10,
+		dispatchUsedThisHour: mockEmailDispatchesCreatedThisHour,
+		largeSendThreshold: CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD,
+	};
+}
+
+export function getMockEmailTemplates(_programId: string, _eventId: string): EmailTemplatesListResponse {
+	return { templates: MOCK_EMAIL_DISPATCH_TEMPLATES.map((template) => ({ ...template })) };
+}
+
+export function getMockEmailSegments(_programId: string, _eventId: string): EmailSegmentsListResponse {
+	return { segments: MOCK_EMAIL_SEGMENTS.map((segment) => ({ ...segment })) };
+}
+
+export function mockPreviewEmailDispatch(
+	_programId: string,
+	eventId: string,
+	body: EmailPreviewRequestBody,
+): EmailPreviewResponse {
+	if (!MOCK_EMAIL_DISPATCH_TEMPLATES.some((template) => template.id === body.templateId)) {
+		throw new Error('template_not_found');
+	}
+	if (body.audience.type === 'registered_manual' && body.audience.contactIds.length === 0) {
+		throw new Error('validation_error');
+	}
+	if (body.audience.type === 'hubspot_segment') {
+		const segmentId = body.audience.segmentId;
+		if (!MOCK_EMAIL_SEGMENTS.some((segment) => segment.id === segmentId)) {
+			throw new Error('segment_not_found');
+		}
+	}
+	return { recipientCount: resolveMockAudienceCount(eventId, body.audience) };
+}
+
+function buildMockRecipients(
+	dispatchId: string,
+	eventId: string,
+	audience: DispatchAudienceRequest,
+	sentAt: string,
+): DispatchRecipientRow[] {
+	if (audience.type === 'hubspot_segment') {
+		const emails = MOCK_SEGMENT_MEMBER_EMAILS[audience.segmentId] ?? [];
+		return emails.map((email, index) => ({
+			dispatchId,
+			contactId: `segment-${audience.segmentId}-${index + 1}`,
+			email,
+			outcome: 'sent',
+			sentAt,
+		}));
+	}
+	return resolveMockRegisteredAttendees(eventId, audience).map((attendee) => ({
+		dispatchId,
+		contactId: attendee.contactId,
+		email: attendee.email,
+		outcome: 'sent',
+		sentAt,
+	}));
+}
+
+export function mockCreateEmailDispatch(
+	programId: string,
+	eventId: string,
+	body: CreateEmailDispatchBody,
+): CreateEmailDispatchResponse {
+	const idempotencyKey = `${emailDispatchKey(programId, eventId)}:${body.idempotencyKey}`;
+	const existingId = mockEmailIdempotencyKeys.get(idempotencyKey);
+	if (existingId) {
+		const existing = findMockEmailDispatch(programId, eventId, existingId);
+		if (existing) {
+			return {
+				dispatchId: existing.dispatchId,
+				status: existing.status,
+				recipientCountPlanned: existing.recipientCountPlanned,
+				scheduledAtUtc: existing.scheduledAtUtc,
+				timezone: existing.timezone,
+			};
+		}
+	}
+
+	if (mockEmailDispatchesCreatedThisHour >= 10) {
+		throw new Error('rate_limited');
+	}
+
+	const preview = mockPreviewEmailDispatch(programId, eventId, {
+		templateId: body.templateId,
+		audience: body.audience,
+	});
+	if (preview.recipientCount <= 0) {
+		throw new Error('validation_error');
+	}
+
+	if (
+		preview.recipientCount >= CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD &&
+		body.largeSendConfirmed !== true
+	) {
+		throw new Error('large_send_confirmation_required');
+	}
+
+	if (body.scheduledAtUtc !== null) {
+		if (!body.timezone) {
+			throw new Error('validation_error');
+		}
+		assertScheduleFields(body.scheduledAtUtc, body.timezone);
+	}
+
+	const template = MOCK_EMAIL_DISPATCH_TEMPLATES.find((entry) => entry.id === body.templateId);
+	if (!template) {
+		throw new Error('template_not_found');
+	}
+
+	const dispatchId = `dsp-${crypto.randomUUID().slice(0, 8)}`;
+	const now = new Date().toISOString();
+	const isScheduled = body.scheduledAtUtc !== null;
+	const status = isScheduled ? 'pending' : 'processing';
+
+	const record: MockEmailDispatchRecord = {
+		dispatchId,
+		dispatchName: body.dispatchName.trim(),
+		programId,
+		eventId,
+		templateId: body.templateId,
+		templateName: template.name,
+		audience: body.audience,
+		audienceSummary: buildMockAudienceSummary(eventId, body.audience),
+		status,
+		scheduledAtUtc: body.scheduledAtUtc,
+		timezone: body.timezone,
+		recipientCountPlanned: preview.recipientCount,
+		recipientCountSent: 0,
+		createdBy: 'admin@adaptavist.com',
+		createdAt: now,
+		completedAt: null,
+	};
+
+	mockEmailDispatchesState.unshift(record);
+	mockEmailIdempotencyKeys.set(idempotencyKey, dispatchId);
+	mockEmailDispatchesCreatedThisHour += 1;
+
+	if (!isScheduled) {
+		const sentAt = new Date().toISOString();
+		const recipients = buildMockRecipients(dispatchId, eventId, body.audience, sentAt);
+		mockEmailRecipientsState[dispatchId] = recipients;
+		record.status = 'completed';
+		record.recipientCountSent = recipients.length;
+		record.completedAt = sentAt;
+	}
+
+	return {
+		dispatchId,
+		status: record.status,
+		recipientCountPlanned: record.recipientCountPlanned,
+		scheduledAtUtc: record.scheduledAtUtc,
+		timezone: record.timezone,
+	};
+}
+
+export function getMockEmailDispatches(
+	programId: string,
+	eventId: string,
+	query: { view?: 'scheduled' | 'log'; page?: number; pageSize?: number } = {},
+): EmailDispatchListResponse {
+	const page = query.page ?? 1;
+	const pageSize = query.pageSize ?? 50;
+	let filtered = listMockEmailDispatches(programId, eventId);
+
+	if (query.view === 'scheduled') {
+		filtered = filtered.filter((entry) => entry.status === 'pending');
+	} else if (query.view === 'log') {
+		filtered = filtered.filter((entry) => ['completed', 'failed', 'processing'].includes(entry.status));
+	}
+
+	filtered = [...filtered].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+	const total = filtered.length;
+	const start = (page - 1) * pageSize;
+
+	return {
+		dispatches: filtered.slice(start, start + pageSize).map((entry) => toListItem(entry)),
+		page,
+		pageSize,
+		total,
+	};
+}
+
+export function getMockEmailDispatchDetail(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+	query: { page?: number; pageSize?: number } = {},
+): EmailDispatchDetailResponse {
+	const record = findMockEmailDispatch(programId, eventId, dispatchId);
+	if (!record) {
+		throw new Error('dispatch_not_found');
+	}
+
+	const page = query.page ?? 1;
+	const pageSize = query.pageSize ?? 50;
+	const recipients = mockEmailRecipientsState[dispatchId] ?? [];
+	const start = (page - 1) * pageSize;
+
+	return {
+		dispatch: { ...toListItem(record), completedAt: record.completedAt },
+		recipients: recipients.slice(start, start + pageSize),
+		page,
+		pageSize,
+		total: recipients.length,
+	};
+}
+
+export function mockUpdateEmailDispatch(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+	body: PatchEmailDispatchBody,
+): EmailDispatchListItem {
+	const record = findMockEmailDispatch(programId, eventId, dispatchId);
+	if (!record) {
+		throw new Error('dispatch_not_found');
+	}
+	if (record.status !== 'pending') {
+		throw new Error('dispatch_locked');
+	}
+
+	const template = MOCK_EMAIL_DISPATCH_TEMPLATES.find((entry) => entry.id === body.templateId);
+	if (!template) {
+		throw new Error('template_not_found');
+	}
+
+	const preview = mockPreviewEmailDispatch(programId, eventId, {
+		templateId: body.templateId,
+		audience: body.audience,
+	});
+	if (preview.recipientCount <= 0) {
+		throw new Error('validation_error');
+	}
+
+	if (
+		preview.recipientCount >= CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD &&
+		body.largeSendConfirmed !== true
+	) {
+		throw new Error('large_send_confirmation_required');
+	}
+
+	if (!body.scheduledAtUtc || !body.timezone) {
+		throw new Error('validation_error');
+	}
+	assertScheduleFields(body.scheduledAtUtc, body.timezone);
+
+	record.dispatchName = body.dispatchName.trim();
+	record.templateId = body.templateId;
+	record.templateName = template.name;
+	record.audience = body.audience;
+	record.audienceSummary = buildMockAudienceSummary(eventId, body.audience);
+	record.scheduledAtUtc = body.scheduledAtUtc;
+	record.timezone = body.timezone;
+	record.recipientCountPlanned = preview.recipientCount;
+
+	return toListItem(record);
+}
+
+export function mockCancelEmailDispatch(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+): CancelEmailDispatchResponse {
+	const record = findMockEmailDispatch(programId, eventId, dispatchId);
+	if (!record) {
+		throw new Error('dispatch_not_found');
+	}
+	if (record.status !== 'pending') {
+		throw new Error('dispatch_locked');
+	}
+	record.status = 'cancelled';
+	return { dispatchId, status: 'cancelled' };
 }

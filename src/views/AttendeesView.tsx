@@ -6,10 +6,11 @@ import { TopBar } from '../components/TopBar';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
-import type { SliceAttendee } from '../types';
+import type { EmailDispatchListItem, SliceAttendee } from '../types';
 import styles from './AttendeesView.module.css';
 
 type CheckedInFilter = 'all' | 'checked-in' | 'not-checked-in';
+type DispatchOutcomeFilter = 'received' | 'not_received';
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -21,6 +22,9 @@ export function AttendeesView() {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [checkedInFilter, setCheckedInFilter] = useState<CheckedInFilter>('all');
+	const [dispatchOptions, setDispatchOptions] = useState<EmailDispatchListItem[]>([]);
+	const [selectedDispatchId, setSelectedDispatchId] = useState('');
+	const [dispatchOutcomeFilter, setDispatchOutcomeFilter] = useState<DispatchOutcomeFilter>('received');
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 	const [total, setTotal] = useState(0);
@@ -32,9 +36,37 @@ export function AttendeesView() {
 	useEffect(() => {
 		setSearchQuery('');
 		setDebouncedSearch('');
+		setCheckedInFilter('all');
+		setSelectedDispatchId('');
+		setDispatchOutcomeFilter('received');
 		setPage(1);
 		awaitingInitialLoadRef.current = true;
 	}, [programId, evId]);
+
+	useEffect(() => {
+		if (!programId || !evId) {
+			setDispatchOptions([]);
+			return;
+		}
+
+		let cancelled = false;
+		void data
+			.fetchEmailDispatches(programId, evId, { view: 'log' })
+			.then((result) => {
+				if (!cancelled) {
+					setDispatchOptions(result.dispatches);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setDispatchOptions([]);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [data, programId, evId]);
 
 	useEffect(() => {
 		const handle = window.setTimeout(() => {
@@ -60,6 +92,10 @@ export function AttendeesView() {
 
 		const checkedIn =
 			checkedInFilter === 'checked-in' ? true : checkedInFilter === 'not-checked-in' ? false : undefined;
+		const dispatchFilter =
+			selectedDispatchId && dispatchOutcomeFilter
+				? { dispatchId: selectedDispatchId, dispatchFilter: dispatchOutcomeFilter }
+				: {};
 
 		void data
 			.fetchSliceAttendees(programId, evId, {
@@ -67,6 +103,7 @@ export function AttendeesView() {
 				checkedIn,
 				page,
 				pageSize: DEFAULT_PAGE_SIZE,
+				...dispatchFilter,
 			})
 			.then((result) => {
 				if (!cancelled) {
@@ -92,7 +129,7 @@ export function AttendeesView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId, debouncedSearch, checkedInFilter, page]);
+	}, [data, programId, evId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page]);
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
@@ -167,6 +204,50 @@ export function AttendeesView() {
 							</button>
 						))}
 					</div>
+				</div>
+
+				<div className={styles.dispatchFilterRow}>
+					<div className={styles.dispatchField}>
+						<label htmlFor="attendees-dispatch-select">Email dispatch</label>
+						<select
+							id="attendees-dispatch-select"
+							value={selectedDispatchId}
+							onChange={(changeEvent) => {
+								setSelectedDispatchId(changeEvent.target.value);
+								setDispatchOutcomeFilter('received');
+								setPage(1);
+							}}
+						>
+							<option value="">No dispatch filter</option>
+							{dispatchOptions.map((dispatch) => (
+								<option key={dispatch.dispatchId} value={dispatch.dispatchId}>
+									{dispatch.dispatchName}
+								</option>
+							))}
+						</select>
+					</div>
+					{selectedDispatchId ? (
+						<div className={styles.dispatchOutcomeFilters} role="group" aria-label="Dispatch outcome filter">
+							{(
+								[
+									['received', 'Received'],
+									['not_received', 'Did not receive'],
+								] as const
+							).map(([value, label]) => (
+								<button
+									key={value}
+									type="button"
+									className={`btn btn-outline btn-sm${dispatchOutcomeFilter === value ? ' active' : ''}`}
+									onClick={() => {
+										setDispatchOutcomeFilter(value);
+										setPage(1);
+									}}
+								>
+									{label}
+								</button>
+							))}
+						</div>
+					) : null}
 				</div>
 
 				<input

@@ -5,6 +5,7 @@ describe('sliceModulePath', () => {
 	it('builds catalog-scoped slice routes without a legacy event id', () => {
 		expect(sliceModulePath('attendees')).toBe('/events/attendees');
 		expect(sliceModulePath('check-in')).toBe('/events/check-in');
+		expect(sliceModulePath('email')).toBe('/events/email');
 	});
 });
 

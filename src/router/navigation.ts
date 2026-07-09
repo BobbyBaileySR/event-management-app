@@ -23,14 +23,15 @@ export function auditPath(): string {
 	return '/audit';
 }
 
-/** Catalog-scoped slice views (Attendees, Check-in) — not tied to legacy event hub URLs. */
-export function sliceModulePath(moduleId: 'attendees' | 'check-in'): string {
+/** Catalog-scoped slice views (Attendees, Check-in, Email) — not tied to legacy event hub URLs. */
+export function sliceModulePath(moduleId: 'attendees' | 'check-in' | 'email'): string {
 	return `/events/${moduleId}`;
 }
 
 const SLICE_MODULE_PATHS: Record<string, string> = {
 	'/events/attendees': 'attendees',
 	'/events/check-in': 'check-in',
+	'/events/email': 'email',
 };
 
 /** Derive the active logical route from URL params (URL is the source of truth). */

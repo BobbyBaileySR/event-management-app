@@ -43,28 +43,28 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 ### Backend foundation
 
-- [ ] T005 Add `EmailDispatchJob`, `DispatchAudience`, `DispatchRecipientRow`, request/response DTOs in `Backend/scripts/Utils/Types.ts` per `specs/005-email-dispatch/data-model.md`
-- [ ] T006 Implement Record Storage CRUD + Event indexes in `Backend/scripts/Utils/DispatchStore.ts`
-- [ ] T007 Implement registered-attendee audience resolution (preview count) in `Backend/scripts/Utils/DispatchAudience.ts` (reuse `RegistrationAdapter`)
-- [ ] T008 Implement idempotency + hourly rate-limit helpers in `Backend/scripts/Utils/DispatchQueue.ts`
-- [ ] T009 [P] Add HubSpot template list adapter in `Backend/scripts/Utils/HubSpot/EmailTemplatesAdapter.ts` (mockable for tests)
-- [ ] T010 [P] Add HubSpot segment list adapter in `Backend/scripts/Utils/HubSpot/SegmentsAdapter.ts` (Active + Static)
-- [ ] T011 [P] Add HubSpot single-send adapter stub in `Backend/scripts/Utils/HubSpot/SingleSendAdapter.ts` (implement after T002 spike)
-- [ ] T012 Add admin-only `programs/…/email/*` rules to `Backend/scripts/Utils/RouteGuard.ts` (override legacy communications on flat routes)
-- [ ] T013 Wire email route placeholders in `Backend/scripts/OnHttpRouter.ts` (limits, templates, segments, preview, dispatches CRUD)
+- [X] T005 Add `EmailDispatchJob`, `DispatchAudience`, `DispatchRecipientRow`, request/response DTOs in `Backend/scripts/Utils/Types.ts` per `specs/005-email-dispatch/data-model.md`
+- [X] T006 Implement Record Storage CRUD + Event indexes in `Backend/scripts/Utils/DispatchStore.ts`
+- [X] T007 Implement registered-attendee audience resolution (preview count) in `Backend/scripts/Utils/DispatchAudience.ts` (reuse `RegistrationAdapter`)
+- [X] T008 Implement idempotency + hourly rate-limit helpers in `Backend/scripts/Utils/DispatchQueue.ts`
+- [X] T009 [P] Add HubSpot template list adapter in `Backend/scripts/Utils/HubSpot/EmailTemplatesAdapter.ts` (mockable for tests)
+- [X] T010 [P] Add HubSpot segment list adapter in `Backend/scripts/Utils/HubSpot/SegmentsAdapter.ts` (Active + Static)
+- [X] T011 [P] Add HubSpot single-send adapter stub in `Backend/scripts/Utils/HubSpot/SingleSendAdapter.ts` (implement after T002 spike)
+- [X] T012 Add admin-only `programs/…/email/*` rules to `Backend/scripts/Utils/RouteGuard.ts` (override legacy communications on flat routes)
+- [X] T013 Wire email route placeholders in `Backend/scripts/OnHttpRouter.ts` (limits, templates, segments, preview, dispatches CRUD)
 
 ### Frontend foundation
 
-- [ ] T014 [P] Add dispatch DTO types in `Frontend/src/types.ts`
-- [ ] T015 [P] Add normalize helpers for email responses in `Frontend/src/utils/normalizeApi.ts`
-- [ ] T016 [P] Merge `specs/005-email-dispatch/contracts/email-api.md` into `Frontend/docs/api-contract.md` (Slice 2 section; deprecate flat `events/{id}/email/*`)
-- [ ] T017 [P] Add Slice 2 email route RBAC rows (`admin` only) in `Frontend/docs/rbac.md`
-- [ ] T018 [P] Update `#/events/email` route map and retire legacy email entry in `Frontend/docs/ui-routes.md`
-- [ ] T019 Add `sliceModulePath('email')` + catalog route handling in `Frontend/src/router/navigation.ts`
-- [ ] T020 Register `/events/email` route and admin gate in `Frontend/src/App.tsx` + `Frontend/src/views/ViewRouter.tsx`
-- [ ] T021 Add catalog-scoped email methods (`fetchEmailLimits`, `fetchEmailTemplates`, `previewEmailDispatch`, `createEmailDispatch`, etc.) in `Frontend/src/services/dataService.ts`
-- [ ] T022 [P] Add mock dispatches, limits, templates, segments in `Frontend/src/data/mockData.ts`
-- [ ] T023 [P] Add normalize tests in `Frontend/src/utils/normalizeApi.test.ts`
+- [X] T014 [P] Add dispatch DTO types in `Frontend/src/types.ts`
+- [X] T015 [P] Add normalize helpers for email responses in `Frontend/src/utils/normalizeApi.ts`
+- [X] T016 [P] Merge `specs/005-email-dispatch/contracts/email-api.md` into `Frontend/docs/api-contract.md` (Slice 2 section; deprecate flat `events/{id}/email/*`)
+- [X] T017 [P] Add Slice 2 email route RBAC rows (`admin` only) in `Frontend/docs/rbac.md`
+- [X] T018 [P] Update `#/events/email` route map and retire legacy email entry in `Frontend/docs/ui-routes.md`
+- [X] T019 Add `sliceModulePath('email')` + catalog route handling in `Frontend/src/router/navigation.ts`
+- [X] T020 Register `/events/email` route and admin gate in `Frontend/src/App.tsx` + `Frontend/src/views/ViewRouter.tsx`
+- [X] T021 Add catalog-scoped email methods (`fetchEmailLimits`, `fetchEmailTemplates`, `previewEmailDispatch`, `createEmailDispatch`, etc.) in `Frontend/src/services/dataService.ts`
+- [X] T022 [P] Add mock dispatches, limits, templates, segments in `Frontend/src/data/mockData.ts`
+- [X] T023 [P] Add normalize tests in `Frontend/src/utils/normalizeApi.test.ts`
 
 **Checkpoint**: Mock `USE_MOCK_API: true` — `createDataService` can call email endpoints without legacy `eventId` paths
 
@@ -78,27 +78,27 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 ### Tests for User Story 1
 
-- [ ] T024 [P] [US1] Add route tests (401/403/400/429, idempotent create) in `Backend/node/tests/EmailDispatchRoutes.test.ts`
-- [ ] T025 [P] [US1] Add queue processing tests (pending→processing→completed, sent rows) in `Backend/node/tests/DispatchQueue.test.ts`
-- [ ] T026 [P] [US1] Add Compose tab + send flow tests in `Frontend/src/views/EmailDispatchView.test.tsx`
-- [ ] T027 [P] [US1] Add email `dataService` path tests in `Frontend/src/services/dataService.test.ts`
+- [X] T024 [P] [US1] Add route tests (401/403/400/429, idempotent create) in `Backend/node/tests/EmailDispatchRoutes.test.ts`
+- [X] T025 [P] [US1] Add queue processing tests (pending→processing→completed, sent rows) in `Backend/node/tests/DispatchQueue.test.ts`
+- [X] T026 [P] [US1] Add Compose tab + send flow tests in `Frontend/src/views/EmailDispatchView.test.tsx`
+- [X] T027 [P] [US1] Add email `dataService` path tests in `Frontend/src/services/dataService.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] Implement `handleGetEmailLimits` in `Backend/scripts/OnGetEmailLimits.ts`
-- [ ] T029 [US1] Implement `handleGetEmailTemplates` in `Backend/scripts/OnGetEmailTemplates.ts`
-- [ ] T030 [US1] Implement `handlePostEmailPreview` (registered audiences + manual ids) in `Backend/scripts/OnPostEmailPreview.ts`
-- [ ] T031 [US1] Implement `handlePostEmailDispatch` (send now, idempotency, rate limit, audit) in `Backend/scripts/OnPostEmailDispatch.ts`
-- [ ] T032 [US1] Implement job claim + HubSpot handoff + recipient rows in `Backend/scripts/Utils/DispatchQueue.ts` + `Backend/scripts/QueueProcessor.ts`
-- [ ] T033 [US1] Implement `handleGetEmailDispatches` (`view=log`) in `Backend/scripts/OnGetEmailDispatches.ts`
-- [ ] T034 [US1] Implement `handleGetEmailDispatchDetail` (paginated recipients) in `Backend/scripts/OnGetEmailDispatchDetail.ts`
-- [ ] T035 [US1] Create `EmailDispatchView` shell with **Compose | Scheduled | Dispatch log** tabs in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T036 [US1] Add Compose tab: limits display, template picker (names), dispatch name, registered audience controls (all / checked-in / not / search / fixed manual multi-select) in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T037 [US1] Add large-send confirm modal using `EMAIL_SEND_CONFIRM_THRESHOLD` from `Frontend/src/config.ts`
-- [ ] T038 [US1] Wire **Send now** + success toast (non-blocking) + Dispatch log tab list/detail in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T039 [US1] Add responsive styles for tabs, forms, tables in `Frontend/src/views/EmailDispatchView.module.css`
-- [ ] T040 [US1] Show **Email** sidebar link for **admin** when Program + Event selected in `Frontend/src/components/Sidebar.tsx`
-- [ ] T041 [US1] Redirect or remove legacy `#/events/:eventId/email` usage from `Frontend/src/views/EmailView.tsx` (retire or thin redirect to `#/events/email`)
+- [X] T028 [US1] Implement `handleGetEmailLimits` in `Backend/scripts/OnGetEmailLimits.ts`
+- [X] T029 [US1] Implement `handleGetEmailTemplates` in `Backend/scripts/OnGetEmailTemplates.ts`
+- [X] T030 [US1] Implement `handlePostEmailPreview` (registered audiences + manual ids) in `Backend/scripts/OnPostEmailPreview.ts`
+- [X] T031 [US1] Implement `handlePostEmailDispatch` (send now, idempotency, rate limit, audit) in `Backend/scripts/OnPostEmailDispatch.ts`
+- [X] T032 [US1] Implement job claim + HubSpot handoff + recipient rows in `Backend/scripts/Utils/DispatchQueue.ts` + `Backend/scripts/QueueProcessor.ts`
+- [X] T033 [US1] Implement `handleGetEmailDispatches` (`view=log`) in `Backend/scripts/OnGetEmailDispatches.ts`
+- [X] T034 [US1] Implement `handleGetEmailDispatchDetail` (paginated recipients) in `Backend/scripts/OnGetEmailDispatchDetail.ts`
+- [X] T035 [US1] Create `EmailDispatchView` shell with **Compose | Scheduled | Dispatch log** tabs in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T036 [US1] Add Compose tab: limits display, template picker (names), dispatch name, registered audience controls (all / checked-in / not / search / fixed manual multi-select) in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T037 [US1] Add large-send confirm modal using `EMAIL_SEND_CONFIRM_THRESHOLD` from `Frontend/src/config.ts`
+- [X] T038 [US1] Wire **Send now** + success toast (non-blocking) + Dispatch log tab list/detail in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T039 [US1] Add responsive styles for tabs, forms, tables in `Frontend/src/views/EmailDispatchView.module.css`
+- [X] T040 [US1] Show **Email** sidebar link for **admin** when Program + Event selected in `Frontend/src/components/Sidebar.tsx`
+- [X] T041 [US1] Redirect or remove legacy `#/events/:eventId/email` usage from `Frontend/src/views/EmailView.tsx` (retire or thin redirect to `#/events/email`)
 
 **Checkpoint**: MVP — admin can send now to registered attendees in mock mode; log shows dispatch + **sent** rows (quickstart §B1 mock path)
 
@@ -112,19 +112,19 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 ### Tests for User Story 2
 
-- [ ] T042 [P] [US2] Add PATCH/DELETE lock tests (`409 dispatch_locked`) in `Backend/node/tests/EmailDispatchRoutes.test.ts`
-- [ ] T043 [P] [US2] Add scheduled list + lockWarning tests in `Frontend/src/views/EmailDispatchView.test.tsx`
+- [X] T042 [P] [US2] Add PATCH/DELETE lock tests (`409 dispatch_locked`) in `Backend/node/tests/EmailDispatchRoutes.test.ts`
+- [X] T043 [P] [US2] Add scheduled list + lockWarning tests in `Frontend/src/views/EmailDispatchView.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T044 [US2] Extend `handlePostEmailDispatch` for scheduled jobs (15-min grid, timezone, past rejection) in `Backend/scripts/OnPostEmailDispatch.ts`
-- [ ] T045 [US2] Implement `handleGetEmailDispatches` (`view=scheduled`, `lockWarning`) in `Backend/scripts/OnGetEmailDispatches.ts`
-- [ ] T046 [US2] Implement `handlePatchEmailDispatch` (pending only) in `Backend/scripts/OnPatchEmailDispatch.ts`
-- [ ] T047 [US2] Implement `handleDeleteEmailDispatch` (cancel pending) in `Backend/scripts/OnDeleteEmailDispatch.ts`
-- [ ] T048 [US2] Extend `QueueProcessor.ts` to claim due `pending` scheduled jobs at cron tick
-- [ ] T049 [US2] Add **Schedule for later** UI (date, 15-min time grid, timezone picker) on Compose tab in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T050 [US2] Build **Scheduled** tab: list, edit modal, cancel, lockWarning banner in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T051 [US2] Extend mock layer for scheduled CRUD in `Frontend/src/data/mockData.ts`
+- [X] T044 [US2] Extend `handlePostEmailDispatch` for scheduled jobs (15-min grid, timezone, past rejection) in `Backend/scripts/OnPostEmailDispatch.ts`
+- [X] T045 [US2] Implement `handleGetEmailDispatches` (`view=scheduled`, `lockWarning`) in `Backend/scripts/OnGetEmailDispatches.ts`
+- [X] T046 [US2] Implement `handlePatchEmailDispatch` (pending only) in `Backend/scripts/OnPatchEmailDispatch.ts`
+- [X] T047 [US2] Implement `handleDeleteEmailDispatch` (cancel pending) in `Backend/scripts/OnDeleteEmailDispatch.ts`
+- [X] T048 [US2] Extend `QueueProcessor.ts` to claim due `pending` scheduled jobs at cron tick
+- [X] T049 [US2] Add **Schedule for later** UI (date, 15-min time grid, timezone picker) on Compose tab in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T050 [US2] Build **Scheduled** tab: list, edit modal, cancel, lockWarning banner in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T051 [US2] Extend mock layer for scheduled CRUD in `Frontend/src/data/mockData.ts`
 
 **Checkpoint**: Schedule create/edit/cancel works in mock; warning visible within 15 minutes (SC-006)
 
@@ -138,16 +138,16 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 ### Tests for User Story 3
 
-- [ ] T052 [P] [US3] Add segment preview/create tests in `Backend/node/tests/EmailDispatchRoutes.test.ts`
-- [ ] T053 [P] [US3] Add segment audience UI tests in `Frontend/src/views/EmailDispatchView.test.tsx`
+- [X] T052 [P] [US3] Add segment preview/create tests in `Backend/node/tests/EmailDispatchRoutes.test.ts`
+- [X] T053 [P] [US3] Add segment audience UI tests in `Frontend/src/views/EmailDispatchView.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T054 [US3] Implement `handleGetEmailSegments` in `Backend/scripts/OnGetEmailSegments.ts`
-- [ ] T055 [US3] Extend `DispatchAudience.ts` for `hubspot_segment` membership at processing time
-- [ ] T056 [US3] Wire segment resolution in preview/create/queue paths in `Backend/scripts/OnPostEmailPreview.ts`, `OnPostEmailDispatch.ts`, `DispatchQueue.ts`
-- [ ] T057 [US3] Add audience type toggle + segment name picker on Compose tab in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T058 [US3] Add segment fixtures to mock data in `Frontend/src/data/mockData.ts`
+- [X] T054 [US3] Implement `handleGetEmailSegments` in `Backend/scripts/OnGetEmailSegments.ts`
+- [X] T055 [US3] Extend `DispatchAudience.ts` for `hubspot_segment` membership at processing time
+- [X] T056 [US3] Wire segment resolution in preview/create/queue paths in `Backend/scripts/OnPostEmailPreview.ts`, `OnPostEmailDispatch.ts`, `DispatchQueue.ts`
+- [X] T057 [US3] Add audience type toggle + segment name picker on Compose tab in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T058 [US3] Add segment fixtures to mock data in `Frontend/src/data/mockData.ts`
 
 **Checkpoint**: Segment-based preview + send in mock; live segment send after spike (§B3)
 
@@ -161,16 +161,16 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 ### Tests for User Story 4
 
-- [ ] T059 [P] [US4] Add `dispatchFilter` query tests on attendees route in `Backend/node/tests/EmailDispatchRoutes.test.ts`
-- [ ] T060 [P] [US4] Add attendee dispatch filter UI tests in `Frontend/src/views/AttendeesView.test.tsx`
+- [X] T059 [P] [US4] Add `dispatchFilter` query tests on attendees route in `Backend/node/tests/EmailDispatchRoutes.test.ts`
+- [X] T060 [P] [US4] Add attendee dispatch filter UI tests in `Frontend/src/views/AttendeesView.test.tsx`
 
 ### Implementation for User Story 4
 
-- [ ] T061 [US4] Extend `OnGetAttendees.ts` with `dispatchId` + `dispatchFilter=received|not_received` (registered attendees only)
-- [ ] T062 [US4] Extend `RegistrationAdapter` or dispatch join helper for attendee filter in `Backend/scripts/Utils/DispatchAudience.ts` or dedicated util
-- [ ] T063 [US4] Polish **Dispatch log** tab: newest-first, detail drawer/panel, paginated recipients in `Frontend/src/views/EmailDispatchView.tsx`
-- [ ] T064 [US4] Add dispatch filter controls (select dispatch + received/not) on Attendees in `Frontend/src/views/AttendeesView.tsx`
-- [ ] T065 [US4] Wire `fetchAttendees` dispatch query params in `Frontend/src/services/dataService.ts` + mock in `Frontend/src/data/mockData.ts`
+- [X] T061 [US4] Extend `OnGetAttendees.ts` with `dispatchId` + `dispatchFilter=received|not_received` (registered attendees only)
+- [X] T062 [US4] Extend `RegistrationAdapter` or dispatch join helper for attendee filter in `Backend/scripts/Utils/DispatchAudience.ts` or dedicated util
+- [X] T063 [US4] Polish **Dispatch log** tab: newest-first, detail drawer/panel, paginated recipients in `Frontend/src/views/EmailDispatchView.tsx`
+- [X] T064 [US4] Add dispatch filter controls (select dispatch + received/not) on Attendees in `Frontend/src/views/AttendeesView.tsx`
+- [X] T065 [US4] Wire `fetchAttendees` dispatch query params in `Frontend/src/services/dataService.ts` + mock in `Frontend/src/data/mockData.ts`
 
 **Checkpoint**: Attendee filter + log detail pass quickstart §B4 in mock mode
 

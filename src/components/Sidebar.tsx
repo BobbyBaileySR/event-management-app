@@ -69,6 +69,12 @@ export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 							active={activeRoute === 'check-in'}
 							onClick={() => navigate(sliceModulePath('check-in'))}
 						/>
+						<NavButton
+							label="Email"
+							icon="✉️"
+							active={activeRoute === 'email'}
+							onClick={() => navigate(sliceModulePath('email'))}
+						/>
 					</div>
 				) : null}
 

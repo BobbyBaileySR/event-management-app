@@ -8,6 +8,60 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-09
 
+### Security — large-send confirmation wired to backend (FR-010)
+
+- **`EmailDispatchView.tsx`**: Sends `largeSendConfirmed: true` after operator confirms large send/schedule/edit; edit flow previews audience and confirms at threshold.
+- **`src/types.ts`**, **`src/data/mockData.ts`**: `largeSendConfirmed` on create/patch bodies; mock API rejects at-threshold sends without it.
+
+### Master QA runbook — Slice 1.5 Tier A + Slice 2
+
+- **`specs/master-qa-slice-1.5-and-slice-2.md`**: Combined operator/engineering QA guide — phased before/after T002, automated tests, Slice 1.5 sign-off, Slice 2 mock + live checks, security comfort, and Live cutover checklist.
+
+### Slice 2 email dispatch — US4 log polish + attendee filter (T060, T063–T065)
+
+- **`AttendeesView.tsx`**: Email dispatch picker (from log) + Received / Did not receive outcome filter; passes `dispatchId` + `dispatchFilter` to `fetchSliceAttendees`.
+- **`EmailDispatchView.tsx`**: Dispatch log detail panel paginates recipients (25 per page).
+- **`dataService.ts`** + **`mockData.ts`**: `fetchSliceAttendees` forwards dispatch filter query params; mock honours sent recipient rows.
+- **Tests**: `AttendeesView.test.tsx` — dispatch filter UI and API wiring.
+
+### Slice 2 email dispatch — US3 segment picker (T053, T057–T058)
+
+- **`EmailDispatchView.tsx`**: Audience source toggle (Registered attendees vs HubSpot segment); segment **name** picker with Active/Static label; membership drift copy.
+- **`src/data/mockData.ts`**: Segment fixtures (`MOCK_EMAIL_SEGMENTS`, recipient counts, sample member emails for mock send-now).
+- **Tests**: `EmailDispatchView.test.tsx` — segment picker load, preview, and send with `hubspot_segment`.
+
+### Slice 2 email dispatch — US2 schedule UI (T049–T051)
+
+- **`EmailDispatchView.tsx`** + **`EmailDispatchView.module.css`**: Compose **Schedule for later** (date, hour, 15-minute grid, timezone); **Scheduled** tab with list, lock-warning banner, edit modal, cancel.
+- **`src/utils/emailSchedule.ts`**: Local schedule ↔ UTC conversion and validation helpers.
+- **`src/data/mockData.ts`**: Scheduled create/update/cancel validation aligned with backend rules.
+- **Tests**: `EmailDispatchView.test.tsx` — scheduled list + `lockWarning`, schedule create, cancel flow.
+
+### Slice 2 email dispatch — US1 UI (T035–T041)
+
+- **`EmailDispatchView.tsx`** + **`EmailDispatchView.module.css`**: Compose tab with audience controls (all / checked-in / not checked-in / manual multi-select with fixed selection), recipient preview, large-send confirm, Send now + toast; Dispatch log with detail panel and sent recipients; Scheduled placeholder tab.
+- **`Sidebar.tsx`**: **Email** nav link for admin when Program + Event are selected (catalog picker pattern).
+- **`EmailView.tsx`**: legacy `#/events/:eventId/email` redirects to `#/events/email`.
+- **`ViewRouter.tsx`**: legacy event-scoped email URL redirects to catalog-scoped route.
+- **Tests**: extended `EmailDispatchView.test.tsx`, `Sidebar.test.tsx`; `EmailView.test.tsx` covers redirect.
+- **Build fix**: narrow `hubspot_segment` in `mockData.ts`; `EmptyState` uses `viewId` in `ViewRouter`; drop unused import in `EmailView.test.tsx`.
+
+### Slice 2 email dispatch — US1 failing tests (T026–T027)
+
+- **`src/views/EmailDispatchView.test.tsx`**: Compose tab, limits display, Send now flow, large-send confirm modal, and XSS guard tests.
+- **`src/views/EmailDispatchView.tsx`** + **`EmailDispatchView.module.css`**: Compose | Scheduled | Dispatch log shell — limits, template picker, Send now with large-send confirm, log table (T035 partial).
+- **`src/views/ViewRouter.tsx`**: Renders `EmailDispatchView` when catalog context is set.
+- **`src/services/dataService.test.ts`**: Catalog-scoped email `dataService` mock/live path, idempotency, and dispatch detail tests.
+
+### Slice 2 email dispatch — foundational (T014–T023)
+
+- **`src/types.ts`**: Slice 2 dispatch DTOs (`DispatchAudience`, `EmailDispatchListItem`, limits/templates/segments responses, etc.).
+- **`src/utils/normalizeApi.ts`** + **`normalizeApi.test.ts`**: normalizers for catalog-scoped email API responses.
+- **`src/data/mockData.ts`**: mock limits, templates, segments, dispatches, preview/create/list/detail/cancel with idempotency and rate-limit simulation.
+- **`src/services/dataService.ts`**: catalog-scoped `fetchEmailLimits`, `fetchEmailTemplates`, `fetchEmailSegments`, `previewEmailDispatch`, `createEmailDispatch`, `fetchEmailDispatches`, `fetchEmailDispatchDetail`, `updateEmailDispatch`, `cancelEmailDispatch` (`USE_MOCK_API` paths).
+- **`src/router/navigation.ts`**, **`App.tsx`**, **`ViewRouter.tsx`**: `#/events/email` route with admin + catalog gate (placeholder until `EmailDispatchView`).
+- **`docs/api-contract.md`**, **`docs/rbac.md`**, **`docs/ui-routes.md`**: Slice 2 email routes merged; legacy flat `events/{id}/email/*` deprecated.
+
 ### Audit log — table fills viewport
 
 - **`AuditView.module.css`**: override global `.table-scroll` `max-height: 420px` so the audit table expands to fill the card (same flex pattern as Attendees view); pagination stays pinned at the bottom.

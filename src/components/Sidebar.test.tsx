@@ -93,13 +93,14 @@ describe('Sidebar slice links', () => {
 		mockNavigate.mockReset();
 	});
 
-	it('shows Attendees and Check-in for admin when catalog Program + Event are selected', () => {
+	it('shows Attendees, Check-in, and Email for admin when catalog Program + Event are selected', () => {
 		renderSidebar({
 			catalog: { programId: 'prog-1', evId: 'ev-1' },
 		});
 
 		expect(screen.getByRole('button', { name: /Attendees/i })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /Check-in/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Email/i })).toBeInTheDocument();
 		expect(screen.getByText('Atlassian Event 2026 — Meeting Room')).toBeInTheDocument();
 	});
 
@@ -142,11 +143,14 @@ describe('Sidebar slice links', () => {
 		expect(screen.getByRole('button', { name: /All Events/i })).toBeInTheDocument();
 	});
 
-	it('navigates to slice module paths when Attendees or Check-in is clicked', () => {
+	it('navigates to slice module paths when Attendees, Check-in, or Email is clicked', () => {
 		renderSidebar({
 			path: '/events/attendees',
 			catalog: { programId: 'prog-1', evId: 'ev-1' },
 		});
+
+		fireEvent.click(screen.getByRole('button', { name: /Email/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/events/email');
 
 		fireEvent.click(screen.getByRole('button', { name: /Check-in/i }));
 		expect(mockNavigate).toHaveBeenCalledWith('/events/check-in');

@@ -39,10 +39,34 @@ const mockFetchSliceAttendees = vi.fn().mockResolvedValue({
 	total: 2,
 });
 
+const mockFetchEmailDispatches = vi.fn().mockResolvedValue({
+	dispatches: [
+		{
+			dispatchId: 'dsp-completed-001',
+			dispatchName: 'Meeting Room reminder',
+			templateName: '48-hour reminder',
+			audienceSummary: 'All registered (2)',
+			status: 'completed',
+			scheduledAtUtc: null,
+			timezone: null,
+			recipientCountPlanned: 2,
+			recipientCountSent: 2,
+			createdBy: 'admin@adaptavist.com',
+			createdAt: '2026-10-01T10:00:00.000Z',
+		},
+	],
+	page: 1,
+	pageSize: 50,
+	total: 1,
+});
+
+const mockDataService = {
+	fetchSliceAttendees: mockFetchSliceAttendees,
+	fetchEmailDispatches: mockFetchEmailDispatches,
+};
+
 vi.mock('../hooks/useDataService', () => ({
-	useDataService: () => ({
-		fetchSliceAttendees: mockFetchSliceAttendees,
-	}),
+	useDataService: () => mockDataService,
 }));
 
 const adminSession: Session = {
@@ -103,6 +127,26 @@ describe('AttendeesView', () => {
 			page: 1,
 			pageSize: 50,
 			total: 2,
+		});
+		mockFetchEmailDispatches.mockResolvedValue({
+			dispatches: [
+				{
+					dispatchId: 'dsp-completed-001',
+					dispatchName: 'Meeting Room reminder',
+					templateName: '48-hour reminder',
+					audienceSummary: 'All registered (2)',
+					status: 'completed',
+					scheduledAtUtc: null,
+					timezone: null,
+					recipientCountPlanned: 2,
+					recipientCountSent: 2,
+					createdBy: 'admin@adaptavist.com',
+					createdAt: '2026-10-01T10:00:00.000Z',
+				},
+			],
+			page: 1,
+			pageSize: 50,
+			total: 1,
 		});
 	});
 
@@ -319,6 +363,75 @@ describe('AttendeesView', () => {
 
 		expect(await screen.findByText('Events list')).toBeInTheDocument();
 		expect(screen.queryByRole('heading', { name: /Attendees/i })).not.toBeInTheDocument();
+	});
+
+	it('loads dispatch options and filters attendees by received outcome', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Email dispatch')).toBeInTheDocument();
+		});
+
+		expect(mockFetchEmailDispatches).toHaveBeenCalledWith('prog-1', 'ev-1', { view: 'log' });
+
+		fireEvent.change(screen.getByLabelText('Email dispatch'), {
+			target: { value: 'dsp-completed-001' },
+		});
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+				q: undefined,
+				checkedIn: undefined,
+				page: 1,
+				pageSize: 50,
+				dispatchId: 'dsp-completed-001',
+				dispatchFilter: 'received',
+			});
+		});
+
+		fireEvent.click(screen.getByRole('button', { name: 'Did not receive' }));
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+				q: undefined,
+				checkedIn: undefined,
+				page: 1,
+				pageSize: 50,
+				dispatchId: 'dsp-completed-001',
+				dispatchFilter: 'not_received',
+			});
+		});
+	});
+
+	it('clears dispatch filter when dispatch select is reset', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Email dispatch')).toBeInTheDocument();
+		});
+
+		fireEvent.change(screen.getByLabelText('Email dispatch'), {
+			target: { value: 'dsp-completed-001' },
+		});
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Received' })).toBeInTheDocument();
+		});
+
+		fireEvent.change(screen.getByLabelText('Email dispatch'), {
+			target: { value: '' },
+		});
+
+		await waitFor(() => {
+			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+				q: undefined,
+				checkedIn: undefined,
+				page: 1,
+				pageSize: 50,
+			});
+		});
+
+		expect(screen.queryByRole('button', { name: 'Did not receive' })).not.toBeInTheDocument();
 	});
 
 	it('does not overflow body horizontally at 375px viewport', async () => {
