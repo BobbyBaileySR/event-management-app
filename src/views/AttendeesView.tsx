@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { CatalogPickerSelect } from '../components/CatalogPickerSelect';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
@@ -31,6 +33,7 @@ export function AttendeesView() {
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 	const awaitingInitialLoadRef = useRef(true);
 
 	useEffect(() => {
@@ -129,11 +132,22 @@ export function AttendeesView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page]);
+	}, [data, programId, evId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page, reloadKey]);
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
 		[attendees],
+	);
+
+	const dispatchSelectOptions = useMemo(
+		() => [
+			{ value: '', label: 'No dispatch filter' },
+			...dispatchOptions.map((dispatch) => ({
+				value: dispatch.dispatchId,
+				label: dispatch.dispatchName,
+			})),
+		],
+		[dispatchOptions],
 	);
 
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -175,7 +189,18 @@ export function AttendeesView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-attendees"
+				title={title}
+				message={error}
+				onRetry={() => {
+					setError(null);
+					awaitingInitialLoadRef.current = true;
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	const meta =
@@ -207,25 +232,19 @@ export function AttendeesView() {
 				</div>
 
 				<div className={styles.dispatchFilterRow}>
-					<div className={styles.dispatchField}>
-						<label htmlFor="attendees-dispatch-select">Email dispatch</label>
-						<select
-							id="attendees-dispatch-select"
-							value={selectedDispatchId}
-							onChange={(changeEvent) => {
-								setSelectedDispatchId(changeEvent.target.value);
-								setDispatchOutcomeFilter('received');
-								setPage(1);
-							}}
-						>
-							<option value="">No dispatch filter</option>
-							{dispatchOptions.map((dispatch) => (
-								<option key={dispatch.dispatchId} value={dispatch.dispatchId}>
-									{dispatch.dispatchName}
-								</option>
-							))}
-						</select>
-					</div>
+					<CatalogPickerSelect
+						id="attendees-dispatch-select"
+						className={styles.dispatchSelect}
+						label="Email dispatch"
+						value={selectedDispatchId}
+						placeholder="No dispatch filter"
+						options={dispatchSelectOptions}
+						onChange={(value) => {
+							setSelectedDispatchId(value);
+							setDispatchOutcomeFilter('received');
+							setPage(1);
+						}}
+					/>
 					{selectedDispatchId ? (
 						<div className={styles.dispatchOutcomeFilters} role="group" aria-label="Dispatch outcome filter">
 							{(
@@ -270,12 +289,12 @@ export function AttendeesView() {
 						<table>
 							<thead>
 								<tr>
-									<th>Name</th>
-									<th className={styles.colCompany}>Company</th>
-									<th className={styles.colEmail}>Email</th>
-									<th className={styles.colAccountManager}>Account manager</th>
-									<th className={styles.colTrack}>Track</th>
-									<th>Checked in</th>
+									<th scope="col">Name</th>
+									<th scope="col" className={styles.colCompany}>Company</th>
+									<th scope="col" className={styles.colEmail}>Email</th>
+									<th scope="col" className={styles.colAccountManager}>Account manager</th>
+									<th scope="col" className={styles.colTrack}>Track</th>
+									<th scope="col">Checked in</th>
 								</tr>
 							</thead>
 							<tbody>

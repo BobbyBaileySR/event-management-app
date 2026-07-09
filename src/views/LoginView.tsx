@@ -57,14 +57,18 @@ export function LoginView() {
 	return (
 		<div className={styles.screen}>
 			<div className={styles.card}>
-				<h2>{CONFIG.APP_NAME}</h2>
+				<h1>{CONFIG.APP_NAME}</h1>
 				<p className={styles.subtitle}>Event Management System</p>
 
 				<div ref={buttonHost} className={styles.googleHost}>
 					<p className={styles.subtitle}>Loading sign-in…</p>
 				</div>
 
-				{error ? <p className={styles.error}>{error}</p> : null}
+				{error ? (
+					<p className={styles.error} role="alert">
+						{error}
+					</p>
+				) : null}
 
 				<p className={styles.notice}>
 					{`${mockLabel}Sign in with your @${CONFIG.ALLOWED_EMAIL_DOMAIN} account to continue.${originHint}`}

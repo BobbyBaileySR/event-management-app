@@ -3,6 +3,7 @@ import { ConversionChart } from '../components/ConversionChart';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
 import type { AnalyticsConversion, AuditEntry, CampaignMetrics, Event } from '../types';
@@ -19,6 +20,7 @@ export function AnalyticsView() {
 	const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		if (!eventId) {
@@ -63,7 +65,7 @@ export function AnalyticsView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, eventId, reloadKey]);
 
 	const totalRegistrations = conversion.checkedIn + conversion.registered + conversion.cancelled;
 	const rates = useMemo(() => {
@@ -95,7 +97,17 @@ export function AnalyticsView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-analytics"
+				title="Analytics"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	if (!event) {

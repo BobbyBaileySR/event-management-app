@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
 import type { AgendaSession, Event } from '../types';
@@ -14,6 +15,7 @@ export function AgendaView() {
 	const [sessions, setSessions] = useState<AgendaSession[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		if (!eventId) {
@@ -52,7 +54,7 @@ export function AgendaView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, eventId, reloadKey]);
 
 	if (!eventId) {
 		return (
@@ -76,7 +78,17 @@ export function AgendaView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-agenda"
+				title="Agenda"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	if (!event) {
@@ -105,11 +117,11 @@ export function AgendaView() {
 					<table>
 						<thead>
 							<tr>
-								<th>Time</th>
-								<th>Session</th>
-								<th>Speaker</th>
-								<th>Room</th>
-								<th>Track</th>
+								<th scope="col">Time</th>
+								<th scope="col">Session</th>
+								<th scope="col">Speaker</th>
+								<th scope="col">Room</th>
+								<th scope="col">Track</th>
 							</tr>
 						</thead>
 						<tbody>

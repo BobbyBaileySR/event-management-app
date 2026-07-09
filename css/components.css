@@ -18,6 +18,14 @@
     cursor: not-allowed;
 }
 
+.btn:focus-visible,
+a:focus-visible,
+.search-input:focus-visible,
+.hub-module:focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+}
+
 .btn-primary {
     background: var(--color-orange);
     color: var(--color-white);
@@ -174,10 +182,11 @@ td {
     color: var(--color-black);
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.form-group input:focus-visible,
+.form-group select:focus-visible,
+.form-group textarea:focus-visible {
     outline: 2px solid var(--color-cobalt);
-    outline-offset: 1px;
+    outline-offset: 2px;
 }
 
 .form-row {

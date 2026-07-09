@@ -21,6 +21,7 @@ export function CatalogPickers() {
 	const [programs, setPrograms] = useState<CatalogProgram[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -89,7 +90,7 @@ export function CatalogPickers() {
 		return () => {
 			cancelled = true;
 		};
-	}, [setSelection, catalogRevision]);
+	}, [data, setSelection, catalogRevision, programId, evId, reloadKey]);
 
 	const activeProgram = useMemo(
 		() => programs.find((program) => program.id === programId) ?? null,
@@ -167,7 +168,7 @@ export function CatalogPickers() {
 	if (loading) {
 		return (
 			<section className={styles.catalogBar} aria-label="Catalog navigation">
-				<LoadingState message="Loading catalog…" variant="inline" />
+				<LoadingState message="Loading catalog…" variant="inline" didYouKnow={false} />
 			</section>
 		);
 	}
@@ -175,7 +176,19 @@ export function CatalogPickers() {
 	if (error) {
 		return (
 			<section className={styles.catalogBar} aria-label="Catalog navigation">
-				<p className={styles.error}>{error}</p>
+				<p className={styles.error} role="alert">
+					{error}
+				</p>
+				<button
+					type="button"
+					className="btn btn-outline btn-sm"
+					onClick={() => {
+						setError(null);
+						setReloadKey((current) => current + 1);
+					}}
+				>
+					Try again
+				</button>
 			</section>
 		);
 	}

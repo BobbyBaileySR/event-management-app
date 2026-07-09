@@ -6,7 +6,7 @@ Parked work, optional hardening, and deferred decisions for the static EMS UI.
 
 **AI agents:** When the user skips or defers work, add an entry here (see `../.cursor/rules/ems-todo-discipline.mdc`).
 
-> **Last updated:** 2026-07-07 (PM — Slice 1.5 Tier A complete; Tier B next)
+> **Last updated:** 2026-07-09 (Slice 007 audit log UX parked for roadmap)
 
 ---
 
@@ -185,6 +185,24 @@ Delivery is by **vertical slice**. Slice 1 = catalog + attendees + check-in ([AD
 
 ---
 
+## Slice 007 — audit log operator UX (`007-audit-log-ux`)
+
+Follow-on to **Slice 1.5 Tier A step A8** (`#/audit` viewer). UI pagination exists today, but the backend loads and sorts **all** audit entries on every request — slow as the log grows. Parked for roadmap; spec to be written when prioritised (~1–1.5 weeks engineering).
+
+| Step | Gate | TODO IDs | Owner | Status |
+| :---: | :--- | :--- | :---: | :---: |
+| 1 | **True server-side paging** (audit index at write time; fetch only current page) | BE-SLICE007-001 | Backend | ⬜ |
+| 2 | **Readable Resource column** (type labels; optional catalog name enrichment) | FE-SLICE007-001, BE-SLICE007-002 | Both | ⬜ |
+| 3 | **Server-side filters + Apply button** (action, actor, resource type/ID; non-reactive) | FE-SLICE007-001, BE-SLICE007-001 | Both | ⬜ |
+| 4 | **Fix event analytics audit strip** — honour paginated `GET events/{id}/audit` response | FE-SLICE007-002 | Frontend | ⬜ |
+
+| ID | Item | Status | Slice | Also affects | Notes |
+| :--- | :--- | :---: | :--- | :--- | :--- |
+| FE-SLICE007-001 | **Audit log filter bar + Apply/Clear** — action, actor, resource type/ID; reset to page 1 on apply; extend `fetchAuditLog` query params | planned | 007 | Backend | Pairs **BE-SLICE007-001**. Action dropdown from known audit actions (static list). No reactive search. |
+| FE-SLICE007-002 | **Audit Resource column readability** — human labels (`Event`, `Program`, etc.); show ID as secondary; use `resourceLabel` from API when present; fix `AnalyticsView` paginated audit (`isAuditLogListResult` branch) | planned | 007 | Backend | Display layer in `auditDisplay.ts` + `AuditView`. Pairs **BE-SLICE007-002** (optional catalog name lookup on current page). |
+
+---
+
 ## Cross-cutting (primary owner: see other folder)
 
 | ID | Item | Status | Phase | Owner | Notes |
@@ -199,6 +217,7 @@ Delivery is by **vertical slice**. Slice 1 = catalog + attendees + check-in ([AD
 | X-007 | **UAT / Live environment split** | in progress | UAT | Backend | Frontend: `FE-INFRA-*`, `deploy-uat.yml`, `VITE_EMS_ENV`. Backend: **BE-INFRA-003**, ScriptRunner envs in web UI. [docs/environments.md](docs/environments.md). |
 | X-008 | **Walk-in HubSpot form verification** (`003` quickstart **B5c**) | blocked | 1 | HubSpot admin | **2026-07-07 QA:** EMS Walk-in iframe ✅ on UAT; submit → Attendees/check-in **unverified** — blocked on events/HubSpot team confirming form workflow (Parts Attended, attendance, Program form submission). Not an EMS code task unless iframe/Attendees refresh bug found after HubSpot config confirmed. Pairs **FE-SLICE1-009** / **BE-SLICE1-008**. |
 | X-009 | **004 Capacity Management QA** (full quickstart sign-off) | blocked | 004 | Both | **2026-07-07:** Blocked on **HubSpot UAT access** — defer live capacity QA (`USE_MOCK_API: false`, §4 live, §5, §10) so live HubSpot data is not impacted. Pairs **FE-CAP-001** / **BE-CAP-001**. Mock §3–§6 may run offline in parallel if useful. |
+| X-SLICE007-001 | **Slice 007 — audit log performance & operator UX** | planned | 007 | Backend | Follow-on to 1.5 A8. True paging (audit index), readable Resource column, server-side filters (Apply button). Spec `007-audit-log-ux` when scheduled. ~1–1.5 weeks. Pairs **BE-SLICE007-001**, **FE-SLICE007-001**, **FE-SLICE007-002**. |
 
 ---
 

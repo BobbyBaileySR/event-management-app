@@ -6,8 +6,9 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { StatusBadge } from '../components/StatusBadge';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
-import { eventPath, useActiveRoute } from '../router/navigation';
+import { eventPath, sliceModulePath, useActiveRoute } from '../router/navigation';
 import type { ActivityItem, AnalyticsConversion, Event } from '../types';
 import { formatDateTime } from '../utils/format';
 import styles from './EventHubView.module.css';
@@ -21,6 +22,7 @@ export function EventHubView() {
 	const [event, setEvent] = useState<Event | null>(null);
 	const [conversion, setConversion] = useState<AnalyticsConversion>({ checkedIn: 0, registered: 0, cancelled: 0 });
 	const [activity, setActivity] = useState<ActivityItem[]>([]);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		if (!eventId) {
@@ -59,7 +61,7 @@ export function EventHubView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, eventId, reloadKey]);
 
 	if (!eventId) {
 		return (
@@ -81,7 +83,17 @@ export function EventHubView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-event-hub"
+				title="Event Hub"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	if (!event) {
@@ -125,10 +137,10 @@ export function EventHubView() {
 			</div>
 
 			<div className="form-row">
-				<button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(eventPath(event.id, 'email'))}>
+				<button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(sliceModulePath('email'))}>
 					Send reminder
 				</button>
-				<button type="button" className="btn btn-outline btn-sm" onClick={() => navigate(eventPath(event.id, 'check-in'))}>
+				<button type="button" className="btn btn-outline btn-sm" onClick={() => navigate(sliceModulePath('check-in'))}>
 					Open check-in
 				</button>
 				<button type="button" className="btn btn-outline btn-sm" onClick={() => navigate(eventPath(event.id, 'agenda'))}>
@@ -145,7 +157,13 @@ export function EventHubView() {
 								key={module.id}
 								type="button"
 								className="hub-module card"
-								onClick={() => navigate(eventPath(event.id, module.id))}
+								onClick={() =>
+									navigate(
+										module.id === 'attendees' || module.id === 'check-in' || module.id === 'email'
+											? sliceModulePath(module.id)
+											: eventPath(event.id, module.id),
+									)
+								}
 							>
 								<span className="hub-module__icon" aria-hidden="true">
 									{module.icon}

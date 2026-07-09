@@ -42,17 +42,22 @@ export function AppLayout() {
 
 	return (
 		<CatalogProvider>
-			<PocBanner />
-			<div className={styles.layout}>
-				<Sidebar onLogout={handleLogout} eventName={eventName} />
-				<main className={styles.main} aria-live="polite">
-					<div className={styles.pickerDock}>
-						<CatalogPickers />
-					</div>
-					<div className={styles.content}>
-						<Outlet />
-					</div>
-				</main>
+			<a href="#main-content" className="skip-link">
+				Skip to main content
+			</a>
+			<div className={styles.shell}>
+				<PocBanner />
+				<div className={styles.layout}>
+					<Sidebar onLogout={handleLogout} eventName={eventName} />
+					<main id="main-content" className={styles.main} aria-live="polite" tabIndex={-1}>
+						<div className={styles.pickerDock}>
+							<CatalogPickers />
+						</div>
+						<div className={styles.content}>
+							<Outlet />
+						</div>
+					</main>
+				</div>
 			</div>
 		</CatalogProvider>
 	);

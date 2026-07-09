@@ -6,6 +6,7 @@ import type { Event, EventStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { eventPath } from '../router/navigation';
 import styles from './EventsView.module.css';
 
@@ -27,6 +28,7 @@ export function EventsView() {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -54,7 +56,7 @@ export function EventsView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data]);
+	}, [data, reloadKey]);
 
 	const filteredEvents = useMemo(
 		() => searchEvents(searchQuery, filterEventsByStatus(statusFilter, allEvents)),
@@ -72,7 +74,17 @@ export function EventsView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-events"
+				title="All Events"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	return (
@@ -122,12 +134,12 @@ export function EventsView() {
 					<table>
 					<thead>
 						<tr>
-							<th>Event</th>
-							<th>Date</th>
-							<th>Location</th>
-							<th>Registrations</th>
-							<th>Status</th>
-							<th aria-label="Actions" />
+							<th scope="col">Event</th>
+							<th scope="col">Date</th>
+							<th scope="col">Location</th>
+							<th scope="col">Registrations</th>
+							<th scope="col">Status</th>
+							<th scope="col" aria-label="Actions" />
 						</tr>
 					</thead>
 					<tbody>

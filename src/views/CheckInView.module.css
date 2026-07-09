@@ -126,8 +126,9 @@
 	line-height: 1.5;
 }
 
-.walkInError {
-	margin: 0;
+.walkInError,
+.searchError {
+	margin: 0 0 12px;
 	color: var(--color-danger, #b00020);
 }
 

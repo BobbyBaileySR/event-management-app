@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ConfirmProvider } from '../components/ConfirmModal';
 import { ToastProvider } from '../components/Toast';
@@ -215,9 +216,6 @@ describe('EmailDispatchView', () => {
 		fireEvent.change(screen.getByLabelText(/dispatch name/i), {
 			target: { value: 'QA immediate send' },
 		});
-		fireEvent.change(screen.getByLabelText(/template/i), {
-			target: { value: '123456789' },
-		});
 		fireEvent.click(screen.getByRole('button', { name: /send now/i }));
 
 		await waitFor(() => {
@@ -247,9 +245,6 @@ describe('EmailDispatchView', () => {
 		fireEvent.change(screen.getByLabelText(/dispatch name/i), {
 			target: { value: 'Large audience send' },
 		});
-		fireEvent.change(screen.getByLabelText(/template/i), {
-			target: { value: '123456789' },
-		});
 		fireEvent.click(screen.getByRole('button', { name: /send now/i }));
 
 		await waitFor(() => {
@@ -276,6 +271,7 @@ describe('EmailDispatchView', () => {
 	});
 
 	it('loads HubSpot segments and shows segment name picker', async () => {
+		const user = userEvent.setup();
 		renderEmailDispatchView();
 
 		await waitFor(() => {
@@ -287,6 +283,9 @@ describe('EmailDispatchView', () => {
 		await waitFor(() => {
 			expect(screen.getByTestId('segment-picker')).toBeInTheDocument();
 		});
+
+		await user.click(screen.getByTestId('segment-picker'));
+
 		expect(screen.getByRole('option', { name: /VIP prospects \(Active\)/i })).toBeInTheDocument();
 		expect(screen.getByRole('option', { name: /Static invite list \(Static\)/i })).toBeInTheDocument();
 	});

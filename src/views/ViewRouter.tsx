@@ -32,13 +32,13 @@ export function ViewRouter() {
 		case 'event-hub':
 			return <EventHubView />;
 		case 'attendees':
-			return <AttendeesView />;
+			return <AttendeesRouteGate />;
 		case 'analytics':
 			return <AnalyticsView />;
 		case 'agenda':
 			return <AgendaView />;
 		case 'check-in':
-			return <CheckInView />;
+			return <CheckInRouteGate />;
 		case 'email':
 			return <EmailRouteGate />;
 		case 'settings':
@@ -46,6 +46,24 @@ export function ViewRouter() {
 		default:
 			return <RoutePlaceholder />;
 	}
+}
+
+/** Legacy `#/events/:eventId/attendees` → catalog-scoped Slice 1 route. */
+function AttendeesRouteGate() {
+	const { eventId } = useActiveRoute();
+	if (eventId) {
+		return <Navigate to={sliceModulePath('attendees')} replace />;
+	}
+	return <AttendeesView />;
+}
+
+/** Legacy `#/events/:eventId/check-in` → catalog-scoped Slice 1 route. */
+function CheckInRouteGate() {
+	const { eventId } = useActiveRoute();
+	if (eventId) {
+		return <Navigate to={sliceModulePath('check-in')} replace />;
+	}
+	return <CheckInView />;
 }
 
 /** Admin + catalog gate for Slice 2 email route — full UI ships in EmailDispatchView (US1). */

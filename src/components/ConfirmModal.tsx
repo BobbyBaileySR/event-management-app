@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 export interface ConfirmOptions {
 	title: string;
@@ -18,6 +19,20 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	const [open, setOpen] = useState(false);
 	const [options, setOptions] = useState<ConfirmOptions>({ title: '', message: '' });
 	const resolveRef = useRef<((value: boolean) => void) | null>(null);
+	const dialogRef = useRef<HTMLDivElement>(null);
+	const titleId = 'confirm-modal-title';
+
+	const close = useCallback((result: boolean) => {
+		setOpen(false);
+		resolveRef.current?.(result);
+		resolveRef.current = null;
+	}, []);
+
+	useModalFocusTrap({
+		open,
+		containerRef: dialogRef,
+		onEscape: () => close(false),
+	});
 
 	const confirm = useCallback((opts: ConfirmOptions) => {
 		return new Promise<boolean>((resolve) => {
@@ -25,12 +40,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 			resolveRef.current = resolve;
 			setOpen(true);
 		});
-	}, []);
-
-	const close = useCallback((result: boolean) => {
-		setOpen(false);
-		resolveRef.current?.(result);
-		resolveRef.current = null;
 	}, []);
 
 	const value = useMemo(() => ({ confirm }), [confirm]);
@@ -41,22 +50,28 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 			{open ? (
 				<div
 					className="modal-overlay"
-					role="dialog"
-					aria-modal="true"
+					role="presentation"
 					onClick={(event) => {
 						if (event.target === event.currentTarget) {
 							close(false);
 						}
 					}}
 				>
-					<div className="modal">
-						<h3>{options.title}</h3>
+					<div
+						ref={dialogRef}
+						className="modal"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby={titleId}
+						onClick={(event) => event.stopPropagation()}
+					>
+						<h3 id={titleId}>{options.title}</h3>
 						<p>{options.message}</p>
 						<div className="modal__actions">
 							<button type="button" className="btn btn-outline" onClick={() => close(false)}>
 								{options.cancelLabel ?? 'Cancel'}
 							</button>
-							<button type="button" className="btn btn-primary" autoFocus onClick={() => close(true)}>
+							<button type="button" className="btn btn-primary" onClick={() => close(true)}>
 								{options.confirmLabel ?? 'Confirm'}
 							</button>
 						</div>

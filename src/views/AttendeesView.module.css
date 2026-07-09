@@ -61,22 +61,9 @@
 	margin-bottom: 12px;
 }
 
-.dispatchField {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+.dispatchSelect {
 	flex: 1 1 220px;
 	min-width: 0;
-}
-
-.dispatchField label {
-	font-weight: 600;
-	font-size: 0.9rem;
-}
-
-.dispatchField select {
-	width: 100%;
-	min-height: 44px;
 	max-width: 28rem;
 }
 

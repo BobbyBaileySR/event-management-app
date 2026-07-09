@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
@@ -18,6 +19,7 @@ export function SettingsView() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [event, setEvent] = useState<Event | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 
 	useEffect(() => {
 		if (!eventId) {
@@ -50,7 +52,7 @@ export function SettingsView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, eventId]);
+	}, [data, eventId, reloadKey]);
 
 	if (!eventId) {
 		return (
@@ -74,7 +76,17 @@ export function SettingsView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-settings"
+				title="Settings"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	if (!event) {

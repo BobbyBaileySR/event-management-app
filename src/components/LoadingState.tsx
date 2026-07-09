@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { getRandomLoadingTip } from '../constants/loadingTips';
 import styles from './LoadingState.module.css';
 
 type LoadingVariant = 'page' | 'panel' | 'inline';
@@ -8,6 +10,16 @@ interface LoadingStateProps {
 	variant?: LoadingVariant;
 	skeleton?: LoadingSkeleton;
 	skeletonRows?: number;
+	/** Random tip above the spinner. Defaults to true for page/panel; false for inline (e.g. catalog pickers). */
+	didYouKnow?: boolean;
+}
+
+function showDidYouKnowTip(variant: LoadingVariant, didYouKnow: boolean | undefined): boolean {
+	if (didYouKnow !== undefined) {
+		return didYouKnow;
+	}
+
+	return variant !== 'inline';
 }
 
 function SkeletonCell({ width = '100%' }: { width?: string }) {
@@ -63,7 +75,11 @@ export function LoadingState({
 	variant = 'page',
 	skeleton = 'none',
 	skeletonRows = 6,
+	didYouKnow: didYouKnowProp,
 }: LoadingStateProps) {
+	const showTip = showDidYouKnowTip(variant, didYouKnowProp);
+	const didYouKnow = useMemo(() => (showTip ? getRandomLoadingTip() : null), [showTip]);
+
 	const skeletonContent =
 		skeleton === 'table' ? (
 			<TableSkeleton rows={skeletonRows} />
@@ -80,6 +96,11 @@ export function LoadingState({
 			aria-live="polite"
 			aria-busy="true"
 		>
+			{didYouKnow ? (
+				<p className={styles.didYouKnow}>
+					<span className={styles.didYouKnowLabel}>Did you know?</span> {didYouKnow}
+				</p>
+			) : null}
 			<div className={styles.spinner} aria-hidden="true" />
 			<p className={styles.message}>{message}</p>
 			{skeletonContent}
