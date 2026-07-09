@@ -152,6 +152,7 @@ Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generate
    - Use links or references to contracts and data model details instead of duplicating them
    - Do not include full implementation code, model/service/controller bodies, migrations, or complete test suites
    - Keep this artifact as a validation/run guide; implementation details belong in `tasks.md` and the implementation phase
+   - **Required:** **`C. Operator security comfort checks`** — copy from [docs/slice-operator-security-qa-template.md](../../docs/slice-operator-security-qa-template.md), fill all placeholders for this slice (step-by-step for non-developer operator). See `.cursor/rules/ems-slice-operator-security-qa.mdc`.
 
 **Output**: data-model.md, /contracts/*, quickstart.md
 

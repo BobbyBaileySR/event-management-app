@@ -6,6 +6,22 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ---
 
+## 2026-07-09
+
+### Audit log — table fills viewport
+
+- **`AuditView.module.css`**: override global `.table-scroll` `max-height: 420px` so the audit table expands to fill the card (same flex pattern as Attendees view); pagination stays pinned at the bottom.
+
+## 2026-07-08
+
+### Slice operator security QA (process + template)
+
+- **`.cursor/rules/ems-slice-operator-security-qa.mdc`**: requires **§C Operator security comfort checks** in every slice `quickstart.md` (and sign-off docs) — detailed step-by-step instructions for the non-developer operator before Live sign-off.
+- **`docs/slice-operator-security-qa-template.md`**: copy-paste template (auth, RBAC, audit, PII, slice-specific checks, sign-off table).
+- **`specs/slice-1.5-tier-a/signoff-checklist.md`**: manual smoke remapped to template step IDs; links to template for future slices.
+- **`specs/003-check-in/quickstart.md`**: B7 points to Tier A sign-off + template for new slices.
+- **`.cursor/rules/ems-testing-discipline.mdc`**, **`speckit-plan` skill**: cross-links to §C requirement.
+
 ## 2026-07-07
 
 ### Slice 1.5 Tier A — step A9: sign-off checklist
