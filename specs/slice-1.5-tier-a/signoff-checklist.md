@@ -53,22 +53,25 @@ Branch `slice-1.5-a1-a5-backend` reviewed with **`/review-security`** before mer
 
 ---
 
-## Manual smoke (optional re-verify)
+## Operator security comfort checks (manual smoke)
 
-Run as **admin** against Live or UAT with `USE_MOCK_API: false` and real session:
+**Format:** Pre-dates the standard §C template. Equivalent checks are listed below; **future slices** must use the full **[slice-operator-security-qa-template.md](../../docs/slice-operator-security-qa-template.md)** in `quickstart.md` §C (see `.cursor/rules/ems-slice-operator-security-qa.mdc`).
 
-| # | Check | Pass |
-| :---: | :--- | :---: |
-| 1 | Sign in with Google → session established | ☐ |
-| 2 | Check-in confirm rejects contact not registered for Event (404 / no HubSpot write) | ☐ |
-| 3 | `GET attendees` succeeds; audit row `attendees.list` appears (no PII in metadata) | ☐ |
-| 4 | Rapid attendee list refresh hits rate limit (429) after threshold | ☐ |
-| 5 | Catalog PATCH writes audit with `metadata.previous` / `metadata.next` | ☐ |
-| 6 | **`#/audit`** loads paginated log for admin | ☐ |
-| 7 | Viewer role cannot open **`#/audit`** (redirect / 403 from API) | ☐ |
-| 8 | Production build has no `.map` files in `dist/assets/` | ☐ |
+**Run as:** **admin** on UAT or Live · `USE_MOCK_API: false` · separate browser/profile for viewer checks · test Program + Event selected.
 
-Ops fallback: `DumpAuditEntries.ts` in ScriptRunner for raw audit keys.
+| Step ID | Check | Pass ☐ | Failure — stop Live deploy |
+| :---: | :--- | :---: | :--- |
+| C3.2 | Sign in with Google (`@adaptavist.com` admin) → session established | | Cannot sign in or non-staff gets session |
+| C7.1.1 | Check-in confirm **rejects** contact **not** registered for Event | | Unregistered contact checked in / HubSpot write |
+| C5.3 | Open Attendees → refresh **`#/audit`** → row `attendees.list` for your action | | No audit row after list load |
+| C5.4 | Inspect that row’s metadata — **no** attendee email or full name | | PII in audit metadata |
+| C7.2.1 | Rapid attendee list refresh → **429** after threshold | | Unlimited list pulls with no limit |
+| C5.3 | Catalog PATCH one field → audit row with `metadata.previous` / `metadata.next` | | PATCH with no audit or missing before/after |
+| C4a.3 | **`#/audit`** loads paginated log for **admin** | | Admin cannot open audit |
+| C4b.2 | **Viewer** cannot open **`#/audit`** (redirect / 403) | | Viewer sees audit rows |
+| C2.4 | Production `dist/assets/` has **no** `.map` files (engineering confirms post-build) | | Public source maps |
+
+Ops fallback: `DumpAuditEntries.ts` in ScriptRunner for raw audit keys if UI is unavailable.
 
 ---
 

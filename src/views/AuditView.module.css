@@ -5,6 +5,10 @@
 	min-height: 0;
 }
 
+.view :global(.top-bar) {
+	flex-shrink: 0;
+}
+
 .card {
 	display: flex;
 	flex-direction: column;
@@ -22,9 +26,11 @@
 }
 
 .tableScroll {
-	overflow: auto;
 	flex: 1;
-	min-height: 0;
+	min-height: 200px;
+	overflow: auto;
+	max-height: none;
+	-webkit-overflow-scrolling: touch;
 }
 
 .colAction {
@@ -43,6 +49,7 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
+	flex-shrink: 0;
 	padding-top: 16px;
 	border-top: 1px solid var(--color-border);
 	margin-top: 16px;
@@ -55,10 +62,6 @@
 }
 
 @media (max-width: 900px) {
-	.tableScroll {
-		-webkit-overflow-scrolling: touch;
-	}
-
 	.colDetails {
 		max-width: 14rem;
 	}
