@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CatalogPickerSelect } from '../components/CatalogPickerSelect';
 import { useConfirm } from '../components/ConfirmModal';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
@@ -47,6 +48,16 @@ const MANUAL_PICKER_PAGE_SIZE = 50;
 const DETAIL_RECIPIENTS_PAGE_SIZE = 25;
 const SCHEDULE_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const TIMEZONE_OPTIONS = listTimezoneOptions();
+
+const SCHEDULE_HOUR_OPTIONS = SCHEDULE_HOURS.map((hour) => ({
+	value: String(hour),
+	label: `${buildTimeSlot(hour, 0).slice(0, 2)}:00`,
+}));
+
+const TIMEZONE_SELECT_OPTIONS = TIMEZONE_OPTIONS.map((zone) => ({
+	value: zone,
+	label: zone,
+}));
 
 function buildAudienceRequest(
 	source: AudienceSource,
@@ -555,6 +566,22 @@ export function EmailDispatchView() {
 	const detailRangeStart = detailTotal === 0 ? 0 : (detailPage - 1) * DETAIL_RECIPIENTS_PAGE_SIZE + 1;
 	const detailRangeEnd = Math.min(detailPage * DETAIL_RECIPIENTS_PAGE_SIZE, detailTotal);
 
+	const templateOptions = useMemo(
+		() => templates.map((template) => ({ value: template.id, label: template.name })),
+		[templates],
+	);
+
+	const segmentOptions = useMemo(
+		() =>
+			segments.length === 0
+				? [{ value: '', label: 'No segments available' }]
+				: segments.map((segment) => ({
+						value: segment.id,
+						label: `${segment.name} (${segment.kind === 'active' ? 'Active' : 'Static'})`,
+					})),
+		[segments],
+	);
+
 	function renderScheduleFields(options: {
 		date: string;
 		hour: number;
@@ -577,20 +604,15 @@ export function EmailDispatchView() {
 						onChange={(event) => options.onDateChange(event.target.value)}
 					/>
 				</div>
-				<div className={styles.field}>
-					<label htmlFor={`${options.idPrefix}-hour`}>Hour</label>
-					<select
-						id={`${options.idPrefix}-hour`}
-						value={options.hour}
-						onChange={(event) => options.onHourChange(Number(event.target.value))}
-					>
-						{SCHEDULE_HOURS.map((hour) => (
-							<option key={hour} value={hour}>
-								{buildTimeSlot(hour, 0).slice(0, 2)}:00
-							</option>
-						))}
-					</select>
-				</div>
+				<CatalogPickerSelect
+					id={`${options.idPrefix}-hour`}
+					className={styles.field}
+					label="Hour"
+					value={String(options.hour)}
+					placeholder="Select hour"
+					options={SCHEDULE_HOUR_OPTIONS}
+					onChange={(value) => options.onHourChange(Number(value))}
+				/>
 				<fieldset className={styles.minuteGrid}>
 					<legend>Minute (15-minute grid)</legend>
 					<div className={styles.minuteOptions} role="radiogroup" aria-label="Schedule minute">
@@ -608,20 +630,15 @@ export function EmailDispatchView() {
 						))}
 					</div>
 				</fieldset>
-				<div className={styles.field}>
-					<label htmlFor={`${options.idPrefix}-timezone`}>Timezone</label>
-					<select
-						id={`${options.idPrefix}-timezone`}
-						value={options.timezone}
-						onChange={(event) => options.onTimezoneChange(event.target.value)}
-					>
-						{TIMEZONE_OPTIONS.map((zone) => (
-							<option key={zone} value={zone}>
-								{zone}
-							</option>
-						))}
-					</select>
-				</div>
+				<CatalogPickerSelect
+					id={`${options.idPrefix}-timezone`}
+					className={styles.field}
+					label="Timezone"
+					value={options.timezone}
+					placeholder="Select timezone"
+					options={TIMEZONE_SELECT_OPTIONS}
+					onChange={options.onTimezoneChange}
+				/>
 			</div>
 		);
 	}
@@ -664,7 +681,14 @@ export function EmailDispatchView() {
 				{activeTab === 'compose' ? (
 					<div className={styles.panel} role="tabpanel">
 						{loading ? <LoadingState message="Loading compose options…" /> : null}
-						{error ? <p role="alert">{error}</p> : null}
+						{error ? (
+							<div role="alert">
+								<p>{error}</p>
+								<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadComposeData()}>
+									Try again
+								</button>
+							</div>
+						) : null}
 						{limits ? (
 							<p className={styles.limits}>
 								{limits.dispatchUsedThisHour} / {limits.dispatchLimitPerHour} dispatches this hour
@@ -684,20 +708,16 @@ export function EmailDispatchView() {
 										autoComplete="off"
 									/>
 								</div>
-								<div className={styles.field}>
-									<label htmlFor="email-template">Template</label>
-									<select
-										id="email-template"
-										value={templateId}
-										onChange={(event) => setTemplateId(event.target.value)}
-									>
-										{templates.map((template) => (
-											<option key={template.id} value={template.id}>
-												{template.name}
-											</option>
-										))}
-									</select>
-								</div>
+								<CatalogPickerSelect
+									id="email-template"
+									className={styles.field}
+									label="Template"
+									value={templateId}
+									placeholder="Select template"
+									options={templateOptions}
+									disabled={templateOptions.length === 0}
+									onChange={setTemplateId}
+								/>
 
 								<fieldset className={styles.audienceFieldset}>
 									<legend>Audience</legend>
@@ -833,25 +853,17 @@ export function EmailDispatchView() {
 												Segment membership is resolved at preview and send time. Recipients may include
 												Contacts who are not registered for this Event.
 											</p>
-											<div className={styles.field}>
-												<label htmlFor="email-segment">Segment</label>
-												<select
-													id="email-segment"
-													data-testid="segment-picker"
-													value={segmentId}
-													onChange={(event) => setSegmentId(event.target.value)}
-												>
-													{segments.length === 0 ? (
-														<option value="">No segments available</option>
-													) : (
-														segments.map((segment) => (
-															<option key={segment.id} value={segment.id}>
-																{segment.name} ({segment.kind === 'active' ? 'Active' : 'Static'})
-															</option>
-														))
-													)}
-												</select>
-											</div>
+											<CatalogPickerSelect
+												id="email-segment"
+												className={styles.field}
+												testId="segment-picker"
+												label="Segment"
+												value={segmentId}
+												placeholder="Select segment"
+												options={segmentOptions}
+												disabled={segments.length === 0}
+												onChange={setSegmentId}
+											/>
 										</div>
 									)}
 
@@ -904,39 +916,39 @@ export function EmailDispatchView() {
 												idPrefix: 'compose-schedule',
 											})
 										: null}
-								</fieldset>
 
-								<div className={styles.actions}>
-									{sendMode === 'now' ? (
-										<button
-											type="button"
-											className="btn btn-primary"
-											onClick={() => void handleSendNow()}
-											disabled={
-												sending ||
-												previewLoading ||
-												recipientCount === 0 ||
-												(audienceSource === 'hubspot_segment' && !segmentId)
-											}
-										>
-											Send now
-										</button>
-									) : (
-										<button
-											type="button"
-											className="btn btn-primary"
-											onClick={() => void handleScheduleForLater()}
-											disabled={
-												sending ||
-												previewLoading ||
-												recipientCount === 0 ||
-												(audienceSource === 'hubspot_segment' && !segmentId)
-											}
-										>
-											Schedule
-										</button>
-									)}
-								</div>
+									<div className={styles.actions}>
+										{sendMode === 'now' ? (
+											<button
+												type="button"
+												className="btn btn-primary"
+												onClick={() => void handleSendNow()}
+												disabled={
+													sending ||
+													previewLoading ||
+													recipientCount === 0 ||
+													(audienceSource === 'hubspot_segment' && !segmentId)
+												}
+											>
+												Send now
+											</button>
+										) : (
+											<button
+												type="button"
+												className="btn btn-primary"
+												onClick={() => void handleScheduleForLater()}
+												disabled={
+													sending ||
+													previewLoading ||
+													recipientCount === 0 ||
+													(audienceSource === 'hubspot_segment' && !segmentId)
+												}
+											>
+												Schedule
+											</button>
+										)}
+									</div>
+								</fieldset>
 							</>
 						) : null}
 					</div>
@@ -1178,20 +1190,16 @@ export function EmailDispatchView() {
 								onChange={(event) => setEditDispatchName(event.target.value)}
 							/>
 						</div>
-						<div className={styles.field}>
-							<label htmlFor="edit-template">Template</label>
-							<select
-								id="edit-template"
-								value={editTemplateId}
-								onChange={(event) => setEditTemplateId(event.target.value)}
-							>
-								{templates.map((template) => (
-									<option key={template.id} value={template.id}>
-										{template.name}
-									</option>
-								))}
-							</select>
-						</div>
+						<CatalogPickerSelect
+							id="edit-template"
+							className={styles.field}
+							label="Template"
+							value={editTemplateId}
+							placeholder="Select template"
+							options={templateOptions}
+							disabled={templateOptions.length === 0}
+							onChange={setEditTemplateId}
+						/>
 						{renderScheduleFields({
 							date: editScheduleDate,
 							hour: editScheduleHour,

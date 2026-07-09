@@ -13,6 +13,8 @@ interface CatalogPickerSelectProps {
 	placeholder: string;
 	options: PickerOption[];
 	disabled?: boolean;
+	className?: string;
+	testId?: string;
 	onChange: (value: string) => void;
 }
 
@@ -23,6 +25,8 @@ export function CatalogPickerSelect({
 	placeholder,
 	options,
 	disabled = false,
+	className,
+	testId,
 	onChange,
 }: CatalogPickerSelectProps) {
 	const listboxId = useId();
@@ -66,15 +70,16 @@ export function CatalogPickerSelect({
 	}
 
 	return (
-		<div className={styles.field} ref={containerRef}>
-			<span id={`${id}-label`} className={styles.fieldLabel}>
+		<div className={`${styles.field} ${className ?? ''}`.trim()} ref={containerRef}>
+			<label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel}>
 				{label}
-			</span>
+			</label>
 			<div className={styles.selectWrap}>
 				<button
 					type="button"
 					id={id}
 					className={styles.selectTrigger}
+					data-testid={testId}
 					aria-haspopup="listbox"
 					aria-expanded={open}
 					aria-label={`${label}: ${selectedLabel}`}

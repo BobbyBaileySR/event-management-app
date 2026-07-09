@@ -1,0 +1,37 @@
+---
+description: UX psychology laws as deterministic coding rules for views and flows
+globs: src/**,css/**
+alwaysApply: false
+---
+
+# UX laws (coding rules)
+
+## Cognitive load
+
+- **Hick's Law:** Max **2 primary** actions in `TopBar` trailing; bury secondary actions in outline buttons or progressive disclosure
+- **Miller's Law:** Chunk long forms and dense tables — cards, sections, pagination
+- **Tesler's Law:** Auto-format inputs (dates, phones) server-side or on blur; do not push complexity to the user
+
+## Feedback and performance
+
+- **Doherty Threshold:** Show `LoadingState` (or inline skeleton) on first paint for any async fetch — target perceived feedback under 400ms
+- **Visibility of system status:** Disable submit buttons while saving; show `aria-busy` on refresh actions
+- **Peak-End Rule:** Call `showToast()` on successful completion of major flows (check-in, send email, save catalog, archive)
+
+## Safety and trust
+
+- **Destructive actions:** `useConfirm()` before archive, cancel dispatch, irreversible mutations
+- **Error prevention:** Disable submit until required fields valid; inline validation before API call
+- **User control:** Every modal and destructive flow has Cancel; modals restore focus on close
+
+## Patterns EMS already uses
+
+- **Jakob's Law:** Event list → event hub → module; sidebar nav; catalog pickers for slice scope
+- **Humane / finite:** Pagination or explicit page controls — no infinite scroll
+- **Aesthetic-usability:** Brand tokens + shared components — do not one-off styling
+
+## Copy
+
+- User-facing errors in plain language — no HTTP codes, HubSpot IDs, or stack traces
+
+See also: `frontend-user-flows.mdc`, `docs/product-flows.md`.

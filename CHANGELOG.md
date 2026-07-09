@@ -8,6 +8,64 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-09
 
+### Email compose — schedule date input styling
+
+- **`EmailDispatchView.module.css`**: Date and text inputs in compose fields match catalog modal form controls (border, padding, denim label, focus ring) — aligned with Hour/Timezone pickers.
+
+### Email compose — Schedule button layout on desktop
+
+- **`EmailDispatchView`**: Move Send/Schedule actions inside the Delivery fieldset so the primary button sits in the form flow with proper padding; stop stretching the compose card/panel to viewport height (fixes button overlapping the card border).
+
+### Catalog admin — Archive Program destructive styling
+
+- **`CatalogAdminView`**: Archive Program uses the same red `danger` button style as Archive Event; Unarchive Program stays secondary.
+
+### Email compose — remove gap between Template and Audience
+
+- **`CatalogPickers.module.css`**: Scope `flex: 1` on picker fields to `.catalogBar` only — in vertical form layouts (Email compose, etc.) the template select no longer stretches to fill leftover panel height.
+
+### UI — consistent dropdown styling (Attendees + Email)
+
+- **`CatalogPickerSelect`**: Reused for Attendees dispatch filter and all Email section selects (template, segment, schedule hour/timezone); native `<select>` styling replaced with catalog-picker look. Optional `className` and `testId` props; proper `<label htmlFor>` association.
+
+### Layout — remove spurious page scroll on desktop
+
+- **`AppLayout`**: Wrap PoC/UAT banner and shell in a `100dvh` flex column so the banner no longer stacks on top of a separate `min-height: 100vh` row (which pushed the document ~40px past the viewport). Main content area still scrolls internally when needed.
+
+### Celebration theme — sidebar selected nav contrast
+
+- **`css/tokens.css`**, **`css/theme-celebration.css`**, **`Sidebar.module.css`**, **`css/layout.css`**: Add `--color-sidebar-nav-active-*` tokens; celebration theme uses ice/white text on blush sidebar so selected menu items stay readable (orange accent was same hue as the shell).
+- **Celebration sidebar header**: `--color-sidebar-header-bg` / `--color-sidebar-header-border` — deep dusty rose (`#9f6b6b`) with light blush accent instead of muddy brown-black on the Event Console strip.
+
+### Sidebar — working context legibility
+
+- **`Sidebar.module.css`**: Increase working-context label size and contrast (match nav item scale, ice colour, semibold); drop uppercase styling so event names read naturally; add section divider on the label (survives mobile `display: contents` flattening) and word-wrap for long titles; keep readable size on mobile wrap layout.
+
+### Loading — Did you know tips on table skeletons
+
+- **`src/constants/loadingTips.ts`**: `LOADING_DID_YOU_KNOW_TIPS` array for operators to populate; `LoadingState` shows a random tip above the spinner on table skeletons when tips exist.
+- **`LoadingState`**: Did you know tips now show on all `page`/`panel` spinners in main content (not only table skeletons); inline catalog picker explicitly excluded.
+- **`LoadingState.module.css`**: Scale Did you know text to 150% on desktop (≥901px); tip renders above the spinner so it stays visible on mobile/tablet without scrolling.
+- **`docs/loading-did-you-know-tips.md`**: Documents the loading-screen easter egg — when tips appear, how to edit/disable them, and which views use it.
+
+### UI/UX Taste Stack — Cursor rules + retrofit
+
+- **`.cursor/rules/`**: Added `frontend-ui-stack.mdc`, `frontend-accessibility.mdc`, `frontend-ux-laws.mdc`, `frontend-user-flows.mdc` — adapted from internal UX guidance to EMS CSS-modules stack (not Shadcn/Tailwind).
+- **`docs/ui-a11y-audit.md`**, **`docs/ui-component-catalog.md`**: Baseline scorecard and shared component index for AI-efficient audits.
+- **Shared shell**: Skip-to-main link, global `:focus-visible`, `prefers-reduced-motion`; `ConfirmModal` focus trap and no `autofocus`.
+- **`ViewErrorState`**: Reusable full-page error with retry; wired across data views.
+- **Views**: Consistent error/alert handling, table `scope="col"`, Check-in search errors inline (keyboard-safe rows).
+
+### Responsive — sidebar navigation on mobile/tablet
+
+- **`Sidebar.module.css`**: Replace broken horizontal scroll (section groups stayed vertical inside a row nav) with wrapped two-column nav buttons; flatten section wrappers so catalog/event labels span full width above their links; compact header/footer on narrow viewports.
+- **`css/layout.css`**: Align legacy sidebar nav breakpoint styles with the same wrap layout.
+
+### Attendees QA — legacy navigation fix
+
+- **`ViewRouter.tsx`**: Redirect legacy `#/events/:eventId/attendees` and `#/events/:eventId/check-in` to `#/events/attendees` / `#/events/check-in` (catalog picker context required), matching the email module pattern.
+- **`EventHubView.tsx`**: Attendees, Check-in, and Email hub shortcuts now open catalog-scoped routes instead of legacy `#/events/{mockEventId}/…` URLs that ignored catalog selection.
+
 ### Security — large-send confirmation wired to backend (FR-010)
 
 - **`EmailDispatchView.tsx`**: Sends `largeSendConfirmed: true` after operator confirms large send/schedule/edit; edit flow previews audience and confirms at threshold.

@@ -65,6 +65,7 @@ export function CheckInView() {
 	const [capacityLoading, setCapacityLoading] = useState(false);
 	const [capacityError, setCapacityError] = useState<string | null>(null);
 	const [capacityAdjusting, setCapacityAdjusting] = useState(false);
+	const [searchReloadKey, setSearchReloadKey] = useState(0);
 
 	const loadCapacityStatus = useCallback(async () => {
 		if (!programId || !evId) {
@@ -150,7 +151,7 @@ export function CheckInView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId, debouncedSearch]);
+	}, [data, programId, evId, debouncedSearch, searchReloadKey]);
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
@@ -238,10 +239,6 @@ export function CheckInView() {
 				action={{ label: 'Go to All Events', to: '/events' }}
 			/>
 		);
-	}
-
-	if (error) {
-		return <div className="empty-state">{error}</div>;
 	}
 
 	const title =
@@ -375,6 +372,21 @@ export function CheckInView() {
 						onChange={(changeEvent) => setSearchQuery(changeEvent.target.value)}
 						aria-label="Search attendees for check-in"
 					/>
+					{error ? (
+						<p className={styles.searchError} role="alert">
+							{error}{' '}
+							<button
+								type="button"
+								className="btn btn-link"
+								onClick={() => {
+									setError(null);
+									setSearchReloadKey((current) => current + 1);
+								}}
+							>
+								Try again
+							</button>
+						</p>
+					) : null}
 					{resultsTruncated ? (
 						<p className={styles.searchHint}>
 							Showing {attendees.length} of {matchTotal} matches — type more to narrow results.
@@ -384,10 +396,10 @@ export function CheckInView() {
 						<table>
 							<thead>
 								<tr>
-									<th>Name</th>
-									<th className={styles.colCompany}>Company</th>
-									<th className={styles.colTrack}>Track</th>
-									<th className={styles.colAction} aria-label="Actions" />
+									<th scope="col">Name</th>
+									<th scope="col" className={styles.colCompany}>Company</th>
+									<th scope="col" className={styles.colTrack}>Track</th>
+									<th scope="col" className={styles.colAction} aria-label="Actions" />
 								</tr>
 							</thead>
 							<tbody>
@@ -406,7 +418,6 @@ export function CheckInView() {
 											<tr
 												key={person.contactId}
 												className={isSelected ? styles.selectedRow : undefined}
-												onClick={() => selectAttendee(person)}
 											>
 												<td>{attendeeName(person)}</td>
 												<td className={styles.colCompany}>{person.company}</td>

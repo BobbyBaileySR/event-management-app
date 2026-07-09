@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import type { AuditLogEntry } from '../types';
@@ -21,6 +22,7 @@ export function AuditView() {
 	const [total, setTotal] = useState(0);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [reloadKey, setReloadKey] = useState(0);
 	const isAdmin = session?.role === 'admin';
 
 	useEffect(() => {
@@ -56,7 +58,7 @@ export function AuditView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, isAdmin, page]);
+	}, [data, isAdmin, page, reloadKey]);
 
 	if (!isAdmin) {
 		return <Navigate to="/events" replace />;
@@ -79,7 +81,17 @@ export function AuditView() {
 	}
 
 	if (error) {
-		return <div className="empty-state">{error}</div>;
+		return (
+			<ViewErrorState
+				viewId="view-audit"
+				title="Audit log"
+				message={error}
+				onRetry={() => {
+					setError(null);
+					setReloadKey((current) => current + 1);
+				}}
+			/>
+		);
 	}
 
 	const meta =
@@ -100,12 +112,12 @@ export function AuditView() {
 						<table>
 							<thead>
 								<tr>
-									<th>Time</th>
-									<th className={styles.colAction}>Action</th>
-									<th>Actor</th>
-									<th>Outcome</th>
-									<th>Resource</th>
-									<th className={styles.colDetails}>Details</th>
+									<th scope="col">Time</th>
+									<th scope="col" className={styles.colAction}>Action</th>
+									<th scope="col">Actor</th>
+									<th scope="col">Outcome</th>
+									<th scope="col">Resource</th>
+									<th scope="col" className={styles.colDetails}>Details</th>
 								</tr>
 							</thead>
 							<tbody>

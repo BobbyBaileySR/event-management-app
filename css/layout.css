@@ -87,8 +87,8 @@
 
 .sidebar-header {
     padding: 24px;
-    background: var(--color-black);
-    border-bottom: 3px solid var(--color-orange);
+    background: var(--color-sidebar-header-bg);
+    border-bottom: 3px solid var(--color-sidebar-header-border);
 }
 
 .sidebar-header h2 {
@@ -128,9 +128,9 @@
 
 .nav-item:hover,
 .nav-item.active {
-    background: var(--color-orange-muted);
-    color: var(--color-orange);
-    border-right: 3px solid var(--color-orange);
+    background: var(--color-sidebar-nav-active-bg);
+    color: var(--color-sidebar-nav-active-text);
+    border-right: 3px solid var(--color-sidebar-nav-active-border);
 }
 
 .sidebar-footer {
@@ -190,11 +190,19 @@
 
     .nav-items {
         flex-direction: row;
-        overflow-x: auto;
-        padding: 8px;
+        flex-wrap: wrap;
+        align-content: flex-start;
+        gap: 4px;
+        padding: 8px 12px;
+        overflow-x: visible;
     }
 
     .nav-item {
+        flex: 1 1 calc(50% - 4px);
+        min-width: min(140px, 100%);
+        width: auto;
+        padding: 10px 12px;
+        text-align: center;
         white-space: nowrap;
         border-right: none;
         border-bottom: 3px solid transparent;
@@ -203,7 +211,7 @@
 
     .nav-item.active {
         border-right: none;
-        border-bottom-color: var(--color-orange);
+        border-bottom-color: var(--color-sidebar-nav-active-border);
     }
 
     .main-content {

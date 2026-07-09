@@ -6,6 +6,15 @@
     --color-orange-hover: #e55a2b;
     --color-orange-muted: rgba(255, 102, 51, 0.12);
 
+    /* Sidebar nav active/hover — themeable (celebration uses light text on blush shell) */
+    --color-sidebar-nav-active-text: var(--color-orange);
+    --color-sidebar-nav-active-bg: var(--color-orange-muted);
+    --color-sidebar-nav-active-border: var(--color-orange);
+
+    /* Sidebar header strip — themeable (celebration uses deep rose, not brown-black) */
+    --color-sidebar-header-bg: var(--color-black);
+    --color-sidebar-header-border: var(--color-orange);
+
     --color-denim: #0B0573;
     --color-denim-light: #1a128a;
     --color-black: #000A27;

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { SessionProvider, useSession } from '../state/appState';
 import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
@@ -366,6 +367,7 @@ describe('AttendeesView', () => {
 	});
 
 	it('loads dispatch options and filters attendees by received outcome', async () => {
+		const user = userEvent.setup();
 		renderAttendees();
 
 		await waitFor(() => {
@@ -374,9 +376,8 @@ describe('AttendeesView', () => {
 
 		expect(mockFetchEmailDispatches).toHaveBeenCalledWith('prog-1', 'ev-1', { view: 'log' });
 
-		fireEvent.change(screen.getByLabelText('Email dispatch'), {
-			target: { value: 'dsp-completed-001' },
-		});
+		await user.click(screen.getByRole('button', { name: 'Email dispatch: No dispatch filter' }));
+		await user.click(screen.getByRole('option', { name: 'Meeting Room reminder' }));
 
 		await waitFor(() => {
 			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
@@ -404,23 +405,22 @@ describe('AttendeesView', () => {
 	});
 
 	it('clears dispatch filter when dispatch select is reset', async () => {
+		const user = userEvent.setup();
 		renderAttendees();
 
 		await waitFor(() => {
 			expect(screen.getByLabelText('Email dispatch')).toBeInTheDocument();
 		});
 
-		fireEvent.change(screen.getByLabelText('Email dispatch'), {
-			target: { value: 'dsp-completed-001' },
-		});
+		await user.click(screen.getByRole('button', { name: 'Email dispatch: No dispatch filter' }));
+		await user.click(screen.getByRole('option', { name: 'Meeting Room reminder' }));
 
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Received' })).toBeInTheDocument();
 		});
 
-		fireEvent.change(screen.getByLabelText('Email dispatch'), {
-			target: { value: '' },
-		});
+		await user.click(screen.getByRole('button', { name: 'Email dispatch: Meeting Room reminder' }));
+		await user.click(screen.getByRole('option', { name: 'No dispatch filter' }));
 
 		await waitFor(() => {
 			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {

@@ -1,0 +1,36 @@
+---
+description: UI component and styling constraints — tokens, shared CSS, existing components
+globs: src/**,css/**
+alwaysApply: false
+---
+
+# UI stack (EMS)
+
+Do **not** add Tailwind, Shadcn, Tremor, or Mantine. EMS uses CSS modules + brand tokens.
+
+## Styling
+
+- Colours, radii, shadows: `css/tokens.css` only — never hardcode hex outside tokens
+- Shared primitives: `css/components.css` (`.btn`, `.card`, `.form-group`, tables, badges)
+- View-specific layout: `*.module.css` beside the component
+- No inline `style={}` except skeleton width placeholders in `LoadingState`
+
+## Reuse before inventing
+
+| Need | Use |
+| :--- | :--- |
+| Page title + meta | `TopBar` |
+| Async loading | `LoadingState` (variant + skeleton) |
+| No data | `EmptyState` |
+| Success / error feedback | `useToast()` |
+| Destructive confirm | `useConfirm()` / `ConfirmModal` |
+| Charts | `ConversionChart` only (Chart.js via npm bundle) |
+| Modal focus trap | `useModalFocusTrap` |
+
+## Patterns
+
+- Staff tool UX: tables for lists, left sidebar, event-first context (see `frontend-ux-laws.mdc`)
+- Layout inspiration: follow journeys in `docs/product-flows.md` — do not import external template libraries
+- AI chat UI (`assistant-ui`, Vercel AI SDK): deferred — park in `TODO.md` if requested
+
+See also: `frontend-patterns.mdc`, `frontend-responsive.mdc`, `docs/ui-component-catalog.md`.

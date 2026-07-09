@@ -9,6 +9,15 @@
 	--color-orange-hover: #b07878;
 	--color-orange-muted: rgba(235, 176, 176, 0.24);
 
+	/* Sidebar active item — ice on blush (orange token is too close to denim bg) */
+	--color-sidebar-nav-active-text: var(--color-ice);
+	--color-sidebar-nav-active-bg: rgba(252, 244, 244, 0.16);
+	--color-sidebar-nav-active-border: var(--color-white);
+
+	/* Sidebar header — deep dusty rose (same hue as shell; avoids muddy brown-black) */
+	--color-sidebar-header-bg: #9f6b6b;
+	--color-sidebar-header-border: #f2c1c1;
+
 	/* Shell — deeper dusty mauve (sidebar), still in the bottle-pink family */
 	--color-denim: #be8282;
 	--color-denim-light: #b08888;

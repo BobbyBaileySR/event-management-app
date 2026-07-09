@@ -1,0 +1,43 @@
+---
+description: WCAG 2.2 accessibility rules for UI components and views
+globs: src/**,css/**,index.html
+alwaysApply: false
+---
+
+# Accessibility (WCAG 2.2)
+
+## Structure
+
+- `<html lang="en">` in `index.html`
+- One `<h1>` per view via `TopBar` — subsections use `<h2>`+
+- Landmarks: `<nav>`, `<main>`, `<header>` where appropriate
+- Tabular data: `<table>`, `<th scope="col|row">`
+- Form groups: `<label htmlFor>` paired with input `id`; complex groups use `<fieldset>` + `<legend>`
+
+## Interaction
+
+- Actionable controls: `<button type="button|submit">` or `<a href>` — never clickable `<div>`
+- **No `autofocus`** anywhere
+- Skip link in `AppLayout`: first focusable element jumps to `#main-content`
+- Modals: `role="dialog"`, `aria-modal="true"`, labelled title, focus trap via `useModalFocusTrap`
+- Hidden panels: remove from tab order when collapsed (`tabIndex={-1}` or `hidden`)
+
+## Keyboard and focus
+
+- Visible `:focus-visible` on buttons, links, inputs, custom selects (see `css/components.css`)
+- Sticky chrome must not obscure focused elements — use `scroll-padding-top` on `main`
+- Do not trap keyboard focus outside modals
+
+## Visual
+
+- Text contrast ≥ 4.5:1; large text / UI borders / icons ≥ 3:1 — use token pairs from `tokens.css`
+- Form validation: error text + `role="alert"` / `aria-describedby` — never colour alone
+- Touch targets ≥ 44×44px on interactive controls (see `frontend-responsive.mdc`)
+- `prefers-reduced-motion`: disable or simplify animations globally
+
+## Media and motion
+
+- No autoplay audio/video
+- Respect `prefers-reduced-motion` for spinners, shimmer, transitions
+
+See also: `frontend-security.mdc` (XSS — dynamic text via `{value}` only).

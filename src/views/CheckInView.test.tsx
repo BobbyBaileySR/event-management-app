@@ -619,7 +619,7 @@ describe('CheckInView', () => {
 				expect(screen.getByText('Jane Doe')).toBeInTheDocument();
 			});
 
-			fireEvent.click(screen.getByText('Jane Doe'));
+			fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
 
 			await waitFor(() => {
 				expect(screen.getByRole('button', { name: 'Confirm check-in' })).toBeInTheDocument();

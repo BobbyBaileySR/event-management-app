@@ -1,0 +1,15 @@
+.view {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.card {
+	margin-top: 0;
+}
+
+.message {
+	color: var(--color-danger);
+	margin-bottom: 16px;
+	font-weight: 600;
+}

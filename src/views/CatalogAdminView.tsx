@@ -187,7 +187,11 @@ export function CatalogAdminView() {
 								Edit Program
 							</button>
 						) : null}
-						<button type="button" className={styles.secondary} onClick={() => void toggleProgramArchive(program)}>
+						<button
+							type="button"
+							className={program.archived ? styles.secondary : styles.danger}
+							onClick={() => void toggleProgramArchive(program)}
+						>
 							{program.archived ? 'Unarchive Program' : 'Archive Program'}
 						</button>
 					</div>
@@ -251,7 +255,14 @@ export function CatalogAdminView() {
 			</div>
 
 			{loading ? <LoadingState message="Loading catalog…" variant="panel" skeleton="table" /> : null}
-			{error ? <p className={styles.error}>{error}</p> : null}
+			{error ? (
+				<div className={styles.panel} role="alert">
+					<p className={styles.error}>{error}</p>
+					<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadCatalog()}>
+						Try again
+					</button>
+				</div>
+			) : null}
 
 			{isActiveTab ? (
 				<section className={styles.panel}>

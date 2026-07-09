@@ -16,6 +16,9 @@
 	flex-direction: column;
 	gap: 4px;
 	min-width: min(100%, 220px);
+}
+
+.catalogBar .field {
 	flex: 1 1 220px;
 }
 

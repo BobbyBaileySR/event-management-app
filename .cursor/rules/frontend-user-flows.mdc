@@ -1,0 +1,40 @@
+---
+description: Standard user flows and required UI states for EMS screens
+globs: src/views/**,docs/product-flows.md,docs/ui-routes.md
+alwaysApply: false
+---
+
+# User flows
+
+Before building or changing a screen, read the matching journey in [docs/product-flows.md](../../docs/product-flows.md) and route entry in [docs/ui-routes.md](../../docs/ui-routes.md).
+
+## EMS flow map
+
+1. **Sign-in** → `LoginView` → Google → `/auth/exchange`
+2. **Catalog scope** → `CatalogPickers` (Program + Event) required for slice views
+3. **Operations** → Attendees / Check-in / Email under selected catalog scope
+4. **Admin** → Catalog admin, Audit log
+
+Email always lives under event/catalog context — never a standalone top-level app.
+
+## Required states per data screen
+
+Every view that fetches data must implement:
+
+| State | Component / pattern |
+| :--- | :--- |
+| Loading | `LoadingState` with appropriate skeleton |
+| Empty | `EmptyState` with helpful next action |
+| Error | Visible message (`role="alert"`) + retry where sensible |
+| Success mutation | `showToast()` |
+
+## Standard flows (checklist)
+
+- **Check-in:** search / scan / walk-in → confirm → toast → list refresh
+- **Send email:** compose → preview recipients → send or schedule → toast → log tab
+- **Catalog CRUD:** modal form → validate → save → toast → tree refresh
+- **Archive / cancel:** confirm dialog → API → toast
+
+Do not duplicate full journey prose here — update `product-flows.md` when product behaviour changes.
+
+See also: `frontend-ui-stack.mdc`, `frontend-ux-laws.mdc`.
