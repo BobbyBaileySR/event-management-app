@@ -82,3 +82,4 @@ Issue tracker, triage labels, domain docs: see `docs/agents/` and [CONTEXT-MAP.m
 - [ ] No secrets, auth bypass, or XSS (`{value}` only — never `dangerouslySetInnerHTML`)
 - [ ] Vitest specs for new views/services
 - [ ] [CHANGELOG.md](CHANGELOG.md) updated
+- [ ] Slice QA / sign-off: **`quickstart.md` §C** operator security checks filled from [docs/slice-operator-security-qa-template.md](docs/slice-operator-security-qa-template.md) when slice reaches manual QA

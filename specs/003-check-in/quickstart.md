@@ -262,12 +262,14 @@ Or: `brew install qrencode` then `qrencode -o ~/Desktop/checkin-qr.png -s 10 'PA
 
 ---
 
-### B7. Security smoke
+### B7. Security smoke (functional — brief)
 
 | # | Check | Expected |
 | :---: | :--- | :--- |
 | 1 | Hostile strings in attendee name/company (Vitest + optional browser spot-check). | Rendered as **text**, not HTML (XSS guard). |
 | 2 | Non-admin access attempts (B1). | No attendee PII exposed. |
+
+**Operator sign-off:** Slice 1 predates the standard §C doc. For **security comfort** before Live, use **[slice-1.5-tier-a/signoff-checklist.md](../slice-1.5-tier-a/signoff-checklist.md)** (Tier A manual smoke) plus B1/B7 above. **New slices** must add full **§C** from [docs/slice-operator-security-qa-template.md](../../docs/slice-operator-security-qa-template.md).
 
 ---
 
