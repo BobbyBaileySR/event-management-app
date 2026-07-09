@@ -337,3 +337,142 @@ export interface PatchCatalogEventBody {
 	capacity?: number | null;
 	walkInFormUrl?: string | null;
 }
+
+// --- Email dispatch (Slice 2) ---
+
+export type DispatchStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+
+export type DispatchAudienceType =
+	| 'registered_all'
+	| 'registered_checked_in'
+	| 'registered_not_checked_in'
+	| 'registered_manual'
+	| 'hubspot_segment';
+
+export type HubSpotSegmentKind = 'active' | 'static';
+
+export type DispatchAudienceRequest =
+	| { type: 'registered_all' | 'registered_checked_in' | 'registered_not_checked_in' }
+	| { type: 'registered_manual'; contactIds: string[] }
+	| { type: 'hubspot_segment'; segmentId: string };
+
+export interface DispatchAudienceRegistered {
+	type: 'registered_all' | 'registered_checked_in' | 'registered_not_checked_in';
+}
+
+export interface DispatchAudienceManual {
+	type: 'registered_manual';
+	contactIds: string[];
+}
+
+export interface DispatchAudienceSegment {
+	type: 'hubspot_segment';
+	segmentId: string;
+	segmentName: string;
+	segmentKind: HubSpotSegmentKind;
+}
+
+export type DispatchAudience = DispatchAudienceRegistered | DispatchAudienceManual | DispatchAudienceSegment;
+
+export interface EmailDispatchLimits {
+	dispatchLimitPerHour: number;
+	dispatchUsedThisHour: number;
+	largeSendThreshold: number;
+}
+
+export interface MarketingTemplateOption {
+	id: string;
+	name: string;
+	description?: string;
+}
+
+export interface EmailTemplatesListResponse {
+	templates: MarketingTemplateOption[];
+}
+
+export interface HubSpotSegmentOption {
+	id: string;
+	name: string;
+	kind: HubSpotSegmentKind;
+}
+
+export interface EmailSegmentsListResponse {
+	segments: HubSpotSegmentOption[];
+}
+
+export interface EmailPreviewRequestBody {
+	templateId: string;
+	audience: DispatchAudienceRequest;
+}
+
+export interface EmailPreviewResponse {
+	recipientCount: number;
+}
+
+export interface CreateEmailDispatchBody {
+	dispatchName: string;
+	templateId: string;
+	audience: DispatchAudienceRequest;
+	scheduledAtUtc: string | null;
+	timezone: string | null;
+	idempotencyKey: string;
+}
+
+export interface CreateEmailDispatchResponse {
+	dispatchId: string;
+	status: DispatchStatus;
+	recipientCountPlanned: number;
+	scheduledAtUtc: string | null;
+	timezone: string | null;
+}
+
+export interface EmailDispatchListItem {
+	dispatchId: string;
+	dispatchName: string;
+	templateName: string;
+	audienceSummary: string;
+	status: DispatchStatus;
+	scheduledAtUtc: string | null;
+	timezone: string | null;
+	recipientCountPlanned: number;
+	recipientCountSent: number;
+	createdBy: string;
+	createdAt: string;
+	lockWarning?: boolean;
+}
+
+export interface EmailDispatchListResponse {
+	dispatches: EmailDispatchListItem[];
+	page: number;
+	pageSize: number;
+	total: number;
+}
+
+export interface DispatchRecipientRow {
+	dispatchId: string;
+	contactId: string;
+	email: string;
+	outcome: 'sent';
+	sentAt: string;
+}
+
+export interface EmailDispatchDetailResponse {
+	dispatch: EmailDispatchListItem & { completedAt: string | null };
+	recipients: DispatchRecipientRow[];
+	page: number;
+	pageSize: number;
+	total: number;
+}
+
+export interface CancelEmailDispatchResponse {
+	dispatchId: string;
+	status: 'cancelled';
+}
+
+export interface PatchEmailDispatchBody {
+	dispatchName: string;
+	templateId: string;
+	audience: DispatchAudienceRequest;
+	scheduledAtUtc: string | null;
+	timezone: string | null;
+}

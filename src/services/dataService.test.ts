@@ -1,7 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../config';
 import { MOCK_EVENTS, resetMockCheckInState } from '../data/mockData';
-import { adjustCapacity, checkInScan, confirmCheckIn, createDataService, fetchCapacityStatus, fetchEvents, fetchSliceAttendees } from './dataService';
+import { resetMockEmailDispatchState } from '../data/mockData';
+import {
+	adjustCapacity,
+	checkInScan,
+	confirmCheckIn,
+	createDataService,
+	createEmailDispatch,
+	fetchCapacityStatus,
+	fetchEmailDispatchDetail,
+	fetchEmailLimits,
+	fetchEvents,
+	fetchSliceAttendees,
+} from './dataService';
 
 vi.mock('../api/client', () => ({
 	apiRequest: vi.fn(),
@@ -247,5 +259,137 @@ describe('adjustCapacity mock path', () => {
 	it('rejects adjust down at floor', async () => {
 		await adjustCapacity(programId, eventId, 'down');
 		await expect(adjustCapacity(programId, eventId, 'down')).rejects.toThrow('capacity_at_floor');
+	});
+});
+
+describe('email dataService catalog-scoped paths', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+	const programId = 'prog-atlassian-2026';
+	const eventId = 'ev-mr-2026';
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockEmailDispatchState();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('returns mock email limits without calling apiRequest', async () => {
+		const result = await fetchEmailLimits(programId, eventId);
+		expect(result).toMatchObject({
+			dispatchLimitPerHour: 10,
+			largeSendThreshold: CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD,
+		});
+		expect(mockedApiRequest).not.toHaveBeenCalled();
+	});
+
+	it('calls catalog-scoped live routes with bearer token when USE_MOCK_API is false', async () => {
+		CONFIG.USE_MOCK_API = false;
+		mockedApiRequest.mockImplementation(async (route) => {
+			if (route.endsWith('/email/limits')) {
+				return { dispatchLimitPerHour: 10, dispatchUsedThisHour: 1, largeSendThreshold: 50 };
+			}
+			if (route.endsWith('/email/templates')) {
+				return { templates: [{ id: '123456789', name: '48-hour reminder', description: 'Marketing Hub' }] };
+			}
+			if (route.endsWith('/email/preview')) {
+				return { recipientCount: 2 };
+			}
+			if (route.endsWith('/email/dispatches') && !route.includes('?')) {
+				return {
+					dispatchId: 'dsp-live-001',
+					status: 'processing',
+					recipientCountPlanned: 2,
+					scheduledAtUtc: null,
+					timezone: null,
+				};
+			}
+			if (route.includes('/email/dispatches?view=log')) {
+				return { dispatches: [], page: 1, pageSize: 50, total: 0 };
+			}
+			return {};
+		});
+
+		const service = createDataService('email-token');
+		await service.fetchEmailLimits(programId, eventId);
+		await service.fetchEmailTemplates(programId, eventId);
+		await service.previewEmailDispatch(programId, eventId, {
+			templateId: '123456789',
+			audience: { type: 'registered_all' },
+		});
+		await service.createEmailDispatch(programId, eventId, {
+			dispatchName: 'Live send',
+			templateId: '123456789',
+			audience: { type: 'registered_all' },
+			scheduledAtUtc: null,
+			timezone: null,
+			idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
+		});
+		await service.fetchEmailDispatches(programId, eventId, { view: 'log' });
+
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`programs/${programId}/events/${eventId}/email/limits`,
+			{},
+			{ token: 'email-token' },
+		);
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`programs/${programId}/events/${eventId}/email/templates`,
+			{},
+			{ token: 'email-token' },
+		);
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`programs/${programId}/events/${eventId}/email/preview`,
+			expect.objectContaining({ method: 'POST' }),
+			{ token: 'email-token' },
+		);
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`programs/${programId}/events/${eventId}/email/dispatches`,
+			expect.objectContaining({ method: 'POST' }),
+			{ token: 'email-token' },
+		);
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`programs/${programId}/events/${eventId}/email/dispatches?view=log`,
+			{},
+			{ token: 'email-token' },
+		);
+	});
+
+	it('dedupes createEmailDispatch in mock mode via idempotency key', async () => {
+		const body = {
+			dispatchName: 'QA immediate send',
+			templateId: '123456789',
+			audience: { type: 'registered_all' as const },
+			scheduledAtUtc: null,
+			timezone: null,
+			idempotencyKey: '660e8400-e29b-41d4-a716-446655440001',
+		};
+
+		const first = await createEmailDispatch(programId, eventId, body);
+		const second = await createEmailDispatch(programId, eventId, body);
+
+		expect(second.dispatchId).toBe(first.dispatchId);
+		expect(mockedApiRequest).not.toHaveBeenCalled();
+	});
+
+	it('fetches dispatch detail from mock store with catalog context', async () => {
+		const created = await createEmailDispatch(programId, eventId, {
+			dispatchName: 'Detail test',
+			templateId: '123456789',
+			audience: { type: 'registered_all' },
+			scheduledAtUtc: null,
+			timezone: null,
+			idempotencyKey: '770e8400-e29b-41d4-a716-446655440002',
+		});
+
+		const detail = await fetchEmailDispatchDetail(programId, eventId, created.dispatchId);
+		expect(detail.dispatch.dispatchId).toBe(created.dispatchId);
+		expect(detail.recipients.length).toBeGreaterThan(0);
+		expect(detail.recipients.every((row) => row.outcome === 'sent')).toBe(true);
 	});
 });

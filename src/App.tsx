@@ -44,6 +44,7 @@ function AuthGate() {
 					<Route path="/events" element={<ViewRouter />} />
 					<Route path="/events/attendees" element={<ViewRouter />} />
 					<Route path="/events/check-in" element={<ViewRouter />} />
+					<Route path="/events/email" element={<ViewRouter />} />
 					<Route path="/catalog" element={<ViewRouter />} />
 					<Route path="/audit" element={<ViewRouter />} />
 					<Route path="/events/:eventId" element={<ViewRouter />} />

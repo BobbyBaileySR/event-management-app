@@ -22,6 +22,15 @@ import {
 	mockCreateProgram,
 	mockUpdateEvent,
 	mockUpdateProgram,
+	getMockEmailLimits,
+	getMockEmailTemplates,
+	getMockEmailSegments,
+	mockPreviewEmailDispatch,
+	mockCreateEmailDispatch,
+	getMockEmailDispatches,
+	getMockEmailDispatchDetail,
+	mockUpdateEmailDispatch,
+	mockCancelEmailDispatch,
 } from '../data/mockData';
 import {
 	normalizeAttendeesResponse,
@@ -29,6 +38,14 @@ import {
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
 	normalizeCapacityStatusResponse,
+	normalizeEmailLimitsResponse,
+	normalizeEmailTemplatesResponse,
+	normalizeEmailSegmentsResponse,
+	normalizeEmailPreviewResponse,
+	normalizeCreateEmailDispatchResponse,
+	normalizeEmailDispatchListResponse,
+	normalizeEmailDispatchDetailResponse,
+	normalizeCancelEmailDispatchResponse,
 	normalizeEventResponse,
 	normalizeEventsResponse,
 	normalizeSliceAttendeesResponse,
@@ -48,6 +65,18 @@ import type {
 	ConfirmCheckInResponse,
 	CapacityStatus,
 	AdjustCapacityDirection,
+	CancelEmailDispatchResponse,
+	CreateEmailDispatchBody,
+	CreateEmailDispatchResponse,
+	EmailDispatchDetailResponse,
+	EmailDispatchLimits,
+	EmailDispatchListResponse,
+	EmailPreviewRequestBody,
+	EmailPreviewResponse,
+	EmailSegmentsListResponse,
+	EmailTemplatesListResponse,
+	PatchEmailDispatchBody,
+	EmailDispatchListItem,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
@@ -571,6 +600,248 @@ export async function updateEvent(
 	);
 }
 
+function emailRoute(programId: string, eventId: string, suffix = ''): string {
+	return `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/email${suffix}`;
+}
+
+function mapMockEmailError(error: unknown): never {
+	if (error instanceof Error) {
+		throw error;
+	}
+	throw new Error('Email dispatch request failed');
+}
+
+export async function fetchEmailLimits(
+	programId: string,
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<EmailDispatchLimits> {
+	const { token } = options;
+	return withMockFallback(
+		() => mockDelay(getMockEmailLimits(programId, eventId)),
+		async () =>
+			normalizeEmailLimitsResponse(
+				((await apiRequest(emailRoute(programId, eventId, '/limits'), {}, requestOptions(token))) ?? {}) as Record<
+					string,
+					unknown
+				>,
+			),
+	);
+}
+
+export async function fetchEmailTemplates(
+	programId: string,
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<EmailTemplatesListResponse> {
+	const { token } = options;
+	return withMockFallback(
+		() => mockDelay(getMockEmailTemplates(programId, eventId)),
+		async () =>
+			normalizeEmailTemplatesResponse(
+				((await apiRequest(emailRoute(programId, eventId, '/templates'), {}, requestOptions(token))) ?? {}) as Record<
+					string,
+					unknown
+				>,
+			),
+	);
+}
+
+export async function fetchEmailSegments(
+	programId: string,
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<EmailSegmentsListResponse> {
+	const { token } = options;
+	return withMockFallback(
+		() => mockDelay(getMockEmailSegments(programId, eventId)),
+		async () =>
+			normalizeEmailSegmentsResponse(
+				((await apiRequest(emailRoute(programId, eventId, '/segments'), {}, requestOptions(token))) ?? {}) as Record<
+					string,
+					unknown
+				>,
+			),
+	);
+}
+
+export async function previewEmailDispatch(
+	programId: string,
+	eventId: string,
+	body: EmailPreviewRequestBody,
+	options: DataServiceOptions = {},
+): Promise<EmailPreviewResponse> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(mockPreviewEmailDispatch(programId, eventId, body));
+			} catch (error) {
+				mapMockEmailError(error);
+			}
+		},
+		async () =>
+			normalizeEmailPreviewResponse(
+				((await apiRequest(
+					emailRoute(programId, eventId, '/preview'),
+					{ method: 'POST', body: JSON.stringify(body) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function createEmailDispatch(
+	programId: string,
+	eventId: string,
+	body: CreateEmailDispatchBody,
+	options: DataServiceOptions = {},
+): Promise<CreateEmailDispatchResponse> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(mockCreateEmailDispatch(programId, eventId, body));
+			} catch (error) {
+				mapMockEmailError(error);
+			}
+		},
+		async () =>
+			normalizeCreateEmailDispatchResponse(
+				((await apiRequest(
+					emailRoute(programId, eventId, '/dispatches'),
+					{ method: 'POST', body: JSON.stringify(body) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export interface FetchEmailDispatchesQuery {
+	view?: 'scheduled' | 'log';
+	page?: number;
+	pageSize?: number;
+}
+
+export async function fetchEmailDispatches(
+	programId: string,
+	eventId: string,
+	query: FetchEmailDispatchesQuery = {},
+	options: DataServiceOptions = {},
+): Promise<EmailDispatchListResponse> {
+	const { token } = options;
+	const search = new URLSearchParams();
+	if (query.view) {
+		search.set('view', query.view);
+	}
+	if (query.page) {
+		search.set('page', String(query.page));
+	}
+	if (query.pageSize) {
+		search.set('pageSize', String(query.pageSize));
+	}
+	const suffix = search.toString() ? `?${search}` : '';
+
+	return withMockFallback(
+		() => mockDelay(getMockEmailDispatches(programId, eventId, query)),
+		async () =>
+			normalizeEmailDispatchListResponse(
+				((await apiRequest(emailRoute(programId, eventId, `/dispatches${suffix}`), {}, requestOptions(token))) ??
+					{}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function fetchEmailDispatchDetail(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+	query: { page?: number; pageSize?: number } = {},
+	options: DataServiceOptions = {},
+): Promise<EmailDispatchDetailResponse> {
+	const { token } = options;
+	const search = new URLSearchParams();
+	if (query.page) {
+		search.set('page', String(query.page));
+	}
+	if (query.pageSize) {
+		search.set('pageSize', String(query.pageSize));
+	}
+	const suffix = search.toString() ? `?${search}` : '';
+
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(getMockEmailDispatchDetail(programId, eventId, dispatchId, query));
+			} catch (error) {
+				mapMockEmailError(error);
+			}
+		},
+		async () =>
+			normalizeEmailDispatchDetailResponse(
+				((await apiRequest(
+					emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}${suffix}`),
+					{},
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function updateEmailDispatch(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+	body: PatchEmailDispatchBody,
+	options: DataServiceOptions = {},
+): Promise<EmailDispatchListItem> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(mockUpdateEmailDispatch(programId, eventId, dispatchId, body));
+			} catch (error) {
+				mapMockEmailError(error);
+			}
+		},
+		async () => {
+			const response = (await apiRequest(
+				emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
+				{ method: 'PATCH', body: JSON.stringify(body) },
+				requestOptions(token),
+			)) as Record<string, unknown>;
+			return normalizeEmailDispatchListResponse({ dispatches: [response], page: 1, pageSize: 1, total: 1 })
+				.dispatches[0];
+		},
+	);
+}
+
+export async function cancelEmailDispatch(
+	programId: string,
+	eventId: string,
+	dispatchId: string,
+	options: DataServiceOptions = {},
+): Promise<CancelEmailDispatchResponse> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(mockCancelEmailDispatch(programId, eventId, dispatchId));
+			} catch (error) {
+				mapMockEmailError(error);
+			}
+		},
+		async () =>
+			normalizeCancelEmailDispatchResponse(
+				((await apiRequest(
+					emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
+					{ method: 'DELETE' },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
 /** Binds the session token to all data-service methods for use in React components. */
 export function createDataService(token?: string | null) {
 	const options: DataServiceOptions = { token };
@@ -607,6 +878,25 @@ export function createDataService(token?: string | null) {
 		updateProgram: (id: string, body: PatchCatalogProgramBody) => updateProgram(id, body, options),
 		createEvent: (body: CreateCatalogEventBody) => createEvent(body, options),
 		updateEvent: (id: string, body: PatchCatalogEventBody) => updateEvent(id, body, options),
+		fetchEmailLimits: (programId: string, eventId: string) => fetchEmailLimits(programId, eventId, options),
+		fetchEmailTemplates: (programId: string, eventId: string) => fetchEmailTemplates(programId, eventId, options),
+		fetchEmailSegments: (programId: string, eventId: string) => fetchEmailSegments(programId, eventId, options),
+		previewEmailDispatch: (programId: string, eventId: string, body: EmailPreviewRequestBody) =>
+			previewEmailDispatch(programId, eventId, body, options),
+		createEmailDispatch: (programId: string, eventId: string, body: CreateEmailDispatchBody) =>
+			createEmailDispatch(programId, eventId, body, options),
+		fetchEmailDispatches: (programId: string, eventId: string, query?: FetchEmailDispatchesQuery) =>
+			fetchEmailDispatches(programId, eventId, query, options),
+		fetchEmailDispatchDetail: (
+			programId: string,
+			eventId: string,
+			dispatchId: string,
+			query?: { page?: number; pageSize?: number },
+		) => fetchEmailDispatchDetail(programId, eventId, dispatchId, query, options),
+		updateEmailDispatch: (programId: string, eventId: string, dispatchId: string, body: PatchEmailDispatchBody) =>
+			updateEmailDispatch(programId, eventId, dispatchId, body, options),
+		cancelEmailDispatch: (programId: string, eventId: string, dispatchId: string) =>
+			cancelEmailDispatch(programId, eventId, dispatchId, options),
 	};
 }
 

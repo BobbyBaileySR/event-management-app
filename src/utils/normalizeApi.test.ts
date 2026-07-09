@@ -6,6 +6,14 @@ import {
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
 	normalizeCapacityStatusResponse,
+	normalizeCreateEmailDispatchResponse,
+	normalizeCancelEmailDispatchResponse,
+	normalizeEmailDispatchDetailResponse,
+	normalizeEmailDispatchListResponse,
+	normalizeEmailLimitsResponse,
+	normalizeEmailPreviewResponse,
+	normalizeEmailSegmentsResponse,
+	normalizeEmailTemplatesResponse,
 	normalizeEvent,
 	normalizeEventResponse,
 	normalizeEventsResponse,
@@ -467,5 +475,147 @@ describe('normalizeCapacityStatusResponse', () => {
 	it('normalizes unset or zero capacity to null', () => {
 		expect(normalizeCapacityStatusResponse({ capacity: 0 }).capacity).toBeNull();
 		expect(normalizeCapacityStatusResponse({ capacity: null }).capacity).toBeNull();
+	});
+});
+
+describe('normalizeEmailLimitsResponse', () => {
+	it('maps dispatch limit fields', () => {
+		expect(
+			normalizeEmailLimitsResponse({
+				dispatchLimitPerHour: 10,
+				dispatchUsedThisHour: 2,
+				largeSendThreshold: 50,
+			}),
+		).toEqual({
+			dispatchLimitPerHour: 10,
+			dispatchUsedThisHour: 2,
+			largeSendThreshold: 50,
+		});
+	});
+});
+
+describe('normalizeEmailTemplatesResponse', () => {
+	it('maps template list items', () => {
+		const result = normalizeEmailTemplatesResponse({
+			templates: [{ id: '123', name: 'Reminder', description: 'Marketing Hub' }],
+		});
+
+		expect(result.templates).toEqual([{ id: '123', name: 'Reminder', description: 'Marketing Hub' }]);
+	});
+});
+
+describe('normalizeEmailSegmentsResponse', () => {
+	it('maps segment kinds', () => {
+		const result = normalizeEmailSegmentsResponse({
+			segments: [
+				{ id: '987', name: 'VIP', kind: 'active' },
+				{ id: '654', name: 'Static list', kind: 'static' },
+				{ id: 'bad', name: 'Unknown', kind: 'other' },
+			],
+		});
+
+		expect(result.segments[0]?.kind).toBe('active');
+		expect(result.segments[1]?.kind).toBe('static');
+		expect(result.segments[2]?.kind).toBe('active');
+	});
+});
+
+describe('normalizeEmailPreviewResponse', () => {
+	it('maps recipient count', () => {
+		expect(normalizeEmailPreviewResponse({ recipientCount: 42 })).toEqual({ recipientCount: 42 });
+	});
+});
+
+describe('normalizeCreateEmailDispatchResponse', () => {
+	it('maps create dispatch response', () => {
+		expect(
+			normalizeCreateEmailDispatchResponse({
+				dispatchId: 'dsp-1',
+				status: 'processing',
+				recipientCountPlanned: 12,
+				scheduledAtUtc: null,
+				timezone: null,
+			}),
+		).toEqual({
+			dispatchId: 'dsp-1',
+			status: 'processing',
+			recipientCountPlanned: 12,
+			scheduledAtUtc: null,
+			timezone: null,
+		});
+	});
+});
+
+describe('normalizeEmailDispatchListResponse', () => {
+	it('maps dispatch list rows with lockWarning', () => {
+		const result = normalizeEmailDispatchListResponse({
+			dispatches: [
+				{
+					dispatchId: 'dsp-1',
+					dispatchName: 'Reminder',
+					templateName: '48-hour reminder',
+					audienceSummary: 'All registered (2)',
+					status: 'pending',
+					scheduledAtUtc: '2026-12-15T08:00:00.000Z',
+					timezone: 'Europe/London',
+					recipientCountPlanned: 2,
+					recipientCountSent: 0,
+					createdBy: 'admin@adaptavist.com',
+					createdAt: '2026-10-01T10:00:00.000Z',
+					lockWarning: true,
+				},
+			],
+			page: 1,
+			pageSize: 50,
+			total: 1,
+		});
+
+		expect(result.dispatches[0]?.lockWarning).toBe(true);
+		expect(result.total).toBe(1);
+	});
+});
+
+describe('normalizeEmailDispatchDetailResponse', () => {
+	it('maps dispatch detail and recipients', () => {
+		const result = normalizeEmailDispatchDetailResponse({
+			dispatch: {
+				dispatchId: 'dsp-1',
+				dispatchName: 'Reminder',
+				templateName: '48-hour reminder',
+				audienceSummary: 'Checked in only (1)',
+				status: 'completed',
+				scheduledAtUtc: null,
+				timezone: null,
+				recipientCountPlanned: 1,
+				recipientCountSent: 1,
+				createdBy: 'admin@adaptavist.com',
+				createdAt: '2026-10-01T10:00:00.000Z',
+				completedAt: '2026-10-01T10:02:00.000Z',
+			},
+			recipients: [
+				{
+					dispatchId: 'dsp-1',
+					contactId: 'c-001',
+					email: 'jane@acme.com',
+					outcome: 'sent',
+					sentAt: '2026-10-01T10:01:30.000Z',
+				},
+			],
+			page: 1,
+			pageSize: 50,
+			total: 1,
+		});
+
+		expect(result.dispatch.completedAt).toBe('2026-10-01T10:02:00.000Z');
+		expect(result.recipients[0]?.email).toBe('jane@acme.com');
+	});
+});
+
+describe('normalizeCancelEmailDispatchResponse', () => {
+	it('maps cancelled status', () => {
+		expect(normalizeCancelEmailDispatchResponse({ dispatchId: 'dsp-1', status: 'cancelled' })).toEqual({
+			dispatchId: 'dsp-1',
+			status: 'cancelled',
+		});
 	});
 });
