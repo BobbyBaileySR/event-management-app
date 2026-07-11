@@ -31,33 +31,52 @@ export function buildTimeSlot(hour: number, minute: number): string {
 	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-export function defaultScheduleDate(): string {
-	const formatter = new Intl.DateTimeFormat('en-CA', {
-		timeZone: resolveDefaultTimezone(),
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-	});
-	return formatter.format(new Date());
+export interface ScheduleSlot {
+	/** Calendar date in the default timezone, `YYYY-MM-DD`. */
+	date: string;
+	hour: number;
+	minute: (typeof SCHEDULE_MINUTE_OPTIONS)[number];
 }
 
-export function defaultScheduleHour(): number {
-	const formatter = new Intl.DateTimeFormat('en-GB', {
-		timeZone: resolveDefaultTimezone(),
-		hour: '2-digit',
-		hour12: false,
-	});
-	return Number(formatter.format(new Date()));
-}
+/**
+ * Suggest the next selectable 15-minute schedule slot from a single clock reading.
+ *
+ * All three parts (date, hour, minute) are derived from one `now`, so rounding the
+ * minute up to the next quarter-hour rolls the hour — and the calendar day — forward
+ * correctly. This avoids the past-time defaults that occurred when the minute rounded
+ * from :46–:59 up to :60 without advancing the hour (e.g. 10:53 → 10:00 today).
+ *
+ * `now` is injectable for testing.
+ */
+export function defaultScheduleSlot(now: Date = new Date()): ScheduleSlot {
+	const timeZone = resolveDefaultTimezone();
+	const parts = readZonedParts(now.toISOString(), timeZone);
 
-export function defaultScheduleMinute(): (typeof SCHEDULE_MINUTE_OPTIONS)[number] {
-	const formatter = new Intl.DateTimeFormat('en-GB', {
-		timeZone: resolveDefaultTimezone(),
-		minute: '2-digit',
-	});
-	const minute = Number(formatter.format(new Date()));
-	const rounded = Math.ceil(minute / 15) * 15;
-	return (rounded === 60 ? 0 : rounded) as (typeof SCHEDULE_MINUTE_OPTIONS)[number];
+	let year = Number(parts.year);
+	let month = Number(parts.month);
+	let day = Number(parts.day);
+	let hour = Number(parts.hour) % 24;
+	const minute = Number(parts.minute);
+
+	let roundedMinute = Math.ceil(minute / 15) * 15;
+	if (roundedMinute === 60) {
+		roundedMinute = 0;
+		hour += 1;
+	}
+	if (hour === 24) {
+		hour = 0;
+		// Advance one calendar day via UTC math so month/year boundaries are handled.
+		const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+		year = nextDay.getUTCFullYear();
+		month = nextDay.getUTCMonth() + 1;
+		day = nextDay.getUTCDate();
+	}
+
+	return {
+		date: `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+		hour,
+		minute: roundedMinute as (typeof SCHEDULE_MINUTE_OPTIONS)[number],
+	};
 }
 
 function readZonedParts(isoInstant: string, timeZone: string): Record<string, string> {

@@ -6,7 +6,7 @@ Parked work, optional hardening, and deferred decisions for the static EMS UI.
 
 **AI agents:** When the user skips or defers work, add an entry here (see `../.cursor/rules/ems-todo-discipline.mdc`).
 
-> **Last updated:** 2026-07-09 (Slice 007 audit log UX parked for roadmap)
+> **Last updated:** 2026-07-11 (FE-TECH-007 data-seam reshape parked from architecture review)
 
 ---
 
@@ -138,11 +138,10 @@ Cross-folder checklist — mirror in [../Backend/TODO.md](../Backend/TODO.md).
 
 ## Code quality & polish (optional — no blueprint phase)
 
-_All optional polish items below are done — see **Done (archive)**._
-
 | ID | Item | Status | Phase | Also affects | Notes |
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | FE-TECH-005 | **Audit display: surface previous/new values when backend adds them** | planned | Slice 1.5 | Backend | **→ FE-SLICE15-002** (viewer) + **BE-SLICE15-005** (field-level PATCH audit). Surface `metadata.previous` / `metadata.next` in audit viewer when present. |
+| FE-TECH-007 | **Reshape the data seam: 31 endpoints → feature adapters** | planned | Optional | — | Architecture review 2026-07-11 (report item #4 — the only one of six deferred). `src/services/dataService.ts` (~921 ln, ~31 fns) mirrors the backend 1:1; `createDataService` re-binds all 31 to the token (~62 ln); `src/data/mockData.ts` (~1,323 ln) is coupled per-operation via `withMockFallback`; some legacy duplicate/unused methods remain. Plan (incremental, tests green): (1) delete caller-less legacy methods; (2) group ops into feature ports (Catalog/Attendee/CheckIn/Email); (3) pick real-vs-mock + bind token **once** at the seam (driven by `src/config.ts`), not per-operation. Keep every method mapped to `docs/api-contract.md`. |
 
 ---
 
