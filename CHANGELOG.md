@@ -6,6 +6,28 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ---
 
+## 2026-07-11
+
+### Email dispatch — extract workflow into a testable hook (behaviour-preserving)
+
+- **`src/hooks/useEmailDispatchWorkflow.ts`** (new): Extracted the entire email-dispatch workflow — all state (~43 fields), effects, and actions (compose, preview, send now, schedule, edit, cancel, dispatch detail) — out of the view into a dedicated hook. The hook owns the invariants (large-send confirmation gate + `largeSendConfirmed` stamping, schedule lock-warning derivation, `dispatch_locked` → friendly toast on edit/cancel, empty-audience guards) and takes its dependencies (`data`, `confirm`, `showToast`, catalog `programId`/`evId`) as explicit parameters so the logic is testable without the DOM. A derived `phase` value (`loading`/`draft`/`previewing`/`submitting`/`editing`/`savingEdit`/`cancelling`) exposes the state machine for assertions; it is not consumed by the view. No API calls or request shapes changed.
+- **`src/views/EmailDispatchView.tsx`**: Reduced from ~1,227 lines to presentation + wiring — it now calls `useEmailDispatchWorkflow` and renders the returned state/actions. JSX, markup, CSS classes, `data-testid`s, and user-visible behaviour are unchanged; the view keeps only presentational helpers (`renderScheduleFields`, `attendeeDisplayName`, title/meta, schedule option constants).
+- **`src/hooks/useEmailDispatchWorkflow.test.ts`** (new): DOM-free Vitest unit test driving the hook via `renderHook`. Asserts the state transitions and the large-send gate directly: draft load/defaults, send-now below threshold (no confirm, no `largeSendConfirmed`), large-send confirm required + `largeSendConfirmed: true` when confirmed, abort when declined, schedule-for-later switching to the scheduled tab, edit open/close, `dispatch_locked` handling, and the cancel confirmation gate. The existing DOM-driven `EmailDispatchView.test.tsx` continues to pass unchanged.
+
+### Email schedule — fix past-time default when the minute rounds past :45
+
+- **`src/utils/emailSchedule.ts`**: Replaced the separate `defaultScheduleDate` / `defaultScheduleHour` / `defaultScheduleMinute` helpers (each read its own `new Date()`) with a single `defaultScheduleSlot(now = new Date())` that derives date, hour, and minute from one clock. Rounding the minute up to the next quarter-hour now rolls the hour — and the calendar day (incl. month/year boundaries) — forward, so the suggested default is never in the past. Previously, between :46 and :59 the minute wrapped to :00 without advancing the hour (e.g. 10:53 suggested 10:00 today). `now` is injectable for testing.
+- **`src/views/EmailDispatchView.tsx`**: Updated the only caller (compose + edit schedule defaults and the edit-modal fallback) to use `defaultScheduleSlot`; UI behaviour is otherwise unchanged.
+- **`src/utils/emailSchedule.test.ts`** (new): Vitest coverage for the :46–:59 hour rollover, the 23:5x day rollover, month/year boundary rollovers, and that every minute maps to a valid 15-minute slot.
+
+### Tooling — install architecture-review skills
+
+- **`.cursor/skills/improve-codebase-architecture/`**, **`.cursor/skills/codebase-design/`**: Added Matt Pocock's `improve-codebase-architecture` skill (+ `HTML-REPORT.md`) and its `codebase-design` dependency (+ `DEEPENING.md`, `DESIGN-IT-TWICE.md`) for codebase health reviews. Skills mirror upstream verbatim; note they reference `docs/adr/` whereas this repo keeps ADRs in `docs/decisions/`.
+
+### Planning — grilling brief for custom objects + standalone Events
+
+- **`specs/custom-objects-and-standalone-events-grilling-brief.md`**: Added a pre-grilling brief framing the HubSpot custom-objects migration (Program/Event objects, Contact↔Event association, attendee status, per-registration JWT storage) together with making Programs optional for standalone Events. Includes a "Design vocabulary" section directing the grilling to use the `codebase-design` skill's terms (module/interface/seam/adapter/depth) and its design-it-twice pattern.
+
 ## 2026-07-09
 
 ### Email compose — schedule date input styling
