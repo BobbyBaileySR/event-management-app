@@ -6,7 +6,30 @@ Parked work, optional hardening, and deferred decisions for the static EMS UI.
 
 **AI agents:** When the user skips or defers work, add an entry here (see `../.cursor/rules/ems-todo-discipline.mdc`).
 
-> **Last updated:** 2026-07-11 (FE-TECH-007 data-seam reshape parked from architecture review)
+> **Last updated:** 2026-07-12 (UI-redesign grilling re-run vs `design_handoff 2` — UI platform theming/typography + Phase A/B split; see [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) / [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md))
+
+---
+
+## Remaining roadmap — after the redesign week
+
+Forward-looking summary (added 2026-07-12). **Next week's planned work (2026-07 W3):**
+
+1. **Redesign Phase A** — semantic token layer + 3 themes (incl. Dark Aurora) + switcher, self-hosted Manrope + Material Symbols, shared a11y field pickers, theme persistence (`FE-REDESIGN-003/005/006/007`; backend `BE-REDESIGN-003`).
+2. **HubSpot UAT** — create the **2 custom objects** in HubSpot UAT and point the **ScriptRunner Connect UAT** environment at HubSpot UAT. Unblocks `X-REDESIGN-001` feasibility gates, `X-REDESIGN-004`, `FE-INFRA-003`.
+3. **Redesign Phase B** — event-first IA/routing, standalone Events, registration-as-association, live capacity ±1, Campaign modal + copy fixes (`FE-REDESIGN-001/002/004`; `X-REDESIGN-003/005/006`).
+4. **Full E2E testing** of **Slice 004** (capacity — `X-009` / `FE-CAP-001`) and **Slice 005** (email dispatch) once the redesign lands. Also verifies the **walk-in path** (`X-008`), since feasibility gate #2 confirms workflow-written registrations.
+5. **Production API proxy** — hope ScriptRunner Connect fixes its **OPTIONS preflight bug** next week; **if not, stand up the Cloudflare proxy before end of week** (`FE-OPS-002` / `FE-INFRA-001`).
+
+**Roadmap remaining after that week:**
+
+| Item | Ref | Notes |
+| :--- | :--- | :--- |
+| **Slice 007** — audit log operator UX | `X-SLICE007-001`, `FE-SLICE007-001/002` | Backend audit index → true paging, readable Resource column, server-side filters + Apply. ~1–1.5 wks. |
+| **Slice 1.5 Tier B** — enterprise ops | B1–B9 (`FE-SLICE15-003/004`, `FE-OPS-004`) | Audit export, operator role UI gating, Cloudflare **Access**, retention/session hardening (backend), monitoring, pen test, runbooks. |
+| **QR generation** | `FE-QR-GEN-001` (pairs `BE-QR-GEN-001`) | Pre-event ticket emails w/ full ~550–800+ char JWT. Slice 2+. |
+| **Later product APIs** | `BE-PROD-002`, `BE-PROD-001` | Event read APIs + analytics — backend-led, surfaced later in UI. |
+| **Optional / parked polish** | `FE-TECH-007`, `FE-REDESIGN-008`, `BE-TECH-005` | Data-seam reshape (31 endpoints → feature adapters), campaign drafts, last backend handler migration. |
+| **Standing disciplines** | `X-003`, `X-005`, `FE-TEST-005` | api-contract/RBAC sync + per-view/service tests — ongoing, never "done". |
 
 ---
 
@@ -120,7 +143,7 @@ Cross-folder checklist — mirror in [../Backend/TODO.md](../Backend/TODO.md).
 | ID | Item | Status | Phase | Also affects | Notes |
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | FE-OPS-001 | **Register deployment origins** in Google Cloud Console (OAuth authorized JavaScript origins) | planned | Before staff UAT/Live URLs | Backend | Add `https://bobbybaileysr.github.io`, localhost origins. One github.io origin covers both UAT and Live project Pages. Mirror in ScriptRunner `ALLOWED_ORIGINS` per environment. See [docs/environments.md](docs/environments.md). |
-| FE-OPS-002 | **Production API proxy** (Cloudflare Worker or equivalent) | blocked | Production | Backend | Blocked — no Cloudflare access yet; ScriptRunner OPTIONS/CORS unresolved for direct browser calls. Local dev uses Vite proxy + `dev-server.config.js`. |
+| FE-OPS-002 | **Production API proxy** (Cloudflare Worker or equivalent) | planned | Production | Backend | **Scheduled for next week (2026-07 W3).** Root cause is ScriptRunner Connect's **OPTIONS preflight bug** on direct browser calls. Plan: hope SRC ships a fix next week; **if not, stand up the Cloudflare proxy before end of week**. Needed before staff use **deployed** URLs; local dev still uses Vite proxy + `dev-server.config.js`. Pairs **FE-INFRA-001**. |
 | FE-OPS-003 | **`gsi/button` 403 on first load** (Google Sign-In button iframe) | parked | Optional | — | Harmless noise when origin is registered; sign-in still works. Revisit only if UX impact. |
 | FE-OPS-004 | **Cloudflare Access** — edge auth before HTML is served | planned | Slice 1.5B | Backend | **Slice 1.5 Tier B step B4** (was Phase 6). Complements Bearer session; does not replace ScriptRunner auth. ADR: [docs/decisions/002-zero-budget-hosting.md](docs/decisions/002-zero-budget-hosting.md). |
 
@@ -142,6 +165,7 @@ Cross-folder checklist — mirror in [../Backend/TODO.md](../Backend/TODO.md).
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | FE-TECH-005 | **Audit display: surface previous/new values when backend adds them** | planned | Slice 1.5 | Backend | **→ FE-SLICE15-002** (viewer) + **BE-SLICE15-005** (field-level PATCH audit). Surface `metadata.previous` / `metadata.next` in audit viewer when present. |
 | FE-TECH-007 | **Reshape the data seam: 31 endpoints → feature adapters** | planned | Optional | — | Architecture review 2026-07-11 (report item #4 — the only one of six deferred). `src/services/dataService.ts` (~921 ln, ~31 fns) mirrors the backend 1:1; `createDataService` re-binds all 31 to the token (~62 ln); `src/data/mockData.ts` (~1,323 ln) is coupled per-operation via `withMockFallback`; some legacy duplicate/unused methods remain. Plan (incremental, tests green): (1) delete caller-less legacy methods; (2) group ops into feature ports (Catalog/Attendee/CheckIn/Email); (3) pick real-vs-mock + bind token **once** at the seam (driven by `src/config.ts`), not per-operation. Keep every method mapped to `docs/api-contract.md`. |
+| FE-TECH-008 | **`improve-codebase-architecture` grilling loop no longer captures domain model inline** | parked | Optional | — | 2026-07-12: swapped the locally-authored `grilling` skill for the [upstream original](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), which is a pure interview and does **not** weave in `domain-modeling` (ADR/glossary capture) or the `codebase-design` vocabulary. `grill-with-docs` is unaffected (it separately says "using the `/domain-modeling` skill"), but `improve-codebase-architecture` step 3 leaned on grilling to keep the domain model current inline. Decide whether to (a) add an explicit `/domain-modeling` step to `improve-codebase-architecture`, or (b) accept the gap. No code impact; skills invoke `/grilling` by name so nothing is broken. |
 
 ---
 
@@ -217,6 +241,34 @@ Follow-on to **Slice 1.5 Tier A step A8** (`#/audit` viewer). UI pagination exis
 | X-008 | **Walk-in HubSpot form verification** (`003` quickstart **B5c**) | blocked | 1 | HubSpot admin | **2026-07-07 QA:** EMS Walk-in iframe ✅ on UAT; submit → Attendees/check-in **unverified** — blocked on events/HubSpot team confirming form workflow (Parts Attended, attendance, Program form submission). Not an EMS code task unless iframe/Attendees refresh bug found after HubSpot config confirmed. Pairs **FE-SLICE1-009** / **BE-SLICE1-008**. |
 | X-009 | **004 Capacity Management QA** (full quickstart sign-off) | blocked | 004 | Both | **2026-07-07:** Blocked on **HubSpot UAT access** — defer live capacity QA (`USE_MOCK_API: false`, §4 live, §5, §10) so live HubSpot data is not impacted. Pairs **FE-CAP-001** / **BE-CAP-001**. Mock §3–§6 may run offline in parallel if useful. |
 | X-SLICE007-001 | **Slice 007 — audit log performance & operator UX** | planned | 007 | Backend | Follow-on to 1.5 A8. True paging (audit index), readable Resource column, server-side filters (Apply button). Spec `007-audit-log-ux` when scheduled. ~1–1.5 weeks. Pairs **BE-SLICE007-001**, **FE-SLICE007-001**, **FE-SLICE007-002**. |
+
+---
+
+## Redesign initiative — UI redesign + custom objects (grilling 2026-07-12)
+
+Outcome of the `grill-with-docs` session(s) on the redesign (design package: `Frontend/design_handoff 2/`; earlier `Frontend/ClaudeDesignHandoff` superseded). **Data model** decisions: [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) (HubSpot custom objects + registration-as-association + per-registration Record Storage) and [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) (standalone Events + event-first navigation); target vocabulary in [CONTEXT.md](CONTEXT.md) § *Redesign transition — target model*. **UI platform** decisions (theming, typography, icons, field pickers, phasing): [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) (2026-07-12 re-run against `design_handoff 2`). Mirror in [../Backend/TODO.md](../Backend/TODO.md).
+
+**Delivery is phased ([ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §10):**
+
+- **Phase A (unblocked now):** the visual foundation — semantic token layer + 3 themes (incl. Dark Aurora), self-hosted Manrope + Material Symbols, shared a11y field pickers, theme switcher + backend preference. No custom-object dependency.
+- **Phase B (blocked on X-REDESIGN-001 feasibility slots):** event-first IA/routing, standalone Events, registration-as-association, live capacity/occupancy ±1, Campaign modal. **Nothing in Phase B ships until the feasibility gates pass.**
+
+| ID | Item | Status | Slice | Also affects | Notes |
+| :--- | :--- | :---: | :--- | :--- | :--- |
+| X-REDESIGN-001 | **Feasibility gates (blocking)** — (1) free **2 custom-object slots** (Program + Event) via HubSpot support / removing unused objects; (2) confirm **workflows can set custom-object associations** on the tier; (3) confirm **≤10 association labels** per pairing covers `registered`/`checked-in`/`customer`/`partner`; (4) standard security write-gate | blocked | Redesign | Backend | HubSpot admin/support. ADR-007 Gates. User chasing slot quota "tomorrow/next week". |
+| X-REDESIGN-002 | **`CustomObjectAdapter` design-it-twice** — the storage model is settled (labels + Record Storage) but the **adapter interface** shape is not. Run `codebase-design` design-it-twice before implementation | planned | Redesign | Backend | ADR-005 seam's 2nd implementation. Pairs **BE-REDESIGN-001**. |
+| X-REDESIGN-003 | **Event-first routing / api-contract** — Slice routes are `programs/{programId}/events/{eventId}/…`; event-first needs **event-scoped routes** or optional `programId`. Breaking contract change — update `api-contract.md` + `rbac.md` + `RouteGuard` together | planned | Redesign | Backend | ADR-008 consequence. Design-it-twice first. |
+| X-REDESIGN-004 | **`docs/hubspot-schema.md` update + verify** — object types, property names, **association-label type IDs** verified against live HubSpot before any write | blocked | Redesign | Backend | Depends on X-REDESIGN-001. Write-gate prerequisite. |
+| X-REDESIGN-005 | **Migration / backfill** — map existing Contact-property attendance + Parts-Attended → objects/associations; EMS catalog IDs stay stable (map to HubSpot IDs inside adapter). Dual-read window TBD | planned | Redesign | Backend | ADR-005 migration triggers. |
+| X-REDESIGN-006 | **`/speckit-specify` the redesign** — turn ADR-007/008 + design handoff into a formal spec (or per-surface specs) before build | planned | Redesign | Both | Feeds plan → tasks → implement. |
+| FE-REDESIGN-001 | **New/redesigned surfaces (Phase B)** — event-first Overview/Events, standalone-Event flows, Check-in Live Capacity ±1, Campaign modal (compose/edit/delete) + campaign-detail per-Contact outcome, remove-attendee + undo-check-in affordances, real-fetch skeletons + "Did you know?" only on slow loads | planned | Redesign B | Backend | Per grilling decisions + `design_handoff 2`. Break into per-surface tasks after X-REDESIGN-006. Theming/typography split out to **FE-REDESIGN-005/006/007** (Phase A). |
+| FE-REDESIGN-002 | **Copy fixes from grilling** — remove "automatically checks in on scan" / "auto-checks in" wording; QR summary fixed set = name, company, email, account manager, attendee type, current status; walk-in UI must set the **roster propagation-lag** expectation (form submit → attendee not instantly on the roster); rename prototype's **"HubSpot list" → "segment"** ([CONTEXT.md](CONTEXT.md) *HubSpot contact segment*) | planned | Redesign | — | Small, do alongside FE-REDESIGN-001 QR/walk-in surfaces. |
+| FE-REDESIGN-004 | **RBAC posture for redesign** — **admin-only for now** (incl. **Overview dashboard admin-only**); build a **role-aware app shell** so a future `check-in operator` role can be slotted in without restructure | planned | Redesign | Backend | Extends existing operator-role work (**FE-SLICE15-004** / **FE-PROD-003** / **BE-SLICE15-009**); redesign shell should be role-aware from the start. |
+| FE-REDESIGN-003 | **Theme persistence (Phase A)** — per-user theme pref **cross-device via backend**, applied instantly; **Celebration re-validated server-side on load/login** (fallback Aurora), never trusted from stored pref | planned | Redesign A | Backend | [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §5. Pairs **BE-REDESIGN-003** (user-prefs store + write-gated endpoint + allowlist Parameter). |
+| FE-REDESIGN-005 | **Semantic token layer + 3 themes (Phase A)** — two-tier tokens (primitive brand + semantic role layer: surface/panel/border/text/muted/accent/accent-soft/status…); themes remap **only** semantic tokens; components reference semantic tokens via CSS modules (**no inline `var(--x)` per element**). Themes: **Aurora** (default light, replaces today's default), **Celebration** (prototype pink `#EC6C93`, WCAG contrast-checked), **Dark Aurora** (net-new dark). Move any hardcoded hex in components onto semantic tokens so dark renders. Add **user-chosen theme switcher**, Celebration allowlist-gated | planned | Redesign A | — | [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §1–§4. Global token refactor; ship with tests. |
+| FE-REDESIGN-006 | **Self-hosted fonts + icons (Phase A)** — bundle **Manrope** subset woff2 via Vite (adopt prototype size/weight scale) and a **Material Symbols Outlined subset** font (only used glyphs, 1:1 ligature names). `font-src 'self'`; **no** Google Fonts / icon CDN | planned | Redesign A | — | [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §6–§7. Update CSP `font-src`. Matches chart.js self-host precedent (**FE-SEC-005**). |
+| FE-REDESIGN-007 | **Custom shared field pickers (Phase A)** — reusable calendar / time / select popovers matching all 3 themes (extend `CatalogPickerSelect`). **Keyboard nav + ARIA + screen-reader support is a completion gate** | planned | Redesign A | — | [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §8; see [docs/ui-a11y-audit.md](docs/ui-a11y-audit.md). |
+| FE-REDESIGN-008 | **Campaign drafts** — persisted draft-campaign state (save half-composed, resume, edit, delete) | parked | Redesign | Backend | [ADR-009](docs/decisions/009-redesign-ui-platform-theming-typography.md) §9. Deferred from redesign; prototype's Drafts stat omitted/zeroed for now. Revisit if the events team wants it. |
 
 ---
 

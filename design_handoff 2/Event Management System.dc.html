@@ -1,0 +1,2342 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics="">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    * { box-sizing: border-box; }
+    ::placeholder { color: inherit; opacity: 0.55; }
+    @keyframes emsSpin { to { transform: rotate(360deg); } }
+    @keyframes emsScan { 0% { top: 14px; } 50% { top: calc(100% - 16px); } 100% { top: 14px; } }
+  </style>
+</helmet>
+
+<div style="{{ rootVarsStyle }}">
+<div style="font-family:'Manrope',ui-sans-serif,system-ui,sans-serif;background:var(--page-bg);height:100vh;display:flex;flex-direction:column;overflow:hidden;color:var(--text)">
+
+  <!-- App frame -->
+  <section style="max-width:1400px;width:100%;margin:0 auto;padding:20px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden">
+    <div style="border:1px solid var(--border);border-radius:20px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex:1;min-height:0;background:var(--page-bg)">
+
+      <!-- Loading state -->
+      <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:40px">
+          <div style="width:46px;height:46px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:emsSpin 0.85s linear infinite"></div>
+          <div style="max-width:420px;text-align:center;border:1px solid var(--border);background:var(--input-bg);border-radius:14px;padding:18px 22px">
+            <p style="margin:0 0 6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent)">Did you know?</p>
+            <p style="margin:0;font-size:13.5px;line-height:1.5;color:var(--text)">{{ currentTip }}</p>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Sidebar (desktop only) -->
+      <sc-if value="{{ appReady }}" hint-placeholder-val="{{ false }}">
+      <sc-if value="{{ layout.isDesktop }}" hint-placeholder-val="{{ true }}">
+        <aside style="width:236px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;padding:22px 14px;border-right:1px solid var(--border);background:var(--sidebar-bg);overflow-y:auto">
+          <div style="display:flex;align-items:center;gap:10px;padding:0 8px">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">E</div>
+            <div>
+              <p style="margin:0;font-size:13.5px;font-weight:700;line-height:1.1">EventOS</p>
+              <p style="margin:0;font-size:11px;color:var(--muted)">Events Team</p>
+            </div>
+          </div>
+          <nav style="margin-top:26px;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ navWorkspace }}" as="item" hint-placeholder-count="2">
+                <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                  <span style="{{ item.barStyle }}"></span>
+                  {{ item.label }}
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="margin:16px 8px 8px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+              <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Working event</span>
+            </div>
+            <div style="position:relative;margin:0 8px 10px">
+              <button onClick="{{ workingEventPicker.onToggle }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;padding:8px 10px;border-radius:9px;background:var(--input-bg);border:1px dashed var(--border);color:var(--text);font-family:inherit;cursor:pointer">
+                <span style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ workingEventPicker.labelColor }}">{{ workingEventPicker.label }}</span>
+                <span style="color:var(--muted);font-size:10px;flex-shrink:0">▾</span>
+              </button>
+              <sc-if value="{{ workingEventPicker.isOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;border:1px solid var(--border);background:var(--panel-bg);border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,0.3);overflow:hidden">
+                  <input value="{{ workingEventPicker.search }}" onChange="{{ workingEventPicker.onSearch }}" placeholder="Type to search events…" autoFocus="{{ true }}" style="width:100%;border:none;border-bottom:1px solid var(--border);background:var(--input-bg);color:var(--text);padding:9px 10px;font-size:12.5px;outline:none;box-sizing:border-box">
+                  <div style="max-height:200px;overflow-y:auto">
+                    <sc-for list="{{ workingEventPicker.matches }}" as="e" hint-placeholder-count="4">
+                      <button onClick="{{ e.onSelect }}" style="display:block;width:100%;text-align:left;border:none;background:none;color:var(--text);padding:9px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;border-bottom:1px solid var(--border)">{{ e.name }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ navEventScoped }}" as="item" hint-placeholder-count="2">
+                <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                  <span style="{{ item.barStyle }}"></span>
+                  {{ item.label }}
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ navAdmin }}" as="item" hint-placeholder-count="1">
+                <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                  <span style="{{ item.barStyle }}"></span>
+                  {{ item.label }}
+                </button>
+              </sc-for>
+            </div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+              <p style="margin:0 0 8px;padding:0 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Theme</p>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <sc-for list="{{ themeSidebarOptions }}" as="th" hint-placeholder-count="3">
+                  <button onClick="{{ th.onClick }}" style="{{ th.style }}">
+                    <span style="{{ th.dotStyle }}"></span>
+                    {{ th.label }}
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </nav>
+        </aside>
+      </sc-if>
+
+      <!-- Tablet icon rail -->
+      <sc-if value="{{ layout.showIconRail }}" hint-placeholder-val="{{ false }}">
+        <aside style="width:64px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;min-height:0;padding:16px 8px;border-right:1px solid var(--border);background:var(--sidebar-bg);gap:6px;overflow-y:auto">
+          <button onClick="{{ toggleTabletDrawer }}" title="Menu" style="width:36px;height:36px;flex-shrink:0;border-radius:9px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);cursor:pointer;font-size:14px;margin-bottom:8px">☰</button>
+          <sc-for list="{{ navWorkspace }}" as="item" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <button onClick="{{ item.onClick }}" title="{{ item.label }}" style="{{ item.railStyle }}">{{ item.abbr }}</button>
+              <span style="{{ item.railDotStyle }}"></span>
+            </div>
+          </sc-for>
+          <div style="width:28px;height:1px;background:var(--border);margin:8px 0"></div>
+          <button onClick="{{ toggleTabletDrawer }}" title="Working event" style="{{ workingEventRail.style }}">{{ workingEventRail.abbr }}</button>
+          <sc-for list="{{ navEventScoped }}" as="item" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <button onClick="{{ item.onClick }}" title="{{ item.label }}" style="{{ item.railStyle }}">{{ item.abbr }}</button>
+              <span style="{{ item.railDotStyle }}"></span>
+            </div>
+          </sc-for>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ navAdmin }}" as="item" hint-placeholder-count="1">
+              <div style="display:flex;flex-direction:column;align-items:center">
+                <button onClick="{{ item.onClick }}" title="{{ item.label }}" style="{{ item.railStyle }}">{{ item.abbr }}</button>
+                <span style="{{ item.railDotStyle }}"></span>
+              </div>
+            </sc-for>
+            <div style="width:28px;height:1px;background:var(--border);margin:4px 0;flex-shrink:0"></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0;padding-bottom:4px">
+              <sc-for list="{{ themeRailOptions }}" as="th" hint-placeholder-count="3">
+                <button onClick="{{ th.onClick }}" title="{{ th.title }}" style="{{ th.style }}"></button>
+              </sc-for>
+            </div>
+          </div>
+        </aside>
+      </sc-if>
+
+      <!-- Main -->
+      <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column">
+        <header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:{{ layout.headerPad }};border-bottom:1px solid var(--border);background:var(--panel-bg)">
+          <div style="min-width:0;display:flex;align-items:center;gap:10px">
+            <div style="min-width:0">
+              <h1 style="margin:0;font-size:16.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ meta.title }}</h1>
+              <p style="margin:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ meta.subtitle }}</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <sc-if value="{{ layout.isDesktop }}" hint-placeholder-val="{{ false }}">
+              
+            </sc-if>
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--denim);color:var(--on-denim);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">EM</div>
+          </div>
+        </header>
+
+        <!-- Tablet/mobile top tabs -->
+        <sc-if value="{{ layout.isDesktop }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}"><span></span></sc-if>
+        </sc-if>
+        <sc-if value="{{ layout.showTopTabs }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:6px;overflow-x:auto;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel-bg)">
+            <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="5">
+              <button onClick="{{ item.onClick }}" style="{{ item.tabStyle }}">{{ item.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel-bg)">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Theme</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <sc-for list="{{ themeRailOptions }}" as="th" hint-placeholder-count="3">
+                <button onClick="{{ th.onClick }}" title="{{ th.title }}" style="{{ th.style }}"></button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <main style="flex:1;min-height:0;overflow-y:auto;padding:{{ layout.mainPad }};display:flex;flex-direction:column;gap:22px">
+
+          <!-- OVERVIEW -->
+          <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:20px">
+              <div style="display:grid;gap:14px;grid-template-columns:{{ layout.statCols }}">
+                <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:18px">
+                    <span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--accent)"></span>
+                    <p style="margin:14px 0 0;font-size:24px;font-weight:800">{{ s.value }}</p>
+                    <p style="margin:2px 0 0;font-size:13.5px;font-weight:600">{{ s.label }}</p>
+                    <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">{{ s.delta }}</p>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:grid;gap:20px;grid-template-columns:{{ layout.split3 }}">
+                <div style="border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                    <h2 style="margin:0;font-size:14.5px;font-weight:700">Upcoming events</h2>
+                    <button onClick="{{ goToEvents }}" style="border:none;background:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">View all ›</button>
+                  </div>
+                  <div style="display:flex;flex-direction:column">
+                    <sc-for list="{{ upcomingEvents }}" as="e" hint-placeholder-count="4">
+                      <div style="display:grid;grid-template-columns:44px 1fr 120px 96px;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--border)">
+                        <div style="width:44px;height:44px;flex-shrink:0;border-radius:10px;background:var(--ice);color:var(--denim);display:flex;flex-direction:column;align-items:center;justify-content:center">
+                          <span style="font-size:9px;font-weight:700;text-transform:uppercase">{{ e.dateDay }}</span>
+                          <span style="font-size:14px;font-weight:800;line-height:1">{{ e.dateNum }}</span>
+                        </div>
+                        <div style="min-width:0">
+                          <p style="margin:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.name }}</p>
+                          <p style="margin:0;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.location }}</p>
+                        </div>
+                        <div style="width:120px" data-hide-mobile="1">
+                          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px"><span>{{ e.registered }}/{{ e.capacity }}</span><span style="font-weight:700">{{ e.pct }}%</span></div>
+                          <div style="height:5px;border-radius:3px;background:var(--ice);overflow:hidden"><div style="height:100%;border-radius:3px;background:{{ e.barColor }};width:{{ e.pctStr }}"></div></div>
+                        </div>
+                        <span style="justify-self:end;border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 9px;background:{{ e.statusBg }};color:{{ e.statusFg }};white-space:nowrap">{{ e.statusLabel }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                  <h2 style="margin:0 0 14px;font-size:14.5px;font-weight:700">Recent activity</h2>
+                  <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px">
+                    <sc-for list="{{ recentActivity }}" as="a" hint-placeholder-count="5">
+                      <li style="display:flex;gap:10px">
+                        <span style="width:6px;height:6px;margin-top:6px;flex-shrink:0;border-radius:50%;background:var(--cobalt)"></span>
+                        <div>
+                          <p style="margin:0;font-size:13px;line-height:1.4"><b>{{ a.user }}</b> <span style="color:var(--muted)">{{ a.action }}</span> {{ a.target }}</p>
+                          <p style="margin:1px 0 0;font-size:11px;color:var(--muted)">{{ a.time }}</p>
+                        </div>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- EVENTS -->
+          <sc-if value="{{ isEventsList }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:18px">
+              <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:20px">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+                  <h2 style="margin:0;font-size:14.5px;font-weight:700">Programs</h2>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--input-bg);border-radius:9px;padding:7px 11px">
+                      <span style="color:var(--muted);font-size:15px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">search</span>
+                      <input value="{{ programSearch }}" onChange="{{ onProgramSearch }}" placeholder="Search programs" style="border:none;background:transparent;outline:none;font-size:12.5px;color:var(--text);width:140px">
+                    </div>
+                    <button onClick="{{ openNewProgram }}" style="display:flex;align-items:center;gap:6px;border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ New program</button>
+                  </div>
+                </div>
+                <div style="display:grid;gap:10px;grid-template-columns:{{ layout.programsCols }};max-height:220px;overflow-y:auto">
+                  <sc-for list="{{ programCards }}" as="p" hint-placeholder-count="3">
+                    <div style="position:relative" onMouseEnter="{{ p.onMouseEnter }}" onMouseLeave="{{ p.onMouseLeave }}">
+                      <button onClick="{{ p.onClick }}" style="{{ p.style }}">
+                        <div style="min-width:0">
+                          <p style="margin:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:{{ p.editableRightPad }}">{{ p.name }}</p>
+                          <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">{{ p.countLabel }}</p>
+                        </div>
+                        <span style="color:var(--muted);flex-shrink:0">›</span>
+                      </button>
+                      <sc-if value="{{ p.editable }}" hint-placeholder-val="{{ false }}">
+                        <div style="{{ p.iconWrapStyle }}">
+                          <button onClick="{{ p.onEdit }}" title="Edit program" style="width:40px;height:40px;border-radius:8px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px">✎</button>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <sc-if value="{{ activeProgramChip }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:12px;color:var(--muted)">Filtered by program:</span>
+                  <span style="display:flex;align-items:center;gap:6px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;padding:5px 10px">
+                    {{ activeProgramChip.name }}
+                    <button onClick="{{ clearProgramFilter }}" style="border:none;background:none;color:var(--accent);cursor:pointer;font-weight:800;font-size:13px;line-height:1;padding:0">×</button>
+                  </span>
+                </div>
+              </sc-if>
+
+              <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);overflow:hidden">
+                <div style="padding:20px;border-bottom:1px solid var(--border)">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+                    <h2 style="margin:0;font-size:14.5px;font-weight:700">Events</h2>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--input-bg);border-radius:9px;padding:7px 11px">
+                        <span style="color:var(--muted);font-size:15px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">search</span>
+                        <input value="{{ eventSearch }}" onChange="{{ onEventSearch }}" placeholder="Search events" style="border:none;background:transparent;outline:none;font-size:12.5px;color:var(--text);width:150px">
+                      </div>
+                      <button onClick="{{ openNewEvent }}" style="display:flex;align-items:center;gap:6px;border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ New event</button>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <sc-for list="{{ eventFilters }}" as="f" hint-placeholder-count="4">
+                      <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <sc-if value="{{ layout.isPhone }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:10px;padding:16px">
+                    <sc-for list="{{ eventsWithMeta }}" as="e" hint-placeholder-count="5">
+                      <button onClick="{{ e.onOpen }}" style="text-align:left;display:flex;flex-direction:column;gap:10px;width:100%;border:1px solid var(--border);border-radius:14px;padding:14px 16px;background:var(--input-bg);font-family:inherit;cursor:pointer">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+                          <div style="min-width:0">
+                            <p style="margin:0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.name }}</p>
+                            <p style="margin:2px 0 0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.location }}</p>
+                          </div>
+                          <span style="flex-shrink:0;border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 9px;background:{{ e.statusBg }};color:{{ e.statusFg }}">{{ e.statusLabel }}</span>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)">
+                          <span>{{ e.program }}</span>
+                          <span>{{ e.date }} · {{ e.time }}</span>
+                        </div>
+                        <div>
+                          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px"><span>{{ e.registered }}/{{ e.capacity }} registered</span><span style="font-weight:700">{{ e.pct }}%</span></div>
+                          <div style="height:6px;border-radius:3px;background:var(--ice);overflow:hidden"><div style="height:100%;border-radius:3px;background:{{ e.barColor }};width:{{ e.pctStr }}"></div></div>
+                        </div>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ !layout.isPhone }}" hint-placeholder-val="{{ true }}">
+                <div style="overflow-x:auto">
+                  <table style="width:100%;border-collapse:collapse;text-align:left">
+                    <thead>
+                      <tr>
+                        <sc-for list="{{ tableHeaders }}" as="h" hint-placeholder-count="6">
+                          <th style="white-space:nowrap;padding:13px 18px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--muted);border-bottom:1px solid var(--border)">{{ h }}</th>
+                        </sc-for>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <sc-for list="{{ eventsWithMeta }}" as="e" hint-placeholder-count="6">
+                        <tr onClick="{{ e.onOpen }}" style="cursor:pointer">
+                          <td style="padding:14px 18px;border-bottom:1px solid var(--border)">
+                            <p style="margin:0;font-size:13.5px;font-weight:600">{{ e.name }}</p>
+                            <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">{{ e.location }}</p>
+                          </td>
+                          <td style="white-space:nowrap;padding:14px 18px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--border)">{{ e.program }}</td>
+                          <td style="white-space:nowrap;padding:14px 18px;font-size:13px;border-bottom:1px solid var(--border)">{{ e.date }}<span style="display:block;font-size:11px;color:var(--muted)">{{ e.time }}</span></td>
+                          <td style="padding:14px 18px;border-bottom:1px solid var(--border)">
+                            <div style="width:120px">
+                              <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:3px"><span>{{ e.registered }}/{{ e.capacity }}</span><span style="font-weight:700">{{ e.pct }}%</span></div>
+                              <div style="height:5px;border-radius:3px;background:var(--ice);overflow:hidden"><div style="height:100%;border-radius:3px;background:{{ e.barColor }};width:{{ e.pctStr }}"></div></div>
+                            </div>
+                          </td>
+                          <td style="padding:14px 18px;border-bottom:1px solid var(--border)">
+                            <span style="border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 9px;background:{{ e.statusBg }};color:{{ e.statusFg }}">{{ e.statusLabel }}</span>
+                          </td>
+                          <td style="padding:14px 18px;text-align:right;color:var(--muted);border-bottom:1px solid var(--border)">›</td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+                </sc-if>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-top:1px solid var(--border)">
+                  <span style="font-size:12px;color:var(--muted)">{{ eventsPager.label }}</span>
+                  <div style="display:flex;gap:8px">
+                    <button onClick="{{ eventsPager.onPrev }}" style="{{ eventsPager.prevStyle }}">‹ Prev</button>
+                    <button onClick="{{ eventsPager.onNext }}" style="{{ eventsPager.nextStyle }}">Next ›</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- EVENT DETAIL -->
+          <sc-if value="{{ isEventDetail }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:20px">
+              <div style="border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px">
+                  <div style="min-width:0">
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                      <span style="border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 9px;background:{{ detail.statusBg }};color:{{ detail.statusFg }}">{{ detail.statusLabel }}</span>
+                      <span style="border-radius:999px;font-size:11.5px;font-weight:600;padding:4px 10px;background:var(--ice);color:var(--denim)">{{ detail.program }}</span>
+                      <sc-if value="{{ detail.isActive }}" hint-placeholder-val="{{ false }}">
+                        <span style="border-radius:999px;font-size:11.5px;font-weight:700;padding:4px 10px;background:var(--accent-soft);color:var(--accent)">✓ Working event</span>
+                      </sc-if>
+                    </div>
+                    <h2 style="margin:0;font-size:19px;font-weight:700">{{ detail.name }}</h2>
+                    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:12.5px;color:var(--muted)">
+                      <span>{{ detail.date }}</span>
+                      <span>{{ detail.time }}</span>
+                      <span>{{ detail.location }}</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">
+                    <button onClick="{{ detail.onEdit }}" style="border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 15px;font-size:13px;font-weight:700;cursor:pointer">Edit event</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <div style="display:grid;gap:14px;grid-template-columns:{{ layout.statCols }}">
+                <sc-for list="{{ detail.stats }}" as="s" hint-placeholder-count="4">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:18px">
+                    <span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--accent)"></span>
+                    <p style="margin:14px 0 0;font-size:22px;font-weight:800">{{ s.value }}</p>
+                    <p style="margin:2px 0 0;font-size:13px;font-weight:600">{{ s.label }}</p>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:grid;gap:20px;grid-template-columns:{{ layout.split3 }}">
+                <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                    <h3 style="margin:0;font-size:14.5px;font-weight:700">Attendees</h3>
+                    <button onClick="{{ goToAttendees }}" style="border:none;background:none;color:var(--accent);font-size:13px;font-weight:700;cursor:pointer">See all ›</button>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ detail.preview }}" as="a" hint-placeholder-count="5">
+                      <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px 14px">
+                        <div style="width:34px;height:34px;flex-shrink:0;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ a.initials }}</div>
+                        <div style="min-width:0;flex:1">
+                          <p style="margin:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</p>
+                          <p style="margin:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.company }} · {{ a.ticket }}</p>
+                        </div>
+                        <span style="font-size:11px;font-weight:700;color:{{ a.statusColor }}">{{ a.statusText }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:20px">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                    <h3 style="margin:0 0 14px;font-size:14.5px;font-weight:700">Capacity</h3>
+                    <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                      <p style="margin:0;font-size:28px;font-weight:800">{{ detail.pct }}%</p>
+                      <p style="margin:0;font-size:12.5px;color:var(--muted)">{{ detail.registered }} / {{ detail.capacity }}</p>
+                    </div>
+                    <div style="margin-top:10px;height:8px;border-radius:4px;background:var(--ice);overflow:hidden"><div style="height:100%;border-radius:4px;background:{{ detail.barColor }};width:{{ detail.pctStr }}"></div></div>
+                    <p style="margin:10px 0 0;font-size:11.5px;color:var(--muted)">{{ detail.remaining }} spots remaining</p>
+                  </div>
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                    <h3 style="margin:0 0 14px;font-size:14.5px;font-weight:700">Details</h3>
+                    <dl style="margin:0;display:flex;flex-direction:column;gap:10px;font-size:13px">
+                      <sc-for list="{{ detail.fields }}" as="f" hint-placeholder-count="5">
+                        <div style="display:flex;justify-content:space-between;gap:12px">
+                          <dt style="margin:0;color:var(--muted)">{{ f.k }}</dt>
+                          <dd style="margin:0;font-weight:600;text-align:right">{{ f.v }}</dd>
+                        </div>
+                      </sc-for>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- REGISTERED ATTENDEES -->
+          <sc-if value="{{ isAttendees }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:20px">
+              <sc-if value="{{ !layout.isDesktop }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;background:var(--panel-bg);padding:10px 14px">
+                  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);white-space:nowrap">Working event</span>
+                  <div style="position:relative;flex:1;min-width:0">
+                    <button onClick="{{ mobileEventSelect.onToggle }}" style="width:100%;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left">
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mobileEventSelect.value }}</span>
+                      <span style="color:var(--muted);font-size:10px;flex-shrink:0">▾</span>
+                    </button>
+                    <sc-if value="{{ mobileEventSelect.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ mobileEventSelect.popoverStyle }}">
+                        <sc-for list="{{ mobileEventSelect.options }}" as="o" hint-placeholder-count="4">
+                          <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div style="display:grid;gap:14px;grid-template-columns:repeat(3,1fr)">
+                <sc-for list="{{ attendeesStats }}" as="s" hint-placeholder-count="3">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:16px 18px">
+                    <p style="margin:0;font-size:22px;font-weight:800">{{ s.value }}</p>
+                    <p style="margin:2px 0 0;font-size:12.5px;font-weight:600;color:var(--muted)">{{ s.label }}</p>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:20px">
+                <div style="flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+                  <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--input-bg);border-radius:9px;padding:8px 12px">
+                    <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">search</span>
+                    <input value="{{ attendeesSearch }}" onChange="{{ onAttendeesSearch }}" placeholder="Search name, email or company" style="border:none;background:transparent;outline:none;font-size:13px;color:var(--text);width:200px">
+                  </div>
+                </div>
+                <div style="flex-shrink:0;display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+                  <div>
+                    <p style="margin:0 0 6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)">Attendee type</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                      <sc-for list="{{ attendeesTicketOptions }}" as="o" hint-placeholder-count="3">
+                        <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div>
+                    <p style="margin:0 0 6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)">Status</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px">
+                      <sc-for list="{{ attendeesStatusOptions }}" as="o" hint-placeholder-count="3">
+                        <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+                <div style="flex-shrink:0;padding:0 14px;display:grid;grid-template-columns:{{ layout.attendeeRowCols }};gap:16px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--muted)">
+                  <span></span><span>Name</span>
+                  <sc-if value="{{ layout.isDesktop }}" hint-placeholder-val="{{ true }}"><span>Company</span><span>Type</span></sc-if>
+                  <span style="justify-self:end">Status</span><span></span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+                  <sc-for list="{{ attendeesRows }}" as="a" hint-placeholder-count="6">
+                    <div style="display:grid;grid-template-columns:{{ layout.attendeeRowCols }};align-items:center;gap:16px;border:1px solid var(--border);border-radius:12px;padding:10px 14px">
+                      <div style="width:34px;height:34px;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ a.initials }}</div>
+                      <div style="min-width:0">
+                        <p style="margin:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</p>
+                        <p style="margin:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.email }}</p>
+                      </div>
+                      <sc-if value="{{ layout.isDesktop }}" hint-placeholder-val="{{ true }}">
+                        <p style="margin:0;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.company }}</p>
+                        <span style="justify-self:start;border-radius:999px;font-size:11px;font-weight:700;padding:4px 10px;background:var(--ice);color:var(--denim);white-space:nowrap">{{ a.ticket }}</span>
+                      </sc-if>
+                      <span style="font-size:11.5px;font-weight:700;color:{{ a.statusColor }};white-space:nowrap;justify-self:end">{{ a.statusLabel }}</span>
+                      <sc-if value="{{ a.canRemove }}" hint-placeholder-val="{{ true }}">
+                        <button onClick="{{ a.onRemove }}" style="border:1px solid var(--border);background:none;color:var(--muted);border-radius:8px;padding:0 14px;min-height:44px;box-sizing:border-box;font-size:11.5px;font-weight:700;cursor:pointer;justify-self:end">Remove</button>
+                      </sc-if>
+                      <sc-if value="{{ !a.canRemove }}" hint-placeholder-val="{{ false }}">
+                        <span></span>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px">
+                  <span style="font-size:12px;color:var(--muted)">{{ attendeesPager.label }}</span>
+                  <div style="display:flex;gap:8px">
+                    <button onClick="{{ attendeesPager.onPrev }}" style="{{ attendeesPager.prevStyle }}">‹ Prev</button>
+                    <button onClick="{{ attendeesPager.onNext }}" style="{{ attendeesPager.nextStyle }}">Next ›</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- CHECK-IN -->
+          <sc-if value="{{ isCheckin }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:20px">
+              <sc-if value="{{ !layout.isDesktop }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;background:var(--panel-bg);padding:10px 14px">
+                  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);white-space:nowrap">Working event</span>
+                  <div style="position:relative;flex:1;min-width:0">
+                    <button onClick="{{ mobileEventSelect.onToggle }}" style="width:100%;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left">
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mobileEventSelect.value }}</span>
+                      <span style="color:var(--muted);font-size:10px;flex-shrink:0">▾</span>
+                    </button>
+                    <sc-if value="{{ mobileEventSelect.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ mobileEventSelect.popoverStyle }}">
+                        <sc-for list="{{ mobileEventSelect.options }}" as="o" hint-placeholder-count="4">
+                          <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:20px">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px">
+                  <div>
+                    <p style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)">Live capacity</p>
+                    <p style="margin:4px 0 0;font-size:28px;font-weight:800">{{ checkin.live.liveCount }} <span style="font-size:15px;font-weight:600;color:var(--muted)">/ {{ checkin.live.capacity }}</span></p>
+                    <sc-if value="{{ checkin.live.showReset }}" hint-placeholder-val="{{ false }}">
+                      <p style="margin:4px 0 0;font-size:11.5px;color:var(--muted)">Includes manual adjustment of {{ checkin.live.manualAdjustment }} · <a onClick="{{ checkin.live.onReset }}" style="color:var(--accent);cursor:pointer;font-weight:600">reset</a></p>
+                    </sc-if>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <button onClick="{{ checkin.live.onDecrement }}" style="width:44px;height:44px;border-radius:9px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);font-size:18px;font-weight:700;cursor:pointer">−</button>
+                    <div style="text-align:center;min-width:70px">
+                      <p style="margin:0;font-size:11px;color:var(--muted)">Adjust count</p>
+                      <p style="margin:0;font-size:13px;font-weight:700">for walk-outs</p>
+                    </div>
+                    <button onClick="{{ checkin.live.onIncrement }}" style="width:44px;height:44px;border-radius:9px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);font-size:18px;font-weight:700;cursor:pointer">+</button>
+                  </div>
+                </div>
+                <div style="margin-top:14px;height:9px;border-radius:5px;background:var(--ice);overflow:hidden">
+                  <div style="height:100%;border-radius:5px;background:{{ checkin.live.barColor }};width:{{ checkin.live.pctStr }}"></div>
+                </div>
+              </div>
+
+              <div style="flex:1;min-height:0;display:grid;gap:20px;grid-template-columns:{{ layout.split3 }};grid-template-rows:{{ layout.checkinGridRows }}">
+                <div style="display:flex;flex-direction:column;min-height:0;border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:20px">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+                    <div>
+                      <p style="margin:0;font-size:13.5px;font-weight:700">Attendees</p>
+                      <p style="margin:0;font-size:12px;color:var(--muted)">{{ checkin.checkedInCount }} of {{ checkin.total }} checked in</p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--input-bg);border-radius:9px;padding:8px 12px">
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">search</span>
+                      <input value="{{ checkin.query }}" onChange="{{ checkin.onQuery }}" placeholder="Search name or email" style="border:none;background:transparent;outline:none;font-size:13px;color:var(--text);width:180px">
+                    </div>
+                  </div>
+                  <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ checkin.filtered }}" as="a" hint-placeholder-count="6">
+                      <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;padding:10px 14px;background:{{ a.rowBg }}">
+                        <div style="width:34px;height:34px;flex-shrink:0;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ a.initials }}</div>
+                        <div style="min-width:0;flex:1">
+                          <p style="margin:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</p>
+                          <p style="margin:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.company }} · {{ a.ticket }}</p>
+                        </div>
+                        <button onClick="{{ a.onToggle }}" style="{{ a.btnStyle }}">{{ a.btnLabel }}</button>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px">
+                    <span style="font-size:12px;color:var(--muted)">{{ checkin.pager.label }}</span>
+                    <div style="display:flex;gap:8px">
+                      <button onClick="{{ checkin.pager.onPrev }}" style="{{ checkin.pager.prevStyle }}">‹ Prev</button>
+                      <button onClick="{{ checkin.pager.onNext }}" style="{{ checkin.pager.nextStyle }}">Next ›</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:16px">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:18px">
+                    <p style="margin:0 0 10px;font-size:13.5px;font-weight:700">Scan QR code</p>
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;border:2px dashed var(--border);background:repeating-linear-gradient(135deg, var(--input-bg), var(--input-bg) 8px, var(--ice) 8px, var(--ice) 16px);padding:30px 10px">
+                      <p style="margin:0;font-size:12.5px;font-weight:700;font-family:ui-monospace,monospace;color:var(--denim)">[ camera preview ]</p>
+                      <p style="margin:6px 0 0;font-size:11.5px;color:var(--muted)">Auto-checks in on scan</p>
+                    </div>
+                    <button onClick="{{ checkin.openScanner }}" style="margin-top:14px;width:100%;border:none;background:var(--denim);color:var(--on-denim);border-radius:9px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">Start scanner</button>
+                  </div>
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:18px">
+                    <p style="margin:0 0 4px;font-size:13.5px;font-weight:700">Walk-in registration</p>
+                    <p style="margin:0 0 14px;font-size:12px;color:var(--muted)">Not on the list? Add them on the spot.</p>
+                    <button onClick="{{ checkin.openWalkin }}" style="width:100%;border:none;background:var(--accent);color:#fff;border-radius:9px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">+ Add walk-in</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- EMAIL -->
+          <sc-if value="{{ isEmail }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:20px">
+              <sc-if value="{{ !layout.isDesktop }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:12px;background:var(--panel-bg);padding:10px 14px">
+                  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);white-space:nowrap">Working event</span>
+                  <div style="position:relative;flex:1;min-width:0">
+                    <button onClick="{{ mobileEventSelect.onToggle }}" style="width:100%;min-height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left">
+                      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ mobileEventSelect.value }}</span>
+                      <span style="color:var(--muted);font-size:10px;flex-shrink:0">▾</span>
+                    </button>
+                    <sc-if value="{{ mobileEventSelect.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ mobileEventSelect.popoverStyle }}">
+                        <sc-for list="{{ mobileEventSelect.options }}" as="o" hint-placeholder-count="4">
+                          <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+
+              <div style="display:grid;gap:14px;grid-template-columns:repeat(3,1fr)">
+                <sc-for list="{{ emailStats }}" as="s" hint-placeholder-count="3">
+                  <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:16px 18px">
+                    <p style="margin:0;font-size:22px;font-weight:800">{{ s.value }}</p>
+                    <p style="margin:2px 0 0;font-size:12.5px;font-weight:600;color:var(--muted)">{{ s.label }}</p>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:22px">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px">
+                  <div>
+                    <h2 style="margin:0;font-size:14.5px;font-weight:700">Email schedule</h2>
+                    <p style="margin:2px 0 0;font-size:12px;color:var(--muted)">Sent and scheduled campaigns for {{ activeEvent.name }}</p>
+                  </div>
+                  <button onClick="{{ openEmailModal }}" style="display:flex;align-items:center;gap:6px;border:none;background:var(--accent);color:#fff;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ New campaign</button>
+                </div>
+                <sc-if value="{{ email.hasScheduleRows }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ email.scheduleRows }}" as="c" hint-placeholder-count="3">
+                      <div onClick="{{ c.onOpen }}" style="display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:12px;padding:12px 16px;cursor:{{ c.rowCursor }};background:{{ c.rowHoverBg }}">
+                        <div style="min-width:0;flex:1">
+                          <p style="margin:0;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.template }}</p>
+                          <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">{{ c.recipientsLabel }} recipients · {{ c.when }}</p>
+                        </div>
+                        <span style="border-radius:999px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 9px;background:{{ c.statusBg }};color:{{ c.statusFg }};flex-shrink:0">{{ c.statusLabel }}</span>
+                        <sc-if value="{{ c.editable }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--accent);flex-shrink:0">✎ Edit</span>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ email.noScheduleRows }}" hint-placeholder-val="{{ false }}">
+                  <div style="text-align:center;padding:30px 10px">
+                    <p style="margin:0 0 12px;font-size:13px;color:var(--muted)">No campaigns sent or scheduled for this event yet.</p>
+                    <button onClick="{{ openEmailModal }}" style="border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">+ Create your first campaign</button>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- AUDIT LOADING -->
+          <sc-if value="{{ isAuditLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:60px 20px">
+              <div style="width:40px;height:40px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:emsSpin 0.85s linear infinite"></div>
+              <div style="max-width:420px;text-align:center;border:1px solid var(--border);background:var(--input-bg);border-radius:14px;padding:18px 22px">
+                <p style="margin:0 0 6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent)">Did you know?</p>
+                <p style="margin:0;font-size:13.5px;line-height:1.5;color:var(--text)">{{ currentTip }}</p>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- AUDIT -->
+          <sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:16px;background:var(--panel-bg);box-shadow:var(--card-shadow);padding:6px">
+              <ul style="list-style:none;margin:0;padding:0;flex:1;min-height:0;overflow-y:auto">
+                <sc-for list="{{ auditRows }}" as="a" hint-placeholder-count="6">
+                  <li style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border-bottom:1px solid var(--border)">
+                    <div style="width:34px;height:34px;flex-shrink:0;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ a.initials }}</div>
+                    <div style="flex:1">
+                      <p style="margin:0;font-size:13px;line-height:1.4"><b>{{ a.user }}</b> <span style="color:var(--muted)">{{ a.action }}</span> {{ a.target }}</p>
+                      <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">{{ a.time }}</p>
+                    </div>
+                    <span style="border-radius:7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;padding:4px 8px;background:var(--ice);color:var(--cobalt)">{{ a.category }}</span>
+                  </li>
+                </sc-for>
+              </ul>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--border)">
+                <span style="font-size:12px;color:var(--muted)">{{ auditPager.label }}</span>
+                <div style="display:flex;gap:8px">
+                  <button onClick="{{ auditPager.onPrev }}" style="{{ auditPager.prevStyle }}">‹ Prev</button>
+                  <button onClick="{{ auditPager.onNext }}" style="{{ auditPager.nextStyle }}">Next ›</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+        </main>
+      </div>
+      </sc-if>
+    </div>
+  </section>
+
+  <!-- Tablet drawer -->
+  <sc-if value="{{ tabletDrawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;display:flex">
+      <div onClick="{{ closeTabletDrawer }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.4)"></div>
+      <aside style="position:relative;z-index:1;width:270px;max-width:80vw;height:100%;display:flex;flex-direction:column;padding:22px 14px;background:var(--sidebar-bg);box-shadow:20px 0 60px -20px rgba(0,0,0,0.4);overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:32px;height:32px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">E</div>
+            <div>
+              <p style="margin:0;font-size:13.5px;font-weight:700;line-height:1.1">EventOS</p>
+              <p style="margin:0;font-size:11px;color:var(--muted)">Events Team</p>
+            </div>
+          </div>
+          <button onClick="{{ closeTabletDrawer }}" style="width:32px;height:32px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-size:14px;cursor:pointer">×</button>
+        </div>
+        <nav style="margin-top:26px;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ navWorkspace }}" as="item" hint-placeholder-count="2">
+              <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                <span style="{{ item.barStyle }}"></span>
+                {{ item.label }}
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="margin:16px 8px 8px;padding-top:14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Working event</span>
+          </div>
+          <div style="position:relative;margin:0 8px 10px">
+            <button onClick="{{ workingEventPicker.onToggle }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;padding:8px 10px;border-radius:9px;background:var(--input-bg);border:1px dashed var(--border);color:var(--text);font-family:inherit;cursor:pointer">
+              <span style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ workingEventPicker.labelColor }}">{{ workingEventPicker.label }}</span>
+              <span style="color:var(--muted);font-size:10px;flex-shrink:0">▾</span>
+            </button>
+            <sc-if value="{{ workingEventPicker.isOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;border:1px solid var(--border);background:var(--panel-bg);border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,0.3);overflow:hidden">
+                <input value="{{ workingEventPicker.search }}" onChange="{{ workingEventPicker.onSearch }}" placeholder="Type to search events…" autoFocus="{{ true }}" style="width:100%;border:none;border-bottom:1px solid var(--border);background:var(--input-bg);color:var(--text);padding:9px 10px;font-size:12.5px;outline:none;box-sizing:border-box">
+                <div style="max-height:200px;overflow-y:auto">
+                  <sc-for list="{{ workingEventPicker.matches }}" as="e" hint-placeholder-count="4">
+                    <button onClick="{{ e.onSelect }}" style="display:block;width:100%;text-align:left;border:none;background:none;color:var(--text);padding:9px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;border-bottom:1px solid var(--border)">{{ e.name }}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ navEventScoped }}" as="item" hint-placeholder-count="2">
+              <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                <span style="{{ item.barStyle }}"></span>
+                {{ item.label }}
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:auto;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ navAdmin }}" as="item" hint-placeholder-count="1">
+              <button onClick="{{ item.onClick }}" style="{{ item.style }}">
+                <span style="{{ item.barStyle }}"></span>
+                {{ item.label }}
+              </button>
+            </sc-for>
+          </div>
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+            <p style="margin:0 0 8px;padding:0 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted)">Theme</p>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ themeSidebarOptions }}" as="th" hint-placeholder-count="3">
+                <button onClick="{{ th.onClick }}" style="{{ th.style }}">
+                  <span style="{{ th.dotStyle }}"></span>
+                  {{ th.label }}
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </nav>
+      </aside>
+    </div>
+  </sc-if>
+
+  <!-- Modals -->
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.45)"></div>
+      <div style="position:relative;z-index:1;width:100%;max-width:{{ modalMeta.width }};max-height:88vh;overflow-y:auto;border-radius:16px;background:var(--panel-bg);border:1px solid var(--border);box-shadow:0 30px 60px -20px rgba(0,0,0,0.4)">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:20px 22px;border-bottom:1px solid var(--border)">
+          <div>
+            <h2 style="margin:0;font-size:16px;font-weight:700">{{ modalMeta.title }}</h2>
+            <p style="margin:2px 0 0;font-size:12px;color:var(--muted)">{{ modalMeta.subtitle }}</p>
+          </div>
+          <button onClick="{{ closeModal }}" style="width:40px;height:40px;flex-shrink:0;border-radius:9px;border:1px solid var(--border);background:none;color:var(--muted);font-size:16px;cursor:pointer">×</button>
+        </div>
+
+        <!-- Generic field modal (New event / New program) -->
+        <sc-if value="{{ isFieldModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ modalMeta.fields }}" as="fld" hint-placeholder-count="5">
+              <div>
+                <label style="display:block;margin-bottom:5px;font-size:12px;font-weight:600;color:var(--muted)">{{ fld.label }}</label>
+                <sc-if value="{{ fld.isText }}" hint-placeholder-val="{{ false }}">
+                  <input value="{{ fld.value }}" onChange="{{ fld.onChange }}" placeholder="{{ fld.placeholder }}" style="width:100%;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:9px;padding:10px 12px;font-size:13.5px">
+                </sc-if>
+                <sc-if value="{{ fld.isTextarea }}" hint-placeholder-val="{{ false }}">
+                  <textarea rows="3" value="{{ fld.value }}" onChange="{{ fld.onChange }}" placeholder="{{ fld.placeholder }}" style="width:100%;resize:none;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:9px;padding:10px 12px;font-size:13.5px;font-family:inherit"></textarea>
+                </sc-if>
+                <sc-if value="{{ fld.isDate }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:relative">
+                    <button onClick="{{ fld.dateField.onToggle }}" style="{{ fld.dateField.btnStyle }}">
+                      <span>{{ fld.dateField.displayValue }}</span>
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">calendar_month</span>
+                    </button>
+                    <sc-if value="{{ fld.dateField.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;border:1px solid var(--border);background:var(--panel-bg);border-radius:14px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);padding:14px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                          <button onClick="{{ fld.dateField.onPrevMonth }}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);cursor:pointer;font-size:13px">‹</button>
+                          <span style="font-size:13px;font-weight:700">{{ fld.dateField.monthLabel }}</span>
+                          <button onClick="{{ fld.dateField.onNextMonth }}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);cursor:pointer;font-size:13px">›</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+                          <sc-for list="{{ fld.dateField.weekdayLabels }}" as="wd" hint-placeholder-count="7">
+                            <span style="text-align:center;font-size:10px;font-weight:700;color:var(--muted)">{{ wd }}</span>
+                          </sc-for>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+                          <sc-for list="{{ fld.dateField.days }}" as="dcell" hint-placeholder-count="42">
+                            <button onClick="{{ dcell.onSelect }}" style="{{ dcell.style }}">{{ dcell.label }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ fld.isTime }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:relative">
+                    <button onClick="{{ fld.timeField.onToggle }}" style="{{ fld.timeField.btnStyle }}">
+                      <span>{{ fld.timeField.displayValue }}</span>
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
+                    </button>
+                    <sc-if value="{{ fld.timeField.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;border:1px solid var(--border);background:var(--panel-bg);border-radius:14px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);display:flex;max-height:220px">
+                        <div style="flex:1;overflow-y:auto;border-right:1px solid var(--border);padding:6px">
+                          <sc-for list="{{ fld.timeField.hours }}" as="h" hint-placeholder-count="24">
+                            <button onClick="{{ h.onSelect }}" style="{{ h.style }}">{{ h.label }}</button>
+                          </sc-for>
+                        </div>
+                        <div style="flex:1;overflow-y:auto;padding:6px">
+                          <sc-for list="{{ fld.timeField.minutes }}" as="m" hint-placeholder-count="4">
+                            <button onClick="{{ m.onSelect }}" style="{{ m.style }}">{{ m.label }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ fld.isNumber }}" hint-placeholder-val="{{ false }}">
+                  <input type="number" value="{{ fld.value }}" onChange="{{ fld.onChange }}" placeholder="{{ fld.placeholder }}" style="width:100%;border:1px solid var(--border);background:var(--input-bg);color:var(--text);border-radius:9px;padding:10px 12px;font-size:13.5px">
+                </sc-if>
+                <sc-if value="{{ fld.isSelect }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:relative">
+                    <button onClick="{{ fld.select.onToggle }}" style="{{ fld.select.btnStyle }}">
+                      <span>{{ fld.select.value }}</span>
+                      <span style="color:var(--muted);font-size:10px">▾</span>
+                    </button>
+                    <sc-if value="{{ fld.select.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ fld.select.popoverStyle }}">
+                        <sc-for list="{{ fld.select.options }}" as="o" hint-placeholder-count="3">
+                          <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--input-bg)">
+            <div>
+              <sc-if value="{{ isEditingEvent }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ onDeleteEvent }}" style="border:1px solid #d33;background:none;color:#c0392b;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Delete event</button>
+              </sc-if>
+              <sc-if value="{{ isEditingProgram }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ onDeleteProgram }}" style="border:1px solid #d33;background:none;color:#c0392b;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Delete program</button>
+              </sc-if>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Cancel</button>
+              <button onClick="{{ closeModal }}" style="border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">{{ modalMeta.confirmLabel }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Email compose modal -->
+        <sc-if value="{{ isEmailModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:20px 22px;display:flex;flex-direction:column;gap:18px">
+            <div>
+              <p style="margin:0 0 4px;font-size:13.5px;font-weight:700">Template</p>
+              <p style="margin:0 0 10px;font-size:11.5px;color:var(--muted)">Choose a HubSpot email template to send</p>
+              <div style="position:relative">
+                <button onClick="{{ email.templateSelect.onToggle }}" style="{{ email.templateSelect.btnStyle }}">
+                  <span>{{ email.templateSelect.value }}</span>
+                  <span style="color:var(--muted);font-size:10px">▾</span>
+                </button>
+                <sc-if value="{{ email.templateSelect.isOpen }}" hint-placeholder-val="{{ false }}">
+                  <div style="{{ email.templateSelect.popoverStyle }}">
+                    <sc-for list="{{ email.templateSelect.options }}" as="o" hint-placeholder-count="5">
+                      <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+
+            <div>
+              <p style="margin:0 0 8px;font-size:13.5px;font-weight:700">Recipients</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;border-radius:11px;padding:4px;background:var(--input-bg);margin-bottom:12px">
+                <sc-for list="{{ email.recipientModeOptions }}" as="m" hint-placeholder-count="2">
+                  <button onClick="{{ m.onClick }}" style="{{ m.style }}">{{ m.label }}</button>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ email.isAttendeesMode }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+                    <div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--input-bg);border-radius:9px;padding:8px 12px;flex:1;min-width:160px">
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">search</span>
+                      <input value="{{ email.attendeeSearch }}" onChange="{{ email.onAttendeeSearch }}" placeholder="Search registered attendees" style="border:none;background:transparent;outline:none;font-size:13px;color:var(--text);width:100%">
+                    </div>
+                    <button onClick="{{ email.onSelectAll }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:8px;padding:8px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">Select all</button>
+                    <button onClick="{{ email.onSelectCheckedIn }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:8px;padding:8px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">Checked-in only</button>
+                    <button onClick="{{ email.onSelectNone }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:8px;padding:8px 11px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap">Clear</button>
+                  </div>
+                  <div style="border:1px solid var(--border);border-radius:11px;max-height:220px;overflow-y:auto">
+                    <sc-for list="{{ email.attendeePickerList }}" as="a" hint-placeholder-count="6">
+                      <div onClick="{{ a.onToggle }}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer">
+                        <span style="{{ a.checkboxStyle }}">{{ a.checkMark }}</span>
+                        <div style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700">{{ a.initials }}</div>
+                        <div style="min-width:0;flex:1">
+                          <p style="margin:0;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</p>
+                          <p style="margin:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.company }} · {{ a.ticket }}</p>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="border:1px solid var(--border);background:var(--input-bg);border-radius:11px;padding:12px 14px">
+                    <p style="margin:0;font-size:13px;font-weight:700;color:var(--denim)">{{ email.selectedCount }} of {{ email.totalAttendees }} attendees selected</p>
+                    <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">From registered attendees of {{ activeEvent.name }}</p>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ email.isListMode }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="position:relative;margin-bottom:10px">
+                    <button onClick="{{ email.listSelect.onToggle }}" style="{{ email.listSelect.btnStyle }}">
+                      <span>{{ email.listSelect.value }}</span>
+                      <span style="color:var(--muted);font-size:10px">▾</span>
+                    </button>
+                    <sc-if value="{{ email.listSelect.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="{{ email.listSelect.popoverStyle }}">
+                        <sc-for list="{{ email.listSelect.options }}" as="o" hint-placeholder-count="4">
+                          <button onClick="{{ o.onSelect }}" style="{{ o.style }}">{{ o.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="border:1px solid var(--border);background:var(--input-bg);border-radius:11px;padding:12px 14px">
+                    <p style="margin:0;font-size:13px;font-weight:700;color:var(--denim)">{{ email.recipientCount }} recipients selected</p>
+                    <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">Synced from HubSpot list {{ email.selectedListName }}</p>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div>
+              <p style="margin:0 0 10px;font-size:13.5px;font-weight:700">Delivery</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;border-radius:11px;padding:4px;background:var(--input-bg);margin-bottom:14px">
+                <sc-for list="{{ email.sendModeOptions }}" as="sm" hint-placeholder-count="2">
+                  <button onClick="{{ sm.onClick }}" style="{{ sm.style }}">{{ sm.label }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ email.isSchedule }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:10px">
+                  <div style="position:relative;min-width:160px;flex:1">
+                    <label style="display:block;margin-bottom:5px;font-size:11.5px;font-weight:600;color:var(--muted)">Date</label>
+                    <button onClick="{{ email.scheduleDateField.onToggle }}" style="{{ email.scheduleDateField.btnStyle }}">
+                      <span>{{ email.scheduleDateField.displayValue }}</span>
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">calendar_month</span>
+                    </button>
+                    <sc-if value="{{ email.scheduleDateField.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;border:1px solid var(--border);background:var(--panel-bg);border-radius:14px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);padding:14px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                          <button onClick="{{ email.scheduleDateField.onPrevMonth }}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);cursor:pointer;font-size:13px">‹</button>
+                          <span style="font-size:13px;font-weight:700">{{ email.scheduleDateField.monthLabel }}</span>
+                          <button onClick="{{ email.scheduleDateField.onNextMonth }}" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text);cursor:pointer;font-size:13px">›</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+                          <sc-for list="{{ email.scheduleDateField.weekdayLabels }}" as="wd" hint-placeholder-count="7">
+                            <span style="text-align:center;font-size:10px;font-weight:700;color:var(--muted)">{{ wd }}</span>
+                          </sc-for>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+                          <sc-for list="{{ email.scheduleDateField.days }}" as="dcell" hint-placeholder-count="42">
+                            <button onClick="{{ dcell.onSelect }}" style="{{ dcell.style }}">{{ dcell.label }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="position:relative;min-width:140px">
+                    <label style="display:block;margin-bottom:5px;font-size:11.5px;font-weight:600;color:var(--muted)">Time</label>
+                    <button onClick="{{ email.scheduleTimeField.onToggle }}" style="{{ email.scheduleTimeField.btnStyle }}">
+                      <span>{{ email.scheduleTimeField.displayValue }}</span>
+                      <span style="color:var(--muted);font-size:16px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
+                    </button>
+                    <sc-if value="{{ email.scheduleTimeField.isOpen }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;border:1px solid var(--border);background:var(--panel-bg);border-radius:14px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);display:flex;max-height:220px">
+                        <div style="flex:1;overflow-y:auto;border-right:1px solid var(--border);padding:6px">
+                          <sc-for list="{{ email.scheduleTimeField.hours }}" as="h" hint-placeholder-count="24">
+                            <button onClick="{{ h.onSelect }}" style="{{ h.style }}">{{ h.label }}</button>
+                          </sc-for>
+                        </div>
+                        <div style="flex:1;overflow-y:auto;padding:6px">
+                          <sc-for list="{{ email.scheduleTimeField.minutes }}" as="m" hint-placeholder-count="4">
+                            <button onClick="{{ m.onSelect }}" style="{{ m.style }}">{{ m.label }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="border:1px solid var(--border);border-top:3px solid var(--accent);border-radius:14px;padding:16px 18px">
+              <p style="margin:0 0 12px;font-size:13.5px;font-weight:700">Summary</p>
+              <dl style="margin:0;display:flex;flex-direction:column;gap:8px;font-size:13px">
+                <sc-for list="{{ email.summaryFields }}" as="f" hint-placeholder-count="6">
+                  <div style="display:flex;justify-content:space-between;gap:12px">
+                    <dt style="margin:0;color:var(--muted)">{{ f.k }}</dt>
+                    <dd style="margin:0;font-weight:600;text-align:right">{{ f.v }}</dd>
+                  </div>
+                </sc-for>
+              </dl>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--input-bg)">
+            <div>
+              <sc-if value="{{ isEditingCampaign }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ onDeleteCampaign }}" style="border:1px solid #d33;background:none;color:#c0392b;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Delete campaign</button>
+              </sc-if>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Cancel</button>
+              <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:none;color:var(--muted);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Save as draft</button>
+              <button onClick="{{ closeModal }}" style="border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">{{ email.sendLabel }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Scanner modal -->
+        <sc-if value="{{ isScannerModal }}" hint-placeholder-val="{{ false }}">
+          <sc-if value="{{ checkin.camera.isPrompt }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:26px 22px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+              <div style="width:56px;height:56px;border-radius:16px;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:28px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24">photo_camera</div>
+              <div>
+                <p style="margin:0 0 6px;font-size:14.5px;font-weight:700">Allow EventOS to use your camera?</p>
+                <p style="margin:0;font-size:12.5px;color:var(--muted);max-width:320px;line-height:1.5">Needed to scan attendee QR codes and check them in automatically.</p>
+              </div>
+              <div style="display:flex;gap:10px;width:100%;max-width:280px">
+                <button onClick="{{ checkin.camera.onDeny }}" style="flex:1;min-height:44px;border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Block</button>
+                <button onClick="{{ checkin.camera.onAllow }}" style="flex:1;min-height:44px;border:none;background:var(--accent);color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Allow</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ checkin.camera.isDenied }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:26px 22px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+              <div style="width:56px;height:56px;border-radius:16px;background:var(--danger-bg,var(--ice));color:#c0392b;display:flex;align-items:center;justify-content:center;font-size:28px;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24">videocam_off</div>
+              <div>
+                <p style="margin:0 0 6px;font-size:14.5px;font-weight:700">Camera access needed</p>
+                <p style="margin:0;font-size:12.5px;color:var(--muted);max-width:320px;line-height:1.5">EventOS can't scan tickets without camera access. Enable it in your browser's site settings, then try again.</p>
+              </div>
+              <button onClick="{{ checkin.camera.onRetry }}" style="min-height:44px;padding:0 22px;border:none;background:var(--accent);color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Try again</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ checkin.camera.isGranted }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px">
+              <div style="position:relative;width:100%;max-width:320px;aspect-ratio:1;border-radius:16px;overflow:hidden;background:radial-gradient(circle at 30% 20%, #232a42, #0B0E1A 65%);display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;inset:14px;border:2px solid rgba(255,255,255,0.5);border-radius:12px"></div>
+                <div style="position:absolute;left:14px;right:14px;height:2px;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:emsScan 1.6s ease-in-out infinite"></div>
+                <p style="position:relative;margin:0;font-size:11px;font-weight:600;color:rgba(255,255,255,0.55);font-family:ui-monospace,monospace">LIVE</p>
+                <sc-if value="{{ checkin.camera.feedback }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;left:10px;right:10px;bottom:10px;border-radius:10px;padding:10px 12px;text-align:center;background:{{ checkin.camera.feedback.ok ? 'rgba(34,197,94,0.9)' : 'rgba(255,255,255,0.15)' }};color:#fff;font-size:12.5px;font-weight:700">{{ checkin.camera.feedback.text }}</div>
+                </sc-if>
+              </div>
+              <p style="margin:0;font-size:13px;color:var(--muted);text-align:center">Point the camera at an attendee's ticket QR code. Check-in happens automatically on a successful scan.</p>
+              <button onClick="{{ checkin.camera.onSimulateScan }}" style="width:100%;max-width:320px;min-height:44px;border:none;background:var(--denim);color:var(--on-denim);border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Simulate a scan</button>
+            </div>
+          </sc-if>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--input-bg)">
+            <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:0 16px;min-height:44px;box-sizing:border-box;font-size:13px;font-weight:700;cursor:pointer">Close</button>
+          </div>
+        </sc-if>
+
+        <!-- Check-in confirm modal -->
+        <sc-if value="{{ isCheckinConfirmModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:22px;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:14px;padding:16px;background:var(--input-bg)">
+              <div style="width:52px;height:52px;flex-shrink:0;border-radius:50%;background:var(--ice);color:var(--denim);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700">{{ checkinConfirm.attendee.initials }}</div>
+              <div style="min-width:0">
+                <p style="margin:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ checkinConfirm.attendee.name }}</p>
+                <p style="margin:2px 0 0;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ checkinConfirm.attendee.email }}</p>
+              </div>
+            </div>
+            <dl style="margin:0;display:flex;flex-direction:column;gap:10px;font-size:13px">
+              <div style="display:flex;justify-content:space-between;gap:12px">
+                <dt style="margin:0;color:var(--muted)">Company</dt>
+                <dd style="margin:0;font-weight:600;text-align:right">{{ checkinConfirm.attendee.company }}</dd>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:12px">
+                <dt style="margin:0;color:var(--muted)">Attendee type</dt>
+                <dd style="margin:0;font-weight:600;text-align:right">{{ checkinConfirm.attendee.ticket }}</dd>
+              </div>
+              <div style="display:flex;justify-content:space-between;gap:12px">
+                <dt style="margin:0;color:var(--muted)">Current status</dt>
+                <dd style="margin:0;font-weight:600;text-align:right">{{ checkinConfirm.attendee.status }}</dd>
+              </div>
+            </dl>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--input-bg)">
+            <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:0 16px;min-height:44px;box-sizing:border-box;font-size:13px;font-weight:700;cursor:pointer">Cancel</button>
+            <button onClick="{{ checkinConfirm.onConfirm }}" style="border:none;background:var(--accent);color:#fff;border-radius:9px;padding:0 18px;min-height:44px;box-sizing:border-box;font-size:13px;font-weight:700;cursor:pointer">{{ checkinConfirm.confirmLabel }}</button>
+          </div>
+        </sc-if>
+
+        <!-- Walk-in modal -->
+        <sc-if value="{{ isWalkinModal }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:0 22px 22px">
+            <iframe title="HubSpot walk-in registration form" style="width:100%;height:460px;border:1px solid var(--border);border-radius:12px;background:#fff" srcdoc="{{ walkinFormSrcdoc }}"></iframe>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--border);background:var(--input-bg)">
+            <button onClick="{{ closeModal }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Close</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Confirm modal -->
+  <sc-if value="{{ confirmModal }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div onClick="{{ confirmModal.onCancel }}" style="position:absolute;inset:0;background:rgba(0,0,0,0.55)"></div>
+      <div style="position:relative;z-index:1;width:100%;max-width:400px;border-radius:16px;background:var(--panel-bg);border:1px solid var(--border);box-shadow:0 30px 60px -20px rgba(0,0,0,0.4);padding:24px">
+        <h2 style="margin:0 0 10px;font-size:16px;font-weight:700">Confirm delete</h2>
+        <p style="margin:0 0 22px;font-size:13.5px;color:var(--muted);line-height:1.5">{{ confirmModal.message }}</p>
+        <div style="display:flex;justify-content:flex-end;gap:10px">
+          <button onClick="{{ confirmModal.onCancel }}" style="border:1px solid var(--border);background:var(--panel-bg);color:var(--muted);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Cancel</button>
+          <button onClick="{{ confirmModal.onConfirm }}" style="border:none;background:#c0392b;color:#fff;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer">Delete</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const THEMES = {
+  aurora: {
+    name: "Aurora", tag: "Light · Airy enterprise SaaS",
+    blurb: "Bright ice-blue canvas, crisp white cards and orange as a focused accent. Calm, spacious and trustworthy for day-to-day planning work.",
+    swatches: ["#FF6633", "#4775FF", "#ECF1FF", "#0B0573"],
+    pageBg: "#F5F7FE", sidebarBg: "#FFFFFF", panelBg: "#FFFFFF", border: "#E1E7F7",
+    text: "#000A27", muted: "#5A6478", accent: "#FF6633", accentSoft: "#FFF1EC",
+    denim: "#0B0573", onDenim: "#FFFFFF", ice: "#ECF1FF", gold: "#FFCB00", cobalt: "#4775FF",
+    success: "#166534", successBg: "#DCFCE7", info: "#0369A1", infoBg: "#E0F2FE",
+    danger: "#991B1B", dangerBg: "#FEE2E2", shadow: "0 30px 80px -40px rgba(11,5,115,0.35)",
+    cardShadow: "0 4px 20px -8px rgba(11,5,115,0.10)", inputBg: "#F5F7FE",
+  },
+  celebration: {
+    name: "Celebration", tag: "Light · Bright pink special edition",
+    blurb: "The Aurora layout re-themed in a bright blush pink, sampled from the team's own water bottle. Same structure, brighter palette.",
+    swatches: ["#EC6C93", "#D45C82", "#FDF1F5", "#F2A0BE"],
+    pageBg: "#FEF8FA", sidebarBg: "#FFFFFF", panelBg: "#FFFFFF", border: "#F6D6E0",
+    text: "#3D2530", muted: "#93707E", accent: "#EC6C93", accentSoft: "#FCE4EA",
+    denim: "#D45C82", onDenim: "#FFFFFF", ice: "#FDF1F5", gold: "#FFCB00", cobalt: "#F2A0BE",
+    success: "#166534", successBg: "#DCFCE7", info: "#0369A1", infoBg: "#E0F2FE",
+    danger: "#991B1B", dangerBg: "#FEE2E2", shadow: "0 30px 80px -40px rgba(212,92,130,0.35)",
+    cardShadow: "0 4px 20px -8px rgba(212,92,130,0.12)", inputBg: "#FEF8FA",
+  },
+  darkAurora: {
+    name: "Dark Aurora", tag: "Dark · Aurora, after hours",
+    blurb: "Aurora's calm structure carried into a deep navy shell with the same orange accent — built for low-light, in-room use during live events.",
+    swatches: ["#FF6633", "#7C9CFF", "#11162A", "#0B0E1A"],
+    pageBg: "#0B0E1A", sidebarBg: "#11162A", panelBg: "#11162A", border: "rgba(255,255,255,0.08)",
+    text: "#F3F5FF", muted: "#93A0C4", accent: "#FF6633", accentSoft: "rgba(255,102,51,0.16)",
+    denim: "#7C9CFF", onDenim: "#0B0E1A", ice: "rgba(124,156,255,0.14)", gold: "#FFCB00", cobalt: "#7C9CFF",
+    success: "#4ADE80", successBg: "rgba(34,197,94,0.16)", info: "#8AB0FF", infoBg: "rgba(71,117,255,0.16)",
+    danger: "#FCA5A5", dangerBg: "rgba(248,113,113,0.16)", shadow: "0 30px 80px -40px rgba(0,0,0,0.7)",
+    cardShadow: "0 12px 40px -24px rgba(0,0,0,0.9)", inputBg: "rgba(255,255,255,0.05)",
+  },
+};
+
+const STATUS_COLORS = {
+  active: (t) => [t.successBg, t.success],
+  draft: (t) => [t.infoBg, t.info],
+  cancelled: (t) => [t.dangerBg, t.danger],
+};
+
+function pagerBtnStyle(disabled) {
+  return [
+    "border:1px solid var(--border)", "background:var(--panel-bg)", "color:var(--text)",
+    "border-radius:8px", "padding:0 16px", "min-height:44px", "box-sizing:border-box", "font-size:12.5px", "font-weight:600",
+    "cursor:" + (disabled ? "default" : "pointer"),
+    "opacity:" + (disabled ? "0.4" : "1"),
+  ].join(";");
+}
+
+function buildWalkinFormSrcdoc(event) {
+  const style = "font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;padding:24px;color:#33475b;background:#fff";
+  const fieldStyle = "display:block;width:100%;box-sizing:border-box;margin-bottom:14px;padding:10px 12px;border:1px solid #cbd6e2;border-radius:6px;font-size:14px";
+  const labelStyle = "display:block;margin-bottom:6px;font-size:12.5px;font-weight:600;color:#33475b";
+  return [
+    "<div style=\"" + style + "\">",
+    "<p style=\"margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#ff7a59\">HubSpot form</p>",
+    "<h2 style=\"margin:0 0 16px;font-size:18px\">Walk-in registration — " + event.name + "</h2>",
+    "<label style=\"" + labelStyle + "\">First name</label><input style=\"" + fieldStyle + "\" placeholder=\"Jane\" />",
+    "<label style=\"" + labelStyle + "\">Last name</label><input style=\"" + fieldStyle + "\" placeholder=\"Doe\" />",
+    "<label style=\"" + labelStyle + "\">Email</label><input style=\"" + fieldStyle + "\" placeholder=\"jane@company.com\" />",
+    "<label style=\"" + labelStyle + "\">Company</label><input style=\"" + fieldStyle + "\" placeholder=\"Company name\" />",
+    "<label style=\"" + labelStyle + "\">Ticket type</label><select style=\"" + fieldStyle + "\"><option>General</option><option>VIP</option><option>Partner</option></select>",
+    "<button style=\"margin-top:6px;border:none;background:#ff7a59;color:#fff;border-radius:6px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer\">Register &amp; check in</button>",
+    "</div>",
+  ].join("");
+}
+
+function parseDateForInput(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}
+
+function parseTimeForInput(timeStr) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(timeStr || "");
+  if (!m) return "";
+  return m[1].padStart(2, "0") + ":" + m[2];
+}
+
+function initials(name) {
+  return name.split(" ").map((n) => n[0]).join("").slice(0, 2);
+}
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const WEEKDAY_LETTERS = ["S","M","T","W","T","F","S"];
+
+function formatDateDisplay(value) {
+  if (!value) return "";
+  const d = new Date(value + "T00:00:00");
+  if (isNaN(d.getTime())) return value;
+  return MONTH_NAMES[d.getMonth()].slice(0, 3) + " " + d.getDate() + ", " + d.getFullYear();
+}
+
+function formatTimeDisplay(value) {
+  if (!value) return "";
+  const [hh, mm] = value.split(":");
+  const h = parseInt(hh, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + ":" + mm + " " + ampm;
+}
+
+function buildCalendarDays(viewYear, viewMonth) {
+  const first = new Date(viewYear, viewMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) {
+    cells.push({ day: daysInPrevMonth - startDow + 1 + i, inMonth: false, dateStr: null });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const mm = String(viewMonth + 1).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    cells.push({ day: d, inMonth: true, dateStr: viewYear + "-" + mm + "-" + dd });
+  }
+  let nextDay = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextDay++, inMonth: false, dateStr: null });
+  }
+  return cells;
+}
+
+function fieldBtnStyle(hasValue) {
+  return [
+    "width:100%", "display:flex", "align-items:center", "justify-content:space-between", "gap:8px",
+    "text-align:left", "min-height:44px", "box-sizing:border-box", "padding:10px 13px",
+    "border-radius:9px", "border:1px solid var(--border)", "background:var(--input-bg)",
+    "color:" + (hasValue ? "var(--text)" : "var(--muted)"),
+    "font-family:inherit", "font-size:13.5px", "cursor:pointer",
+  ].join(";");
+}
+
+function fieldPopoverStyle() {
+  return "position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;border:1px solid var(--border);background:var(--panel-bg);border-radius:12px;box-shadow:0 16px 40px -12px rgba(0,0,0,0.35);overflow:hidden;max-height:260px;overflow-y:auto";
+}
+
+function optionRowStyle(active, t) {
+  return [
+    "display:flex", "align-items:center", "width:100%", "text-align:left", "border:none",
+    "background:" + (active ? t.accentSoft : "none"),
+    "color:" + (active ? t.accent : t.text),
+    "padding:11px 13px", "font-size:13px", "font-weight:" + (active ? "700" : "500"),
+    "cursor:pointer", "font-family:inherit", "min-height:44px", "box-sizing:border-box",
+  ].join(";");
+}
+
+function dayCellStyle(t, inMonth, selected, isToday) {
+  return [
+    "aspect-ratio:1", "display:flex", "align-items:center", "justify-content:center",
+    "border-radius:8px", "font-size:12.5px", "font-weight:700",
+    "border:none", "min-width:36px", "min-height:36px",
+    "cursor:" + (inMonth ? "pointer" : "default"),
+    "background:" + (selected ? t.accent : "transparent"),
+    "color:" + (selected ? "#fff" : !inMonth ? "transparent" : isToday ? t.accent : t.text),
+  ].join(";");
+}
+
+function timeCellStyle(active, t) {
+  return [
+    "display:block", "width:100%", "text-align:center", "border:none",
+    "background:" + (active ? t.accentSoft : "none"),
+    "color:" + (active ? t.accent : t.text),
+    "padding:9px 6px", "font-size:13px", "font-weight:" + (active ? "700" : "500"),
+    "cursor:pointer", "font-family:inherit", "min-height:40px", "box-sizing:border-box", "border-radius:7px",
+  ].join(";");
+}
+
+function pillStyle(active, t, opts) {
+  opts = opts || {};
+  return [
+    "border-radius:" + (opts.radius || "8px"),
+    "padding:" + (opts.padding || "8px 14px"),
+    "font-size:" + (opts.fontSize || "12.5px"),
+    "font-weight:700",
+    "cursor:pointer",
+    "border:" + (active ? "1px solid " + t.accent : "1px solid transparent"),
+    "background:" + (active ? t.accentSoft : "transparent"),
+    "color:" + (active ? t.accent : t.muted),
+    "text-align:center",
+  ].join(";");
+}
+
+const LOADING_TIPS = [
+  "HubSpot lists sync into EventOS every 2 minutes via ScriptRunner Connect.",
+  "Attendees checked in by QR scan show up in the Audit Log within seconds.",
+  "Campaign emails can be scheduled in 15-minute increments for precise send timing.",
+  "Programs group related events together — handy for multi-city tours or recurring series.",
+  "Events don't need a Program — standalone one-offs work fine on their own.",
+  "The Check-in screen is built for tablets at the venue door as much as desktops back at HQ.",
+];
+
+class Component extends DCLogic {
+  state = {
+    theme: "aurora",
+    view: "overview",
+    activeEventId: null,
+    detailEventId: null,
+    vw: typeof window !== "undefined" ? window.innerWidth : 1440,
+    data: null,
+    tipIndex: 0,
+    checkinList: [],
+    checkinQuery: "",
+    checkinPage: 1,
+    manualAdjustment: 0,
+    emailLayout: "B",
+    emailTemplateId: "tpl-01",
+    recipientMode: "attendees",
+    attendeeSearch: "",
+    selectedAttendeeIds: null,
+    listId: "hs-01",
+    sendMode: "now",
+    scheduleDate: "2026-03-12",
+    scheduleTime: "09:00",
+    openPopover: null,
+    calendarView: {},
+    cameraState: "prompt",
+    scanFeedback: null,
+    modal: null,
+    checkinConfirmId: null,
+    checkinConfirmSource: null,
+    auditLoading: false,
+    eventFilter: "all",
+    eventsPage: 1,
+    auditPage: 1,
+    programSearch: "",
+    programFilter: null,
+    eventSearch: "",
+    editingEventId: null,
+    editingCampaignId: null,
+    editingProgramName: null,
+    modalFieldValues: {},
+    deletedProgramIds: [],
+    deletedEventIds: [],
+    deletedCampaignIds: [],
+    removedAttendeeIds: [],
+    confirmModal: null,
+    attendeesSearch: "",
+    attendeesTicketFilter: "all",
+    attendeesStatusFilter: "all",
+    attendeesPage: 1,
+    workingEventOpen: false,
+    workingEventSearch: "",
+    hoveredProgramId: null,
+    tabletDrawerOpen: false,
+  };
+
+  componentDidMount() {
+    this._tipTimer = setInterval(() => {
+      this.setState((s) => ({ tipIndex: (s.tipIndex + 1) % LOADING_TIPS.length }));
+    }, 3200);
+    this._loadTimer = setTimeout(() => {
+      import("./lib/mock-data.js").then((m) => {
+        this.setState({
+          data: m,
+          checkinList: m.attendees.map((a) => ({ ...a })),
+          selectedAttendeeIds: m.attendees.map((a) => a.id),
+        });
+      });
+    }, 10000);
+    this._onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener("resize", this._onResize);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("resize", this._onResize);
+    clearInterval(this._tipTimer);
+    clearTimeout(this._loadTimer);
+    clearTimeout(this._auditTimer);
+    clearTimeout(this._scanFeedbackTimer);
+  }
+
+  askConfirm(message, action) {
+    this.setState({
+      confirmModal: {
+        message,
+        onCancel: () => this.setState({ confirmModal: null }),
+        onConfirm: () => {
+          action();
+          this.setState({ confirmModal: null });
+        },
+      },
+    });
+  }
+
+  goTo(view) {
+    this.setState({ view, detailEventId: null });
+    if (view === "audit") {
+      clearTimeout(this._auditTimer);
+      this.setState({ auditLoading: true });
+      this._auditTimer = setTimeout(() => this.setState({ auditLoading: false }), 10000);
+    }
+  }
+
+  componentWillUnmountAudit() {
+    clearTimeout(this._auditTimer);
+  }
+
+  renderVals() {
+    const state = this.state;
+    const t = THEMES[state.theme];
+    const d = state.data || {
+      events: [], attendees: [], auditLog: [], hubspotLists: [],
+      programs: [], statusLabels: { active: "Active", draft: "Completed", cancelled: "Cancelled" },
+      emailTemplates: [],
+    };
+
+    const rootVarsStyle = [
+      "--page-bg:" + t.pageBg, "--sidebar-bg:" + t.sidebarBg, "--panel-bg:" + t.panelBg,
+      "--border:" + t.border, "--text:" + t.text, "--muted:" + t.muted,
+      "--accent:" + t.accent, "--accent-soft:" + t.accentSoft, "--denim:" + t.denim,
+      "--on-denim:" + t.onDenim, "--ice:" + t.ice, "--gold:" + t.gold, "--cobalt:" + t.cobalt,
+      "--shadow:" + t.shadow, "--card-shadow:" + t.cardShadow, "--input-bg:" + t.inputBg,
+    ].join(";");
+
+    const vw = state.vw;
+    const isDesktop = vw >= 1024;
+    const isTablet = vw >= 768 && vw < 1024;
+    const isPhone = vw < 768;
+    const layout = {
+      isDesktop, isPhone, isTablet,
+      showTopTabs: isPhone,
+      showIconRail: isTablet,
+      headerPad: isDesktop ? "18px 32px" : "16px 20px",
+      mainPad: isDesktop ? "28px 32px" : "18px 16px",
+      statCols: isDesktop ? "repeat(4,1fr)" : "repeat(2,1fr)",
+      split3: isDesktop ? "2fr 1fr" : "1fr",
+      programsCols: isDesktop ? "repeat(3,1fr)" : isTablet ? "repeat(2,1fr)" : "1fr",
+      checkinGridRows: isDesktop ? "1fr" : "minmax(340px,1fr) auto",
+      attendeeRowCols: isDesktop ? "34px 2fr 1.2fr 0.8fr 130px 110px" : "34px 1fr 130px 100px",
+    };
+
+    // Custom field popovers (select / date / time) — replaces native selects & date/time inputs
+    const openPopover = state.openPopover;
+    const togglePopover = (key) => this.setState((s) => ({ openPopover: s.openPopover === key ? null : key }));
+    const closePopover = () => this.setState({ openPopover: null });
+    const ensureCalView = (key, valueStr) => {
+      const existing = state.calendarView[key];
+      if (existing) return existing;
+      const d = valueStr ? new Date(valueStr + "T00:00:00") : new Date();
+      if (isNaN(d.getTime())) return { year: new Date().getFullYear(), month: new Date().getMonth() };
+      return { year: d.getFullYear(), month: d.getMonth() };
+    };
+    const navCalendar = (key, valueStr, delta) => {
+      this.setState((s) => {
+        const cur = s.calendarView[key] || ensureCalView(key, valueStr);
+        let m = cur.month + delta, y = cur.year;
+        if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+        return { calendarView: { ...s.calendarView, [key]: { year: y, month: m } } };
+      });
+    };
+    const makeSelectField = (key, value, options, onChange, placeholder) => {
+      const isOpen = openPopover === key;
+      return {
+        key, value: value || placeholder || "Select…", hasValue: !!value, isOpen,
+        onToggle: () => togglePopover(key),
+        options: options.map((o) => ({
+          label: o, active: o === value,
+          style: optionRowStyle(o === value, t),
+          onSelect: () => { onChange(o); closePopover(); },
+        })),
+        btnStyle: fieldBtnStyle(!!value),
+        popoverStyle: fieldPopoverStyle(),
+      };
+    };
+    const makeDateField = (key, value, onChange) => {
+      const isOpen = openPopover === key;
+      const view = state.calendarView[key] || ensureCalView(key, value);
+      const cells = buildCalendarDays(view.year, view.month);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      return {
+        key, value, hasValue: !!value,
+        displayValue: value ? formatDateDisplay(value) : "Select date",
+        isOpen, onToggle: () => togglePopover(key),
+        btnStyle: fieldBtnStyle(!!value),
+        monthLabel: MONTH_NAMES[view.month] + " " + view.year,
+        onPrevMonth: () => navCalendar(key, value, -1),
+        onNextMonth: () => navCalendar(key, value, 1),
+        weekdayLabels: WEEKDAY_LETTERS,
+        days: cells.map((c) => ({
+          label: c.inMonth ? String(c.day) : "",
+          style: dayCellStyle(t, c.inMonth, c.inMonth && c.dateStr === value, c.inMonth && c.dateStr === todayStr),
+          onSelect: c.inMonth ? () => { onChange(c.dateStr); closePopover(); } : undefined,
+        })),
+      };
+    };
+    const makeTimeField = (key, value, onChange) => {
+      const isOpen = openPopover === key;
+      const parts = (value || "09:00").split(":");
+      const hh = parts[0], mm = parts[1];
+      const hourList = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+      const minuteList = ["00", "15", "30", "45"];
+      return {
+        key, value, hasValue: !!value,
+        displayValue: value ? formatTimeDisplay(value) : "Select time",
+        isOpen, onToggle: () => togglePopover(key),
+        btnStyle: fieldBtnStyle(!!value),
+        hours: hourList.map((h) => ({ label: h, style: timeCellStyle(h === hh, t), onSelect: () => onChange(h + ":" + (mm || "00")) })),
+        minutes: minuteList.map((m) => ({ label: m, style: timeCellStyle(m === mm, t), onSelect: () => { onChange(hh + ":" + m); closePopover(); } })),
+      };
+    };
+
+    const THEME_IDS = ["aurora", "celebration", "darkAurora"];
+    const themeSidebarOptions = THEME_IDS.map((id) => {
+      const active = state.theme === id;
+      const th = THEMES[id];
+      return {
+        id,
+        label: th.name,
+        onClick: () => this.setState({ theme: id }),
+        dotStyle: "width:9px;height:9px;border-radius:50%;background:" + th.accent + ";flex-shrink:0",
+        style: [
+          "display:flex", "align-items:center", "gap:10px", "width:100%", "text-align:left",
+          "padding:9px 12px", "border-radius:9px", "border:none", "cursor:pointer", "font-family:inherit",
+          "font-size:12.5px", "font-weight:" + (active ? "700" : "600"),
+          "background:" + (active ? t.accentSoft : "transparent"),
+          "color:" + (active ? t.accent : t.muted),
+        ].join(";"),
+      };
+    });
+    const themeRailOptions = THEME_IDS.map((id) => {
+      const active = state.theme === id;
+      const th = THEMES[id];
+      return {
+        id,
+        title: th.name,
+        onClick: () => this.setState({ theme: id }),
+        style: [
+          "width:22px", "height:22px", "border-radius:50%", "cursor:pointer", "padding:0",
+          "background:" + th.accent,
+          "border:2px solid " + (active ? t.text : "transparent"),
+          "box-shadow:" + (active ? "0 0 0 2px " + t.panelBg : "none"),
+        ].join(";"),
+      };
+    });
+
+    const ICON_FONT = "font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20;font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;-webkit-font-smoothing:antialiased;";
+    const NAV_ABBR = { overview: "bar_chart", events: "folder_open", eventDetails: "description", attendees: "group", checkin: "task_alt", email: "mail", audit: "history" };
+    const navDefs = [
+      { id: "overview", label: "Overview" },
+      { id: "events", label: "Programs & Events" },
+      { id: "eventDetails", label: "Event Details" },
+      { id: "attendees", label: "Registered Attendees" },
+      { id: "checkin", label: "Check-in" },
+      { id: "email", label: "Email" },
+      { id: "audit", label: "Audit Log" },
+    ];
+    const eventScopedIds = ["eventDetails", "attendees", "checkin", "email"];
+    const navItems = navDefs.map((n) => {
+      const active = n.id === "eventDetails"
+        ? state.view === "events" && !!state.detailEventId && state.detailEventId === state.activeEventId
+        : state.view === n.id && !(n.id === "events" && state.detailEventId);
+      const disabled = eventScopedIds.includes(n.id) && !state.activeEventId;
+      const noop = () => {};
+      return {
+        ...n,
+        active, disabled,
+        onClick: disabled ? noop : n.id === "eventDetails"
+          ? () => this.setState({ view: "events", detailEventId: state.activeEventId, tabletDrawerOpen: false })
+          : () => { this.goTo(n.id); this.setState({ tabletDrawerOpen: false }); },
+        railStyle: ICON_FONT + [
+          "width:40px", "height:40px", "border-radius:10px",
+          "border:1px solid " + (active ? t.accent : "transparent"),
+          "display:flex", "align-items:center", "justify-content:center",
+          "font-size:20px", "cursor:" + (disabled ? "not-allowed" : "pointer"),
+          "background:" + (active ? t.accentSoft : "transparent"),
+          "color:" + (disabled ? t.muted : active ? t.accent : t.muted),
+          "opacity:" + (disabled ? "0.4" : "1"),
+        ].join(";"),
+        railDotStyle: [
+          "width:4px", "height:4px", "border-radius:50%", "margin-top:3px",
+          "background:" + (active ? t.accent : "transparent"),
+        ].join(";"),
+        abbr: NAV_ABBR[n.id] || n.label.slice(0, 2).toUpperCase(),
+        style: [
+          "position:relative", "display:flex", "align-items:center", "gap:10px",
+          "padding:10px 12px 10px 16px", "border-radius:9px", "border:none",
+          "cursor:" + (disabled ? "not-allowed" : "pointer"),
+          "text-align:left", "font-size:13.5px", "font-weight:600",
+          "background:" + (active ? t.accentSoft : "transparent"),
+          "color:" + (disabled ? t.muted : active ? t.accent : t.muted),
+          "opacity:" + (disabled ? "0.55" : "1"),
+        ].join(";"),
+        barStyle: [
+          "position:absolute", "left:0", "top:50%", "transform:translateY(-50%)",
+          "width:3px", "height:16px", "border-radius:0 3px 3px 0",
+          "background:" + (active ? t.accent : "transparent"),
+        ].join(";"),
+        tabStyle: (disabled
+          ? ["border-radius:999px", "padding:8px 14px", "font-size:12.5px", "font-weight:700", "cursor:not-allowed", "border:1px solid transparent", "background:transparent", "color:" + t.muted, "opacity:0.55"].join(";")
+          : pillStyle(active, t, { radius: "999px", padding: "8px 14px", fontSize: "12.5px" })) + ";white-space:nowrap;flex-shrink:0",
+      };
+    });
+    const navWorkspace = navItems.filter((n) => n.id === "overview" || n.id === "events");
+    const navEventScoped = navItems.filter((n) => n.id === "eventDetails" || n.id === "attendees" || n.id === "checkin" || n.id === "email");
+    const navAdmin = navItems.filter((n) => n.id === "audit");
+    const toggleTabletDrawer = () => this.setState((s) => ({ tabletDrawerOpen: !s.tabletDrawerOpen }));
+    const closeTabletDrawer = () => this.setState({ tabletDrawerOpen: false });
+
+    const liveEvents = d.events.filter((e) => !state.deletedEventIds.includes(e.id));
+    const hasWorkingEvent = !!state.activeEventId;
+    const activeEvent = liveEvents.find((e) => e.id === state.activeEventId) || {
+      name: "", date: "", time: "", location: "", registered: 0, capacity: 0,
+    };
+    const detailEvent = liveEvents.find((e) => e.id === state.detailEventId) || null;
+
+    function statusMeta(status) {
+      const [bg, fg] = (STATUS_COLORS[status] || STATUS_COLORS.draft)(t);
+      return { statusBg: bg, statusFg: fg, statusLabel: d.statusLabels[status] || status };
+    }
+
+    function withMeta(e) {
+      const pct = Math.min(100, Math.round((e.registered / e.capacity) * 100));
+      return {
+        ...e, ...statusMeta(e.status), pct,
+        pctStr: pct + "%",
+        barColor: pct > 90 ? t.gold : t.accent,
+        dateDay: e.date.split(" ")[0], dateNum: e.date.split(" ")[1].replace(",", ""),
+        onOpen: () => this.setState({ detailEventId: e.id, activeEventId: e.id }),
+      };
+    }
+
+    const meta = (() => {
+      if (state.view === "events" && detailEvent) {
+        return { title: "Event Details", subtitle: "Full record for the selected event" };
+      }
+      const map = {
+        overview: { title: "Overview", subtitle: "Everything happening across your events" },
+        events: { title: "Programs & Events", subtitle: "Create, manage and archive your event lineup" },
+        attendees: { title: "Registered Attendees", subtitle: "Full attendee roster for the working event" },
+        checkin: { title: "Check-in", subtitle: "Scan, search or add attendees at the door" },
+        email: { title: "Email", subtitle: "Send and schedule campaigns to attendees" },
+        audit: { title: "Audit Log", subtitle: "A complete record of team activity" },
+      };
+      return { ...map[state.view] };
+    })();
+
+    // Overview
+    const stats = [
+      { label: "Events this month", value: "3", delta: "Across 2 programs" },
+      { label: "Total registered", value: "1,197", delta: "+284 this week" },
+      { label: "Registered this week", value: "284", delta: "Across all events" },
+      { label: "Emails scheduled this week", value: "3", delta: "Across 3 events" },
+    ];
+    const upcomingEvents = liveEvents.filter((e) => e.status !== "cancelled").slice(0, 4).map(withMeta.bind(this));
+    const recentActivity = d.auditLog.slice(0, 5);
+
+    // Events list
+    const eventFilters = [
+      { id: "all", label: "All" }, { id: "active", label: "Active" },
+      { id: "cancelled", label: "Cancelled" }, { id: "draft", label: "Completed" },
+    ].map((f) => {
+      const active = state.eventFilter === f.id;
+      return { ...f, onClick: () => this.setState({ eventFilter: f.id, eventsPage: 1 }), style: pillStyle(active, t, { radius: "9px" }) };
+    });
+    const programFilteredEvents = state.programFilter === "__unassigned__"
+      ? liveEvents.filter((e) => !e.program)
+      : state.programFilter
+      ? liveEvents.filter((e) => e.program === state.programFilter)
+      : liveEvents;
+    const statusFilteredEvents = state.eventFilter === "all" ? programFilteredEvents : programFilteredEvents.filter((e) => e.status === state.eventFilter);
+    const eq = state.eventSearch.toLowerCase();
+    const filteredEvents = statusFilteredEvents.filter((e) => e.name.toLowerCase().includes(eq) || e.location.toLowerCase().includes(eq));
+    const EVENTS_PAGE_SIZE = 5;
+    const eventsTotalPages = Math.max(1, Math.ceil(filteredEvents.length / EVENTS_PAGE_SIZE));
+    const eventsPageNum = Math.min(state.eventsPage, eventsTotalPages);
+    const eventsWithMeta = filteredEvents.slice((eventsPageNum - 1) * EVENTS_PAGE_SIZE, eventsPageNum * EVENTS_PAGE_SIZE).map(withMeta.bind(this));
+    const eventsPager = {
+      label: "Page " + eventsPageNum + " of " + eventsTotalPages + " · " + filteredEvents.length + " events",
+      prevStyle: pagerBtnStyle(eventsPageNum <= 1), nextStyle: pagerBtnStyle(eventsPageNum >= eventsTotalPages),
+      onPrev: () => this.setState({ eventsPage: Math.max(1, eventsPageNum - 1) }),
+      onNext: () => this.setState({ eventsPage: Math.min(eventsTotalPages, eventsPageNum + 1) }),
+    };
+    const liveProgramList = d.programs.filter((p) => !state.deletedProgramIds.includes(p));
+    const unassignedCount = liveEvents.filter((e) => !e.program).length;
+    const ps = state.programSearch.toLowerCase();
+    const noProgramCard = { id: "__unassigned__", name: "No program (standalone)", countLabel: unassignedCount + (unassignedCount === 1 ? " event" : " events"), editable: false, sortDate: -Infinity };
+    const namedProgramCards = liveProgramList.map((p) => {
+      const eventsForP = liveEvents.filter((e) => e.program === p);
+      const count = eventsForP.length;
+      const dates = eventsForP.map((e) => new Date(e.date).getTime()).filter((n) => !isNaN(n));
+      const sortDate = dates.length ? Math.min(...dates) : Infinity;
+      return { id: p, name: p, countLabel: count + (count === 1 ? " event" : " events"), editable: true, sortDate };
+    });
+    const allProgramCards = [noProgramCard, ...namedProgramCards];
+    const curatedProgramCards = [noProgramCard, ...[...namedProgramCards].sort((a, b) => a.sortDate - b.sortDate).slice(0, 2)];
+    const programCards = (ps ? allProgramCards : curatedProgramCards)
+      .filter((p) => p.name.toLowerCase().includes(ps))
+      .map((p) => {
+        const active = state.programFilter === p.id;
+        const iconsVisible = !isDesktop || state.hoveredProgramId === p.id;
+        return {
+          ...p, active,
+          editableRightPad: p.editable ? "56px" : "0",
+          onMouseEnter: () => this.setState({ hoveredProgramId: p.id }),
+          onMouseLeave: () => this.setState((s) => (s.hoveredProgramId === p.id ? { hoveredProgramId: null } : null)),
+          iconWrapStyle: "position:absolute;top:4px;right:24px;display:flex;gap:2px;opacity:" + (iconsVisible ? "1" : "0") + ";transition:opacity 0.12s ease;pointer-events:" + (iconsVisible ? "auto" : "none"),
+          onClick: () => this.setState({ programFilter: active ? null : p.id, eventsPage: 1 }),
+          onEdit: (ev) => {
+            ev.stopPropagation();
+            this.setState({ modal: "program", editingProgramName: p.name, modalFieldValues: { pname: p.name } });
+          },
+          onDelete: (ev) => {
+            ev.stopPropagation();
+            this.askConfirm("You are deleting \"" + p.name + "\". Its events will become standalone. Are you sure?", () => {
+              this.setState((s) => ({
+                deletedProgramIds: [...s.deletedProgramIds, p.name],
+                programFilter: s.programFilter === p.id ? null : s.programFilter,
+              }));
+            });
+          },
+          style: [
+            "display:flex", "align-items:center", "justify-content:space-between", "text-align:left",
+            "border-radius:12px", "padding:12px 14px", "cursor:pointer", "width:100%",
+            "border:1px solid " + (active ? t.accent : t.border),
+            "background:" + (active ? t.accentSoft : t.inputBg),
+            "color:" + t.text, "font-family:inherit",
+          ].join(";"),
+        };
+      });
+    const activeProgramChip = state.programFilter
+      ? (allProgramCards.find((p) => p.id === state.programFilter) || null)
+      : null;
+    const clearProgramFilter = () => this.setState({ programFilter: null, eventsPage: 1 });
+
+    // Detail
+    let detail = null;
+    if (detailEvent) {
+      const pct = Math.min(100, Math.round((detailEvent.registered / detailEvent.capacity) * 100));
+      const checkedIn = d.attendees.filter((a) => a.status === "checked-in").length;
+      const sm = statusMeta(detailEvent.status);
+      detail = {
+        ...detailEvent, ...sm, pct, pctStr: pct + "%",
+        barColor: pct > 90 ? t.gold : t.accent,
+        remaining: detailEvent.capacity - detailEvent.registered,
+        isActive: detailEvent.id === state.activeEventId,
+        showSetActive: detailEvent.id !== state.activeEventId,
+        onSetActive: () => this.setState({ activeEventId: detailEvent.id }),
+        onEdit: () => this.setState({
+          modal: "event",
+          editingEventId: detailEvent.id,
+          modalFieldValues: {
+            name: detailEvent.name,
+            program: detailEvent.program || "No program",
+            date: parseDateForInput(detailEvent.date),
+            time: parseTimeForInput(detailEvent.time),
+            location: detailEvent.location,
+            capacity: String(detailEvent.capacity),
+            status: (d.statusLabels[detailEvent.status] || detailEvent.status),
+          },
+        }),
+        stats: [
+          { label: "Registered", value: detailEvent.registered.toLocaleString() },
+          { label: "Capacity", value: detailEvent.capacity.toLocaleString() },
+          { label: "Checked in", value: String(checkedIn) },
+          { label: "Filled", value: pct + "%" },
+        ],
+        preview: d.attendees.slice(0, 5).map((a) => ({
+          ...a, initials: initials(a.name),
+          statusText: a.status === "checked-in" ? "In · " + a.checkedInAt : "Registered",
+          statusColor: a.status === "checked-in" ? t.success : t.muted,
+        })),
+        fields: [
+          { k: "Program", v: detailEvent.program }, { k: "Location", v: detailEvent.location },
+          { k: "Date", v: detailEvent.date }, { k: "Time", v: detailEvent.time },
+          { k: "Source", v: "HubSpot (synced)" },
+        ],
+      };
+    }
+
+    // Registered Attendees
+    const liveAttendeeList = state.checkinList.filter((a) => !state.removedAttendeeIds.includes(a.id));
+    const ticketTypes = ["all", ...Array.from(new Set(liveAttendeeList.map((a) => a.ticket)))];
+    const az = state.attendeesSearch.toLowerCase();
+    const attendeesMatches = liveAttendeeList
+      .filter((a) => state.attendeesTicketFilter === "all" || a.ticket === state.attendeesTicketFilter)
+      .filter((a) => state.attendeesStatusFilter === "all" || a.status === state.attendeesStatusFilter)
+      .filter((a) => a.name.toLowerCase().includes(az) || a.email.toLowerCase().includes(az) || a.company.toLowerCase().includes(az));
+    const ATTENDEES_PAGE_SIZE = 10;
+    const attendeesTotalPages = Math.max(1, Math.ceil(attendeesMatches.length / ATTENDEES_PAGE_SIZE));
+    const attendeesPageNum = Math.min(state.attendeesPage, attendeesTotalPages);
+    const attendeesPager = {
+      label: "Page " + attendeesPageNum + " of " + attendeesTotalPages + " · " + attendeesMatches.length + " attendees",
+      prevStyle: pagerBtnStyle(attendeesPageNum <= 1), nextStyle: pagerBtnStyle(attendeesPageNum >= attendeesTotalPages),
+      onPrev: () => this.setState({ attendeesPage: Math.max(1, attendeesPageNum - 1) }),
+      onNext: () => this.setState({ attendeesPage: Math.min(attendeesTotalPages, attendeesPageNum + 1) }),
+    };
+    const attendeesRows = attendeesMatches
+      .slice((attendeesPageNum - 1) * ATTENDEES_PAGE_SIZE, attendeesPageNum * ATTENDEES_PAGE_SIZE)
+      .map((a) => ({
+        ...a, initials: initials(a.name),
+        statusLabel: a.status === "checked-in" ? "Checked in · " + a.checkedInAt : "Registered",
+        statusColor: a.status === "checked-in" ? t.success : t.muted,
+        canRemove: a.status !== "checked-in",
+        onRemove: () => {
+          this.askConfirm("You are removing \"" + a.name + "\" from this event's roster. Are you sure?", () => {
+            this.setState((s) => ({ removedAttendeeIds: [...s.removedAttendeeIds, a.id] }));
+          });
+        },
+      }));
+    const attendeesTicketOptions = ticketTypes.map((tk) => {
+      const active = state.attendeesTicketFilter === tk;
+      return { id: tk, label: tk === "all" ? "All" : tk, onClick: () => this.setState({ attendeesTicketFilter: tk, attendeesPage: 1 }), style: pillStyle(active, t, { radius: "9px" }) };
+    });
+    const attendeesStatusOptions = [
+      { id: "all", label: "All statuses" }, { id: "checked-in", label: "Checked in" }, { id: "registered", label: "Registered" },
+    ].map((o) => {
+      const active = state.attendeesStatusFilter === o.id;
+      return { ...o, onClick: () => this.setState({ attendeesStatusFilter: o.id, attendeesPage: 1 }), style: pillStyle(active, t, { radius: "9px" }) };
+    });
+    const attendeesStats = [
+      { label: "Registered", value: String(liveAttendeeList.length) },
+      { label: "Checked in", value: String(liveAttendeeList.filter((a) => a.status === "checked-in").length) },
+      { label: "Not checked in", value: String(liveAttendeeList.filter((a) => a.status !== "checked-in").length) },
+    ];
+
+    // Check-in
+    const checkedInCount = state.checkinList.filter((a) => a.status === "checked-in").length;
+    const liveCount = Math.max(0, checkedInCount + state.manualAdjustment);
+    const capacity = activeEvent.capacity || 0;
+    const livePct = capacity ? Math.min(100, Math.round((liveCount / capacity) * 100)) : 0;
+    const liveMeta = {
+      liveCount, capacity, pct: livePct, pctStr: livePct + "%",
+      barColor: livePct > 90 ? t.gold : t.accent,
+      manualAdjustment: state.manualAdjustment,
+      onIncrement: () => this.setState((s) => ({ manualAdjustment: s.manualAdjustment + 1 })),
+      onDecrement: () => this.setState((s) => ({ manualAdjustment: Math.max(-checkedInCount, s.manualAdjustment - 1) })),
+      onReset: () => this.setState({ manualAdjustment: 0 }),
+      showReset: state.manualAdjustment !== 0,
+    };
+    const openScanner = () => this.setState({ modal: "scanner", cameraState: "prompt", scanFeedback: null });
+    const openWalkin = () => this.setState({ modal: "walkin" });
+    const camera = {
+      state: state.cameraState,
+      isPrompt: state.cameraState === "prompt",
+      isGranted: state.cameraState === "granted",
+      isDenied: state.cameraState === "denied",
+      onAllow: () => this.setState({ cameraState: "granted", scanFeedback: null }),
+      onDeny: () => this.setState({ cameraState: "denied" }),
+      onRetry: () => this.setState({ cameraState: "prompt" }),
+      feedback: state.scanFeedback,
+      onSimulateScan: () => {
+        const candidates = state.checkinList.filter((a) => a.status !== "checked-in");
+        clearTimeout(this._scanFeedbackTimer);
+        if (!candidates.length) {
+          this.setState({ scanFeedback: { text: "Everyone is already checked in", ok: false } });
+          this._scanFeedbackTimer = setTimeout(() => this.setState({ scanFeedback: null }), 2400);
+        } else {
+          const pick = candidates[Math.floor(Math.random() * candidates.length)];
+          this.setState({ modal: "checkinConfirm", checkinConfirmId: pick.id, checkinConfirmSource: "scan", scanFeedback: null });
+        }
+      },
+    };
+    const q = state.checkinQuery.toLowerCase();
+    const checkinMatches = state.checkinList
+      .filter((a) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q));
+    const CHECKIN_PAGE_SIZE = 5;
+    const checkinTotalPages = Math.max(1, Math.ceil(checkinMatches.length / CHECKIN_PAGE_SIZE));
+    const checkinPageNum = Math.min(state.checkinPage, checkinTotalPages);
+    const checkinPager = {
+      label: "Page " + checkinPageNum + " of " + checkinTotalPages + " · " + checkinMatches.length + " attendees",
+      prevStyle: pagerBtnStyle(checkinPageNum <= 1), nextStyle: pagerBtnStyle(checkinPageNum >= checkinTotalPages),
+      onPrev: () => this.setState({ checkinPage: Math.max(1, checkinPageNum - 1) }),
+      onNext: () => this.setState({ checkinPage: Math.min(checkinTotalPages, checkinPageNum + 1) }),
+    };
+    const filteredCheckin = checkinMatches
+      .slice((checkinPageNum - 1) * CHECKIN_PAGE_SIZE, checkinPageNum * CHECKIN_PAGE_SIZE)
+      .map((a) => {
+        const done = a.status === "checked-in";
+        return {
+          ...a, initials: initials(a.name),
+          rowBg: done ? t.inputBg : t.panelBg,
+          btnLabel: done ? "In · " + a.checkedInAt : "Check in",
+          btnStyle: [
+            "display:flex", "align-items:center", "justify-content:center", "gap:6px", "border:none", "border-radius:8px",
+            "padding:0 14px", "min-height:44px", "box-sizing:border-box", "font-size:12.5px", "font-weight:700", "cursor:pointer", "flex-shrink:0",
+            "background:" + (done ? t.successBg : t.accent),
+            "color:" + (done ? t.success : "#fff"),
+          ].join(";"),
+          onToggle: () => {
+            this.setState({ modal: "checkinConfirm", checkinConfirmId: a.id, checkinConfirmSource: "list" });
+          },
+        };
+      });
+    const checkinConfirmSource = state.checkinList.find((x) => x.id === state.checkinConfirmId) || null;
+    const checkinConfirm = checkinConfirmSource
+      ? {
+          isCheckout: checkinConfirmSource.status === "checked-in",
+          confirmLabel: checkinConfirmSource.status === "checked-in" ? "Confirm check-out" : "Confirm check-in",
+          attendee: { ...checkinConfirmSource, initials: initials(checkinConfirmSource.name) },
+          onConfirm: () => {
+            const targetId = checkinConfirmSource.id;
+            const wasCheckedIn = checkinConfirmSource.status === "checked-in";
+            this.setState((s) => ({
+              checkinList: s.checkinList.map((x) =>
+                x.id === targetId ? { ...x, status: wasCheckedIn ? "registered" : "checked-in", checkedInAt: wasCheckedIn ? null : "now" } : x
+              ),
+              modal: null, checkinConfirmId: null,
+            }));
+          },
+        }
+      : null;
+    const selectableEvents = liveEvents.filter((e) => e.status !== "cancelled");
+    const mobileEventSelect = makeSelectField(
+      "mobileEventSelect",
+      activeEvent.name || "",
+      selectableEvents.map((e) => e.name),
+      (name) => {
+        const ev = selectableEvents.find((e) => e.name === name);
+        if (ev) this.setState({ activeEventId: ev.id });
+      }
+    );
+    const wq = state.workingEventSearch.toLowerCase();
+    const workingEventMatches = selectableEvents.filter((e) => e.name.toLowerCase().includes(wq));
+    const workingEventPicker = {
+      isOpen: state.workingEventOpen,
+      search: state.workingEventSearch,
+      label: hasWorkingEvent ? activeEvent.name : "Select an event…",
+      labelColor: hasWorkingEvent ? t.text : t.muted,
+      matches: workingEventMatches.map((e) => ({
+        ...e,
+        onSelect: () => this.setState({ activeEventId: e.id, workingEventOpen: false, workingEventSearch: "", tabletDrawerOpen: false }),
+      })),
+      onToggle: () => this.setState((s) => ({ workingEventOpen: !s.workingEventOpen, workingEventSearch: "" })),
+      onSearch: (e) => this.setState({ workingEventSearch: e.target.value }),
+    };
+    const workingEventRail = {
+      abbr: "confirmation_number",
+      style: ICON_FONT + [
+        "width:40px", "height:40px", "border-radius:10px",
+        "border:1px dashed " + (hasWorkingEvent ? t.accent : t.border),
+        "display:flex", "align-items:center", "justify-content:center",
+        "font-size:18px", "color:" + (hasWorkingEvent ? t.accent : t.muted),
+        "cursor:pointer", "background:transparent",
+        "opacity:" + (hasWorkingEvent ? "1" : "0.55"),
+      ].join(";"),
+    };
+
+    // Email
+    const template = d.emailTemplates.find((tp) => tp.id === state.emailTemplateId) || d.emailTemplates[0] || { name: "" };
+    const selectedList = d.hubspotLists.find((l) => l.id === state.listId) || d.hubspotLists[0] || { name: "", contacts: 0 };
+    const selectedIds = state.selectedAttendeeIds || [];
+    let recipientCount = 0;
+    if (state.recipientMode === "attendees") {
+      recipientCount = selectedIds.length;
+    } else {
+      recipientCount = selectedList.contacts;
+    }
+    const scheduleLabel = formatDateDisplay(state.scheduleDate) + " at " + formatTimeDisplay(state.scheduleTime);
+
+    const as = state.attendeeSearch.toLowerCase();
+    const attendeePickerList = (d.attendees || [])
+      .filter((a) => a.name.toLowerCase().includes(as) || a.email.toLowerCase().includes(as) || a.company.toLowerCase().includes(as))
+      .map((a) => {
+        const checked = selectedIds.includes(a.id);
+        return {
+          ...a, initials: initials(a.name), checked,
+          checkMark: checked ? "✓" : "",
+          checkboxStyle: [
+            "width:18px", "height:18px", "flex-shrink:0", "border-radius:5px",
+            "display:flex", "align-items:center", "justify-content:center",
+            "font-size:11px", "font-weight:800", "line-height:1",
+            "border:" + (checked ? "none" : "1.5px solid " + t.border),
+            "background:" + (checked ? t.accent : "transparent"),
+            "color:#fff",
+          ].join(";"),
+          onToggle: () => {
+            this.setState((s) => {
+              const cur = s.selectedAttendeeIds || [];
+              return {
+                selectedAttendeeIds: cur.includes(a.id) ? cur.filter((id) => id !== a.id) : [...cur, a.id],
+              };
+            });
+          },
+        };
+      });
+    const campaignsForEvent = (d.emailCampaigns || []).filter((c) => c.eventId === activeEvent.id && !state.deletedCampaignIds.includes(c.id));
+    const campaignStatusMeta = { sent: [t.successBg, t.success, "Sent"], scheduled: [t.infoBg, t.info, "Scheduled"], draft: [t.ice, t.muted, "Draft"] };
+    const scheduleRows = campaignsForEvent.map((c) => {
+      const [bg, fg, label] = campaignStatusMeta[c.status] || campaignStatusMeta.draft;
+      const editable = c.status !== "sent";
+      return {
+        ...c, statusBg: bg, statusFg: fg, statusLabel: label, recipientsLabel: c.recipients.toLocaleString(),
+        editable, rowCursor: editable ? "pointer" : "default",
+        rowHoverBg: editable ? t.inputBg : "transparent",
+        onOpen: editable ? () => {
+          const tpl = (d.emailTemplates || []).find((tp) => tp.name === c.template);
+          this.setState({
+            modal: "email", editingCampaignId: c.id,
+            emailTemplateId: tpl ? tpl.id : state.emailTemplateId,
+            sendMode: c.status === "scheduled" ? "schedule" : "now",
+          });
+        } : undefined,
+      };
+    });
+    const emailStats = [
+      { label: "Sent", value: String(campaignsForEvent.filter((c) => c.status === "sent").length) },
+      { label: "Scheduled", value: String(campaignsForEvent.filter((c) => c.status === "scheduled").length) },
+      { label: "Drafts", value: String(campaignsForEvent.filter((c) => c.status === "draft").length) },
+    ];
+    const templateSelect = makeSelectField(
+      "email:template",
+      template.name || "",
+      d.emailTemplates.map((tp) => tp.name),
+      (name) => {
+        const tp = d.emailTemplates.find((x) => x.name === name);
+        if (tp) this.setState({ emailTemplateId: tp.id });
+      }
+    );
+    const listSelect = makeSelectField(
+      "email:list",
+      selectedList ? selectedList.name + " · " + selectedList.contacts.toLocaleString() + " contacts" : "",
+      d.hubspotLists.map((l) => l.name + " · " + l.contacts.toLocaleString() + " contacts"),
+      (label) => {
+        const l = d.hubspotLists.find((x) => label.indexOf(x.name) === 0);
+        if (l) this.setState({ listId: l.id });
+      }
+    );
+    const scheduleDateField = makeDateField("email:scheduleDate", state.scheduleDate, (v) => this.setState({ scheduleDate: v }));
+    const scheduleTimeField = makeTimeField("email:scheduleTime", state.scheduleTime, (v) => this.setState({ scheduleTime: v }));
+
+    const email = {
+      gridCols: isDesktop ? "3fr 2fr" : "1fr",
+      templates: d.emailTemplates, templateId: state.emailTemplateId, templateSelect,
+      isAttendeesMode: state.recipientMode === "attendees",
+      isListMode: state.recipientMode === "list",
+      recipientModeOptions: [
+        { id: "attendees", label: "Event attendees" }, { id: "list", label: "HubSpot list" },
+      ].map((m) => {
+        const active = state.recipientMode === m.id;
+        return { ...m, onClick: () => this.setState({ recipientMode: m.id }), style: [
+          "border-radius:8px", "padding:9px 10px", "font-size:12.5px", "font-weight:600", "cursor:pointer",
+          "border:none", "background:" + (active ? t.panelBg : "transparent"),
+          "color:" + (active ? t.accent : t.muted),
+          "box-shadow:" + (active ? "0 1px 3px rgba(0,0,0,0.12)" : "none"),
+        ].join(";") };
+      }),
+      attendeeSearch: state.attendeeSearch,
+      onAttendeeSearch: (e) => this.setState({ attendeeSearch: e.target.value }),
+      attendeePickerList,
+      selectedCount: selectedIds.length,
+      totalAttendees: (d.attendees || []).length,
+      onSelectAll: () => this.setState({ selectedAttendeeIds: (d.attendees || []).map((a) => a.id) }),
+      onSelectNone: () => this.setState({ selectedAttendeeIds: [] }),
+      onSelectCheckedIn: () => this.setState({ selectedAttendeeIds: (d.attendees || []).filter((a) => a.status === "checked-in").map((a) => a.id) }),
+      lists: d.hubspotLists.map((l) => ({ ...l, contactsLabel: l.contacts.toLocaleString() + " contacts" })),
+      listId: state.listId, listSelect,
+      selectedListName: selectedList.name,
+      recipientCount: recipientCount.toLocaleString(),
+      sendModeOptions: [
+        { id: "now", label: "Send now" }, { id: "schedule", label: "Schedule" },
+      ].map((m) => {
+        const active = state.sendMode === m.id;
+        return { ...m, onClick: () => this.setState({ sendMode: m.id }), style: [
+          "border-radius:8px", "padding:9px 10px", "font-size:12.5px", "font-weight:600", "cursor:pointer",
+          "border:none", "background:" + (active ? t.panelBg : "transparent"),
+          "color:" + (active ? t.accent : t.muted),
+          "box-shadow:" + (active ? "0 1px 3px rgba(0,0,0,0.12)" : "none"),
+        ].join(";") };
+      }),
+      isSchedule: state.sendMode === "schedule",
+      scheduleDate: state.scheduleDate, scheduleDateField, scheduleTimeField,
+      scheduleRows, hasScheduleRows: scheduleRows.length > 0, noScheduleRows: scheduleRows.length === 0,
+      summaryFields: [
+        { k: "Event", v: activeEvent.name },
+        { k: "Template", v: template.name },
+        { k: "Audience", v: state.recipientMode === "attendees" ? "Event attendees" : "HubSpot list" },
+        { k: "Recipients", v: recipientCount.toLocaleString() },
+        { k: "From", v: "events@company.com" },
+        { k: "Delivery", v: state.sendMode === "now" ? "Send immediately" : scheduleLabel },
+      ],
+      sendLabel: state.sendMode === "now" ? "Send campaign now" : "Schedule for " + scheduleLabel,
+    };
+    // Audit
+    const AUDIT_PAGE_SIZE = 4;
+    const auditTotalPages = Math.max(1, Math.ceil(d.auditLog.length / AUDIT_PAGE_SIZE));
+    const auditPageNum = Math.min(state.auditPage, auditTotalPages);
+    const auditPager = {
+      label: "Page " + auditPageNum + " of " + auditTotalPages + " · " + d.auditLog.length + " entries",
+      prevStyle: pagerBtnStyle(auditPageNum <= 1), nextStyle: pagerBtnStyle(auditPageNum >= auditTotalPages),
+      onPrev: () => this.setState({ auditPage: Math.max(1, auditPageNum - 1) }),
+      onNext: () => this.setState({ auditPage: Math.min(auditTotalPages, auditPageNum + 1) }),
+    };
+    const auditRows = d.auditLog
+      .slice((auditPageNum - 1) * AUDIT_PAGE_SIZE, auditPageNum * AUDIT_PAGE_SIZE)
+      .map((a) => ({ ...a, initials: initials(a.user) }));
+
+    // Modals
+    const isEditingEvent = state.modal === "event" && !!state.editingEventId;
+    const fieldTypes = (f) => {
+      const value = state.modalFieldValues[f.key] ?? "";
+      const onChangeVal = (v) => this.setState((s) => ({ modalFieldValues: { ...s.modalFieldValues, [f.key]: v } }));
+      const base = {
+        ...f,
+        isText: f.type === "text", isTextarea: f.type === "textarea", isDate: f.type === "date",
+        isTime: f.type === "time", isNumber: f.type === "number", isSelect: f.type === "select",
+        value,
+        onChange: (e) => onChangeVal(e.target.value),
+      };
+      if (f.type === "select") return { ...base, select: makeSelectField("modal:" + f.key, value, f.options, onChangeVal, "Select " + f.label.toLowerCase()) };
+      if (f.type === "date") return { ...base, dateField: makeDateField("modal:" + f.key, value, onChangeVal) };
+      if (f.type === "time") return { ...base, timeField: makeTimeField("modal:" + f.key, value, onChangeVal) };
+      return base;
+    };
+    const modalMeta = state.modal === "event"
+      ? {
+          title: isEditingEvent ? "Edit event" : "New event",
+          subtitle: isEditingEvent ? "Update details for this event" : "Add a standalone event or attach it to a program",
+          confirmLabel: isEditingEvent ? "Save changes" : "Create event", width: "520px",
+          fields: [
+            { key: "name", label: "Event name", type: "text", placeholder: "e.g. Product Summit — Paris" },
+            { key: "program", label: "Program", type: "select", options: ["No program", ...liveProgramList] },
+            { key: "date", label: "Date", type: "date" }, { key: "time", label: "Start time", type: "time" },
+            { key: "location", label: "Location", type: "text", placeholder: "Venue and city" },
+            { key: "capacity", label: "Capacity", type: "number", placeholder: "500" },
+            { key: "status", label: "Status", type: "select", options: ["Active", "Completed"] },
+          ].map(fieldTypes),
+        }
+      : state.modal === "program"
+      ? {
+          title: state.editingProgramName ? "Edit program" : "New program",
+          subtitle: state.editingProgramName ? "Update this program's details" : "Group related events under a single program",
+          confirmLabel: state.editingProgramName ? "Save changes" : "Create program", width: "520px",
+          fields: [
+            { key: "pname", label: "Program name", type: "text", placeholder: "e.g. Summit Series 2026" },
+            { key: "description", label: "Description", type: "textarea", placeholder: "What is this program about?" },
+            { key: "owner", label: "Program owner", type: "select", options: ["Elena Marsh", "James Cole", "Priya Nair"] },
+            { key: "startDate", label: "Start date", type: "date" }, { key: "endDate", label: "End date", type: "date" },
+          ].map(fieldTypes),
+        }
+      : state.modal === "email"
+      ? { title: state.editingCampaignId ? "Edit campaign" : "New campaign", subtitle: "Compose and send to " + activeEvent.name, width: "680px", fields: [] }
+      : state.modal === "scanner"
+      ? { title: "Scan QR code", subtitle: activeEvent.name, width: "420px", fields: [] }
+      : state.modal === "walkin"
+      ? { title: "Walk-in registration", subtitle: "Register an attendee who isn't on the list", width: "560px", fields: [] }
+      : state.modal === "checkinConfirm"
+      ? { title: checkinConfirm && checkinConfirm.isCheckout ? "Confirm check-out" : "Confirm check-in", subtitle: activeEvent.name, width: "420px", fields: [] }
+      : { title: "", subtitle: "", confirmLabel: "", fields: [], width: "520px" };
+
+    return {
+      appReady: !!state.data,
+      isLoading: !state.data,
+      currentTip: LOADING_TIPS[state.tipIndex],
+      rootVarsStyle, layout, themeSidebarOptions, themeRailOptions, navItems, navWorkspace, navEventScoped, navAdmin,
+      toggleTabletDrawer, closeTabletDrawer, tabletDrawerOpen: state.tabletDrawerOpen, workingEventRail,
+      isOverview: state.view === "overview",
+      isEventsList: state.view === "events" && !detailEvent,
+      isEventDetail: state.view === "events" && !!detailEvent,
+      isCheckin: state.view === "checkin",
+      isAttendees: state.view === "attendees",
+      attendeesStats, attendeesRows, attendeesPager,
+      attendeesSearch: state.attendeesSearch,
+      onAttendeesSearch: (e) => this.setState({ attendeesSearch: e.target.value, attendeesPage: 1 }),
+      attendeesTicketOptions, attendeesStatusOptions,
+      goToAttendees: () => this.setState({ view: "attendees", detailEventId: null }),
+      isEmail: state.view === "email",
+      openEmailModal: () => this.setState({ modal: "email" }),
+      isAudit: state.view === "audit" && !state.auditLoading,
+      isAuditLoading: state.view === "audit" && state.auditLoading,
+      meta, stats, upcomingEvents, recentActivity, goToEvents: () => this.goTo("events"),
+      backToList: () => this.setState({ detailEventId: null }),
+      eventFilters, eventsWithMeta, eventsPager,
+      eventSearch: state.eventSearch,
+      onEventSearch: (e) => this.setState({ eventSearch: e.target.value, eventsPage: 1 }),
+      programCards, programSearch: state.programSearch,
+      onProgramSearch: (e) => this.setState({ programSearch: e.target.value }),
+      activeProgramChip, clearProgramFilter,
+      openNewEvent: () => this.setState({ modal: "event", editingEventId: null, modalFieldValues: {} }),
+      openNewProgram: () => this.setState({ modal: "program" }),
+      tableHeaders: ["Event", "Program", "Date", "Capacity", "Status", ""],
+      detail,
+      activeEvent, activeEventId: state.activeEventId,
+      onChangeActive: (e) => this.setState({ activeEventId: e.target.value }),
+      selectableEvents, workingEventPicker, mobileEventSelect,
+      checkin: {
+        checkedInCount, total: state.checkinList.length, filtered: filteredCheckin, pager: checkinPager,
+        query: state.checkinQuery, onQuery: (e) => this.setState({ checkinQuery: e.target.value, checkinPage: 1 }),
+        live: liveMeta, openScanner, openWalkin, camera,
+      },
+      email, emailStats,
+      auditRows, auditPager,
+      modalOpen: !!state.modal,
+      confirmModal: state.confirmModal,
+      modalMeta,
+      isFieldModal: state.modal === "event" || state.modal === "program",
+      isEmailModal: state.modal === "email",
+      isScannerModal: state.modal === "scanner",
+      isWalkinModal: state.modal === "walkin",
+      isCheckinConfirmModal: state.modal === "checkinConfirm",
+      checkinConfirm,
+      walkinFormSrcdoc: buildWalkinFormSrcdoc(activeEvent),
+      isEditingEvent, isEditingProgram: !!state.editingProgramName, isEditingCampaign: !!state.editingCampaignId,
+      onDeleteEvent: () => {
+        const ev = liveEvents.find((e) => e.id === state.editingEventId);
+        this.askConfirm("You are deleting \"" + (ev ? ev.name : "this event") + "\". Are you sure?", () => {
+          this.setState((s) => ({ deletedEventIds: [...s.deletedEventIds, s.editingEventId], modal: null, editingEventId: null, modalFieldValues: {}, detailEventId: null }));
+        });
+      },
+      onDeleteProgram: () => {
+        this.askConfirm("You are deleting \"" + state.editingProgramName + "\". Its events will become standalone. Are you sure?", () => {
+          this.setState((s) => ({
+            deletedProgramIds: [...s.deletedProgramIds, s.editingProgramName],
+            programFilter: s.programFilter === s.editingProgramName ? null : s.programFilter,
+            modal: null, editingProgramName: null, modalFieldValues: {},
+          }));
+        });
+      },
+      onDeleteCampaign: () => {
+        const camp = campaignsForEvent.find((c) => c.id === state.editingCampaignId);
+        this.askConfirm("You are deleting \"" + (camp ? camp.template : "this campaign") + "\". Are you sure?", () => {
+          this.setState((s) => ({ deletedCampaignIds: [...s.deletedCampaignIds, s.editingCampaignId], modal: null, editingCampaignId: null }));
+        });
+      },
+      closeModal: () => this.setState({ modal: null, editingEventId: null, editingCampaignId: null, editingProgramName: null, modalFieldValues: {} }),
+
+    };
+  }
+}
+
+</script>
+</body>
+</html>
