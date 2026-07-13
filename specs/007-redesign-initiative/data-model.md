@@ -41,28 +41,28 @@ Per-user, cross-device stored choice. Backed by a Record Storage user-preference
 
 ## Phase B — Event-first data model (gated on `X-REDESIGN-001`)
 
-> All of Phase B is blocked until the feasibility gates pass (research R-005). Shapes below are the **target model** per ADR-007/008 and [CONTEXT.md](../../CONTEXT.md) § *Redesign transition — target model*.
+> **Gate status (updated 2026-07-13):** Program + Event custom objects **created in HubSpot UAT** (gate #1 ✔, gate #3 ✔ — slots free). Remaining before writes: gate #2 (workflow can set Contact↔Event association — **assumed**, needs a test) and gate #4/`X-REDESIGN-004` (attributes + Contact↔Event labels created and verified). Shapes below are the **target model** per ADR-007/008 and [CONTEXT.md](../../CONTEXT.md) § *Redesign transition — target model*. **Confirmed IDs, proposed property API names, and env Parameters live in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) § *Redesign custom objects* — the single source of truth. Object/association IDs are read at runtime from ScriptRunner Connect Parameters, never hardcoded.**
 
-### Program (HubSpot custom object) — optional grouping
+### Program (HubSpot custom object "Event Programs", type `2-65757052`) — optional grouping
 
 | Field (intent) | Type | Notes |
 | :--- | :--- | :--- |
 | `id` | string | HubSpot object id (mapped to stable EMS catalog id inside the adapter) |
-| `name` | string | required |
+| `name` | string | required (`program_name`, primary display) |
 | `description` | string | optional |
-| `owner` | string | program owner |
+| `owner` | string | program owner (`hubspot_owner_id`) |
 | `startDate` / `endDate` | date | optional |
 
-- **Optional**: an Event may reference a Program via `programId`, or stand alone ([ADR-008] §3–§4).
+- **Program → Event is a 1-to-many HubSpot association** (association type ID `286`, Parameter `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`) — **not** a `programId` property. An Event may have no Program association and stand alone ([ADR-008] §3–§4).
 
-### Event (HubSpot custom object) — primary entity
+### Event (HubSpot custom object "Event Items", type `2-65757130`) — primary entity
 
 | Field (intent) | Type | Notes |
 | :--- | :--- | :--- |
 | `id` | string | HubSpot object id (mapped to stable EMS catalog id inside the adapter) |
-| `name` | string | required |
-| `programId` | string \| null | **optional** — standalone Event when absent (FR-014) |
-| `date` / `startTime` | date/time | — |
+| `name` | string | required (`event_name`, primary display) |
+| Program link | association | **1-to-many Program→Event association (ID `286`)**; absent ⇒ standalone Event (FR-014). No `programId` property |
+| `date` / `startTime` | date/time | `event_start` (+ optional `event_end`) |
 | `location` | string | — |
 | `capacity` | number | Live capacity/occupancy ±1 handled per Slice 004 |
 | `status` | `'active' \| 'cancelled'` | manual; **`completed`** is **derived** when end date has passed (FR-017) |
@@ -78,12 +78,14 @@ Registration **exists ⇔ the association exists**. Lifecycle + type are **assoc
 
 | Concept | Representation | Notes |
 | :--- | :--- | :--- |
-| Registered | label `registered` | created by HubSpot workflow (public/walk-in), not EMS |
-| Checked in | label `checked-in` | EMS flips `registered` → `checked-in`; undo reverses |
-| Attendee type | label `customer` / `partner` | durable label, never Record Storage |
+| Registered | label `registered` (Parameter `HUBSPOT_ASSOC_LABEL_REGISTERED`) | created by HubSpot workflow (public/walk-in), not EMS |
+| Checked in | label `checked-in` (Parameter `HUBSPOT_ASSOC_LABEL_CHECKED_IN`) | EMS flips `registered` → `checked-in`; undo reverses |
+| Attendee type | **deferred** — derived from existing Parts Attended flags, **not** an association label this pass | revisit if needed (see hubspot-schema.md) |
+
+Contact↔Event association type ID → Parameter `HUBSPOT_ASSOC_CONTACT_EVENT` (TBD until created). Workflow-settable behaviour is **assumed** (gate #2) — confirm with a test workflow before EMS writes.
 
 **Rules**
-- ≤ 10 association labels per object pairing (gate #3, research R-005).
+- Phase B needs **2** labels (`registered`, `checked-in`); ≤ 10 per object pairing (gate #3 ✔, research R-005).
 - **Remove attendee** = delete the association; **blocked while `checked-in`** (FR-015).
 - EMS exposes **no** "register attendee" write (FR-015; ADR-007 §4).
 

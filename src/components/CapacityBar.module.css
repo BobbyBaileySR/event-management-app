@@ -140,23 +140,23 @@
 }
 
 .tier-caution .fill {
-	background: var(--color-info, #0066cc);
+	background: var(--info);
 }
 
 .tier-caution .tierLabel {
-	color: var(--color-info, #0066cc);
-	background: rgba(0, 102, 204, 0.1);
+	color: var(--info);
+	background: var(--info-bg);
 }
 
 .tier-critical .fill,
 .tier-over .fill {
-	background: var(--color-danger, #b00020);
+	background: var(--danger);
 }
 
 .tier-critical .tierLabel,
 .tier-over .tierLabel {
-	color: var(--color-danger, #b00020);
-	background: rgba(176, 0, 32, 0.1);
+	color: var(--danger);
+	background: var(--danger-bg);
 }
 
 @media (max-width: 480px) {

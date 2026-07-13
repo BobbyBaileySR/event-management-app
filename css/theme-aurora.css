@@ -1,0 +1,22 @@
+/**
+ * Aurora theme — default light theme, :root[data-theme="aurora"] (or no data-theme attribute).
+ * Semantic role-token remap (T015); values from design_handoff 2/ THEMES.aurora — the source
+ * of truth for the redesign (research R-001/R-002). See tokens.css for the role layer (T004).
+ */
+:root[data-theme='aurora'] {
+	--surface: #F5F7FE;
+	--panel: #FFFFFF;
+	--border: #E1E7F7;
+	--text: #000A27;
+	--muted: #5A6478;
+	--accent: #FF6633;
+	--accent-soft: #FFF1EC;
+	--ice: #ECF1FF;
+
+	--success: #166534;
+	--success-bg: #DCFCE7;
+	--info: #0369A1;
+	--info-bg: #E0F2FE;
+	--danger: #991B1B;
+	--danger-bg: #FEE2E2;
+}

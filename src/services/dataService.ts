@@ -31,6 +31,8 @@ import {
 	getMockEmailDispatchDetail,
 	mockUpdateEmailDispatch,
 	mockCancelEmailDispatch,
+	getMockThemePreference,
+	setMockThemePreference,
 } from '../data/mockData';
 import {
 	normalizeAttendeesResponse,
@@ -38,6 +40,7 @@ import {
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
 	normalizeCapacityStatusResponse,
+	normalizeThemePreferenceResponse,
 	normalizeEmailLimitsResponse,
 	normalizeEmailTemplatesResponse,
 	normalizeEmailSegmentsResponse,
@@ -88,7 +91,9 @@ import type {
 	EventsResponse,
 	ScheduledEmail,
 	SliceAttendeesResponse,
+	ThemePreference,
 } from '../types';
+import type { ThemeId } from '../theme/themeTokens';
 
 export interface DataServiceOptions {
 	token?: string | null;
@@ -491,6 +496,57 @@ export async function adjustCapacity(
 				)) ?? {}) as Record<string, unknown>,
 			),
 	);
+}
+
+/**
+ * `email` is a mock-only parameter that simulates the server-side Celebration allowlist
+ * re-validation (contracts/theme-preference-api.md) — the live route derives it from the
+ * authenticated session, so it is never sent in the live request.
+ */
+export async function fetchThemePreference(
+	email?: string | null,
+	options: DataServiceOptions = {},
+): Promise<ThemePreference> {
+	const { token } = options;
+	return withMockFallback(
+		() => mockDelay(getMockThemePreference(email)),
+		async () =>
+			normalizeThemePreferenceResponse(
+				((await apiRequest('user/prefs', {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function updateThemePreference(
+	theme: ThemeId,
+	email?: string | null,
+	options: DataServiceOptions = {},
+): Promise<ThemePreference> {
+	const { token } = options;
+	return withMockFallback(
+		() => {
+			try {
+				return mockDelay(setMockThemePreference(theme, email));
+			} catch (error) {
+				mapMockThemePreferenceError(error);
+			}
+		},
+		async () =>
+			normalizeThemePreferenceResponse(
+				((await apiRequest(
+					'user/prefs/theme',
+					{ method: 'PUT', body: JSON.stringify({ theme }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+function mapMockThemePreferenceError(error: unknown): never {
+	if (error instanceof Error && error.message === 'celebration_not_allowed') {
+		throw new Error('celebration_not_allowed');
+	}
+	throw error instanceof Error ? error : new Error('Theme preference update failed');
 }
 
 function mapMockCapacityError(error: unknown): never {
@@ -915,6 +971,8 @@ export function createDataService(token?: string | null) {
 			updateEmailDispatch(programId, eventId, dispatchId, body, options),
 		cancelEmailDispatch: (programId: string, eventId: string, dispatchId: string) =>
 			cancelEmailDispatch(programId, eventId, dispatchId, options),
+		getThemePreference: (email?: string | null) => fetchThemePreference(email, options),
+		setThemePreference: (theme: ThemeId, email?: string | null) => updateThemePreference(theme, email, options),
 	};
 }
 

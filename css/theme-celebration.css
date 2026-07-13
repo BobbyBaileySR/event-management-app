@@ -1,35 +1,53 @@
 /**
- * Dusty blush celebration theme — :root[data-theme="celebration"].
- * Palette from reference: #EBB0B0 (mid), #F2C1C1 (light), #DDA0A0 (dusty).
- * Cosmetic only; default Adaptavist tokens remain in tokens.css.
+ * Celebration theme — :root[data-theme="celebration"]. Allowlist-gated (research R-002);
+ * cosmetic only, re-validated server-side on every load (never trusted from stored pref).
+ *
+ * Values from design_handoff 2/ THEMES.celebration — the prototype pink (#EC6C93), which
+ * supersedes the earlier dusty-rose palette (#EBB0B0 family). Two layers, per R-001:
+ * - Primitive remaps below keep already-shipped components (still on --color-* primitives,
+ *   pending their Phase 4 restyle) visually consistent with the new pink, not the old dusty tone.
+ * - The semantic role block is what new/migrated components (semantic tokens only) read.
  */
 :root[data-theme='celebration'] {
-	/* Primary actions — dusty rose dark enough for white label text */
-	--color-orange: #c48888;
-	--color-orange-hover: #b07878;
-	--color-orange-muted: rgba(235, 176, 176, 0.24);
+	/* Primitive remaps (legacy — until Phase 4 migrates each view onto semantic tokens) */
+	--color-orange: #EC6C93;
+	--color-orange-hover: #D45C82;
+	--color-orange-muted: rgba(236, 108, 147, 0.24);
 
-	/* Sidebar active item — ice on blush (orange token is too close to denim bg) */
 	--color-sidebar-nav-active-text: var(--color-ice);
-	--color-sidebar-nav-active-bg: rgba(252, 244, 244, 0.16);
+	--color-sidebar-nav-active-bg: rgba(253, 241, 245, 0.16);
 	--color-sidebar-nav-active-border: var(--color-white);
 
-	/* Sidebar header — deep dusty rose (same hue as shell; avoids muddy brown-black) */
-	--color-sidebar-header-bg: #9f6b6b;
-	--color-sidebar-header-border: #f2c1c1;
+	--color-sidebar-header-bg: #D45C82;
+	--color-sidebar-header-border: #F2A0BE;
 
-	/* Shell — deeper dusty mauve (sidebar), still in the bottle-pink family */
-	--color-denim: #be8282;
-	--color-denim-light: #b08888;
-	--color-black: #4a3838;
+	--color-denim: #D45C82;
+	--color-denim-light: #E08AA8;
+	--color-black: #3D2530;
 
-	--color-ice: #fcf4f4;
-	--color-link: #a65c5c;
-	--color-border: #ebd0d0;
+	--color-ice: #FDF1F5;
+	--color-link: #D45C82;
+	--color-border: #F6D6E0;
 
-	/* Charts — stay on-palette instead of cobalt + orange */
-	--color-cobalt: #dda0a0;
+	--color-cobalt: #F2A0BE;
 
-	--shadow-card: 0 4px 6px -1px rgba(158, 115, 115, 0.1);
-	--shadow-login: 0 20px 40px rgba(74, 56, 56, 0.25);
+	--shadow-card: 0 4px 20px -8px rgba(212, 92, 130, 0.12);
+	--shadow-login: 0 30px 80px -40px rgba(212, 92, 130, 0.35);
+
+	/* Semantic role layer (T004/R-001) */
+	--surface: #FEF8FA;
+	--panel: #FFFFFF;
+	--border: #F6D6E0;
+	--text: #3D2530;
+	--muted: #93707E;
+	--accent: #EC6C93;
+	--accent-soft: #FCE4EA;
+	--ice: #FDF1F5;
+
+	--success: #166534;
+	--success-bg: #DCFCE7;
+	--info: #0369A1;
+	--info-bg: #E0F2FE;
+	--danger: #991B1B;
+	--danger-bg: #FEE2E2;
 }

@@ -81,7 +81,7 @@ function renderSidebar({
 				<CatalogProvider>
 					<SessionHarness session={session} />
 					{catalog ? <CatalogHarness {...catalog} /> : null}
-					<Sidebar onLogout={vi.fn()} />
+					<Sidebar onLogout={vi.fn()} theme="aurora" celebrationAllowed={false} onThemeChange={vi.fn()} />
 				</CatalogProvider>
 			</SessionProvider>
 		</MemoryRouter>,
@@ -131,7 +131,7 @@ describe('Sidebar slice links', () => {
 		expect(screen.getByRole('button', { name: /Catalog admin/i })).toBeInTheDocument();
 	});
 
-	it('hides catalog admin and slice links for non-admin users', () => {
+	it('hides catalog admin, slice links, and All Events for non-admin users (FR-013: shell is admin-only for now)', () => {
 		renderSidebar({
 			session: staffSession,
 			catalog: { programId: 'prog-1', evId: 'ev-1' },
@@ -140,7 +140,7 @@ describe('Sidebar slice links', () => {
 		expect(screen.queryByRole('button', { name: /Catalog admin/i })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Attendees/i })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Check-in/i })).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /All Events/i })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /All Events/i })).not.toBeInTheDocument();
 	});
 
 	it('navigates to slice module paths when Attendees, Check-in, or Email is clicked', () => {

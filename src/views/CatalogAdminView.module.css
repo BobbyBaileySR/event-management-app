@@ -12,8 +12,8 @@
 
 .tab,
 .tabActive {
-	border: 1px solid rgba(11, 5, 115, 0.2);
-	background: #fff;
+	border: 1px solid var(--border);
+	background: var(--panel);
 	color: var(--color-denim);
 	padding: 8px 14px;
 	border-radius: 999px;
@@ -27,8 +27,8 @@
 }
 
 .panel {
-	background: #fff;
-	border: 1px solid rgba(11, 5, 115, 0.12);
+	background: var(--panel);
+	border: 1px solid var(--border);
 	border-radius: 8px;
 	padding: 16px;
 }
@@ -51,7 +51,7 @@
 
 .formGrid input {
 	padding: 8px 10px;
-	border: 1px solid rgba(11, 5, 115, 0.2);
+	border: 1px solid var(--border);
 	border-radius: 6px;
 }
 
@@ -83,9 +83,9 @@
 }
 
 .danger {
-	background: #fff;
-	color: #b42318;
-	border: 1px solid rgba(180, 35, 24, 0.35);
+	background: var(--panel);
+	color: var(--danger);
+	border: 1px solid var(--danger);
 }
 
 .list {
@@ -95,7 +95,7 @@
 }
 
 .card {
-	border: 1px solid rgba(11, 5, 115, 0.12);
+	border: 1px solid var(--border);
 	border-radius: 8px;
 	padding: 12px;
 }
@@ -110,7 +110,7 @@
 
 .meta {
 	margin: 4px 0 0;
-	color: rgba(0, 10, 39, 0.75);
+	color: var(--muted);
 	font-size: 0.9rem;
 }
 
@@ -121,7 +121,7 @@
 }
 
 .error {
-	color: #b42318;
+	color: var(--danger);
 }
 
 .metadata {

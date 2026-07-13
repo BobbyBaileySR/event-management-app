@@ -36,8 +36,11 @@ import type {
 	ScheduledEmail,
 	SliceAttendee,
 	SliceAttendeesResponse,
+	ThemePreference,
 } from '../types';
 import { CONFIG } from '../config';
+import { DEFAULT_THEME_ID, type ThemeId } from '../theme/themeTokens';
+import { isCelebrationEmail } from '../utils/celebrationTheme';
 import { assertScheduleFields } from '../utils/emailSchedule';
 
 /**
@@ -1320,4 +1323,28 @@ export function mockCancelEmailDispatch(
 	}
 	record.status = 'cancelled';
 	return { dispatchId, status: 'cancelled' };
+}
+
+/** Mock theme-preference store (T021) — a single in-memory value, mirroring the real
+ * per-user Record Storage row. `email` simulates the server-side Celebration allowlist
+ * re-validation the real `user/prefs` route performs (contracts/theme-preference-api.md). */
+let mockThemePreference: ThemeId = DEFAULT_THEME_ID;
+
+export function getMockThemePreference(email?: string | null): ThemePreference {
+	const celebrationAllowed = isCelebrationEmail(email);
+	const theme = mockThemePreference === 'celebration' && !celebrationAllowed ? 'aurora' : mockThemePreference;
+	return { theme, celebrationAllowed };
+}
+
+export function setMockThemePreference(theme: ThemeId, email?: string | null): ThemePreference {
+	const celebrationAllowed = isCelebrationEmail(email);
+	if (theme === 'celebration' && !celebrationAllowed) {
+		throw new Error('celebration_not_allowed');
+	}
+	mockThemePreference = theme;
+	return { theme, celebrationAllowed, updatedAt: new Date().toISOString() };
+}
+
+export function resetMockThemePreference(): void {
+	mockThemePreference = DEFAULT_THEME_ID;
 }

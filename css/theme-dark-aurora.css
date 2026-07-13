@@ -1,0 +1,22 @@
+/**
+ * Dark Aurora theme — net-new dark theme, :root[data-theme="darkAurora"].
+ * Semantic role-token remap (T015); values from design_handoff 2/ THEMES.darkAurora — the
+ * source of truth for the redesign (research R-001/R-002). See tokens.css for the role layer (T004).
+ */
+:root[data-theme='darkAurora'] {
+	--surface: #0B0E1A;
+	--panel: #11162A;
+	--border: rgba(255, 255, 255, 0.08);
+	--text: #F3F5FF;
+	--muted: #93A0C4;
+	--accent: #FF6633;
+	--accent-soft: rgba(255, 102, 51, 0.16);
+	--ice: rgba(124, 156, 255, 0.14);
+
+	--success: #4ADE80;
+	--success-bg: rgba(34, 197, 94, 0.16);
+	--info: #8AB0FF;
+	--info-bg: rgba(71, 117, 255, 0.16);
+	--danger: #FCA5A5;
+	--danger-bg: rgba(248, 113, 113, 0.16);
+}

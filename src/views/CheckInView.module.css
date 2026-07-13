@@ -43,7 +43,7 @@
 .capacityError {
 	margin: 0 0 8px;
 	font-size: 0.875rem;
-	color: var(--color-danger, #b00020);
+	color: var(--danger);
 }
 
 .deskToolbar {
@@ -66,7 +66,7 @@
 	height: 2px;
 	border: 0;
 	margin: 0;
-	background: var(--color-border, rgba(0, 0, 0, 0.12));
+	background: var(--border);
 	border-radius: 999px;
 }
 
@@ -95,9 +95,9 @@
 	flex: 1;
 	min-height: 56px;
 	padding: 14px 20px;
-	border: 2px solid var(--color-border, rgba(0, 0, 0, 0.12));
+	border: 2px solid var(--border);
 	border-radius: var(--radius-md, 8px);
-	background: var(--color-white, #fff);
+	background: var(--panel);
 	font: inherit;
 	font-size: 1.125rem;
 	font-weight: 700;
@@ -107,8 +107,8 @@
 }
 
 .modeActive {
-	border-color: var(--color-info, #0066cc) !important;
-	background: rgba(0, 102, 204, 0.1);
+	border-color: var(--info) !important;
+	background: var(--info-bg);
 	color: var(--color-denim);
 }
 
@@ -129,7 +129,7 @@
 .walkInError,
 .searchError {
 	margin: 0 0 12px;
-	color: var(--color-danger, #b00020);
+	color: var(--danger);
 }
 
 .walkInFrame {
@@ -137,7 +137,7 @@
 	min-height: min(70vh, 720px);
 	border: 0;
 	border-radius: 4px;
-	background: #fff;
+	background: var(--panel);
 }
 
 @media (max-width: 900px) {
@@ -248,7 +248,7 @@
 
 .selectedRow {
 	cursor: pointer;
-	background: rgba(0, 102, 204, 0.08);
+	background: var(--info-bg);
 }
 
 .summaryCard {

@@ -22,7 +22,7 @@
 .form input,
 .form textarea {
 	padding: 8px 10px;
-	border: 1px solid rgba(11, 5, 115, 0.2);
+	border: 1px solid var(--border);
 	border-radius: 6px;
 	font: inherit;
 }
@@ -33,6 +33,6 @@
 }
 
 .requiredMark {
-	color: #c0392b;
+	color: var(--danger);
 	font-weight: 700;
 }

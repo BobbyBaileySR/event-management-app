@@ -1,0 +1,16 @@
+/**
+ * Self-hosted font subsets (research R-003). Sourced via npm (@fontsource-variable/*,
+ * OFL-1.1 / Apache-2.0 licensed) — same self-host-via-bundler precedent as chart.js
+ * (FE-SEC-005). Latin-only subsets; font-src 'self' only (T008 wires the CSP); no
+ * Google Fonts / icon CDN. Each package's own CSS declares the @font-face rule and
+ * resolves its woff2 file relative to itself — Vite bundles it via this @import.
+ */
+
+/* Manrope Variable — single variable file covering weights 200–800 (research R-003 needs 400–800). */
+@import '@fontsource-variable/manrope/wght.css';
+
+/* Material Symbols Outlined, weight 400 only (research R-003 / T007) — the prototype only ever
+   uses 'wght' 400; the static single-weight build is ~318KB vs. ~1.4MB for the full variable
+   axis range, so this is the smaller "subset" for our fixed-appearance usage. See
+   docs/ui-component-catalog.md for the glyph list actually in use. */
+@import '@fontsource/material-symbols-outlined/400.css';

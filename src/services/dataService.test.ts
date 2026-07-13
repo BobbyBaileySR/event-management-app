@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../config';
-import { MOCK_EVENTS, resetMockCheckInState } from '../data/mockData';
+import { MOCK_EVENTS, resetMockCheckInState, resetMockThemePreference } from '../data/mockData';
 import { resetMockEmailDispatchState } from '../data/mockData';
 import {
 	adjustCapacity,
@@ -13,6 +13,8 @@ import {
 	fetchEmailLimits,
 	fetchEvents,
 	fetchSliceAttendees,
+	fetchThemePreference,
+	updateThemePreference,
 } from './dataService';
 
 vi.mock('../api/client', () => ({
@@ -259,6 +261,98 @@ describe('adjustCapacity mock path', () => {
 	it('rejects adjust down at floor', async () => {
 		await adjustCapacity(programId, eventId, 'down');
 		await expect(adjustCapacity(programId, eventId, 'down')).rejects.toThrow('capacity_at_floor');
+	});
+});
+
+describe('theme preference mock path (T013)', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockThemePreference();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('defaults to aurora with celebration not allowed for a non-allowlisted email', async () => {
+		const result = await fetchThemePreference('staff@adaptavist.com');
+		expect(result).toEqual({ theme: 'aurora', celebrationAllowed: false });
+	});
+
+	it('rejects setting celebration for a non-allowlisted email, stored value unchanged', async () => {
+		await expect(updateThemePreference('celebration', 'staff@adaptavist.com')).rejects.toThrow(
+			'celebration_not_allowed',
+		);
+
+		const after = await fetchThemePreference('staff@adaptavist.com');
+		expect(after.theme).toBe('aurora');
+	});
+
+	it('a previously-stored celebration preference resolves to aurora once no longer allowlisted', async () => {
+		await updateThemePreference('celebration', CONFIG.CELEBRATION_THEME_EMAIL);
+
+		const asAllowlisted = await fetchThemePreference(CONFIG.CELEBRATION_THEME_EMAIL);
+		expect(asAllowlisted).toEqual({ theme: 'celebration', celebrationAllowed: true });
+
+		const asOtherUser = await fetchThemePreference('staff@adaptavist.com');
+		expect(asOtherUser).toEqual({ theme: 'aurora', celebrationAllowed: false });
+	});
+
+	it('persists a non-gated theme choice', async () => {
+		const result = await updateThemePreference('darkAurora', 'staff@adaptavist.com');
+		expect(result.theme).toBe('darkAurora');
+
+		const after = await fetchThemePreference('staff@adaptavist.com');
+		expect(after.theme).toBe('darkAurora');
+	});
+});
+
+describe('theme preference live path (T013)', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = false;
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+	});
+
+	it('maps getThemePreference to GET user/prefs', async () => {
+		mockedApiRequest.mockResolvedValue({ theme: 'darkAurora', celebrationAllowed: false });
+
+		const result = await fetchThemePreference(undefined, { token: 'session-token' });
+
+		expect(mockedApiRequest).toHaveBeenCalledWith('user/prefs', {}, { token: 'session-token' });
+		expect(result).toEqual({ theme: 'darkAurora', celebrationAllowed: false });
+	});
+
+	it('maps setThemePreference to PUT user/prefs/theme', async () => {
+		mockedApiRequest.mockResolvedValue({ theme: 'aurora', celebrationAllowed: false, updatedAt: '2026-07-13T10:00:00.000Z' });
+
+		const result = await updateThemePreference('aurora', undefined, { token: 'session-token' });
+
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			'user/prefs/theme',
+			{ method: 'PUT', body: JSON.stringify({ theme: 'aurora' }) },
+			{ token: 'session-token' },
+		);
+		expect(result.updatedAt).toBe('2026-07-13T10:00:00.000Z');
+	});
+
+	it('never trusts an unrecognized theme value — normalizes to aurora', async () => {
+		mockedApiRequest.mockResolvedValue({ theme: 'not-a-real-theme', celebrationAllowed: false });
+
+		const result = await fetchThemePreference(undefined, { token: 'session-token' });
+
+		expect(result.theme).toBe('aurora');
 	});
 });
 

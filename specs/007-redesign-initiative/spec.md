@@ -98,7 +98,7 @@ Staff land on an Events overview and can reach any Event directly; a Program is 
 
 ### User Story 6 - Registration and check-in via Contact↔Event associations (Phase B) (Priority: P2)
 
-Attendance is modelled as a Contact↔Event association with labels (`registered` / `checked-in` / `customer` / `partner`). Staff check in, undo check-in, and remove attendees through the audited EMS write path; public/walk-in registration is written HubSpot-workflow-side.
+Attendance is modelled as a Contact↔Event association with labels `registered` / `checked-in` (attendee type `customer`/`partner` is **deferred** this pass — derived from existing Parts-Attended flags). Staff check in, undo check-in, and remove attendees through the audited EMS write path; public/walk-in registration is written HubSpot-workflow-side.
 
 **Why this priority**: Data-model migration that makes standalone Events coherent (ADR-007); gated on the same feasibility slots as US5.
 
@@ -121,7 +121,7 @@ Attendance is modelled as a Contact↔Event association with labels (`registered
 - What happens if a redesigned component's new markup breaks an existing Vitest render test that asserted on old DOM structure?
 - How is a walk-in shown between form submission and the attendee appearing on the roster (propagation lag) — the UI must set this expectation rather than implying an instant add?
 - What happens to existing `programs/{programId}/events/{eventId}/…` routes when navigation becomes event-first — the breaking contract change must update `api-contract.md` + `rbac.md` + `RouteGuard` together (`X-REDESIGN-003`).
-- How do existing Program→Event catalog records behave after migration — they remain valid with a `programId`; migration adds standalone Events without forcing reparenting.
+- How do existing Program→Event catalog records behave after migration — the Program→Event relationship becomes a HubSpot association (type ID `286`); migration adds standalone Events (no Program association) without forcing reparenting.
 
 ## Requirements *(mandatory)*
 
@@ -141,7 +141,7 @@ Attendance is modelled as a Contact↔Event association with labels (`registered
 - **FR-012**: Phase B (event-first IA/routing, standalone Events, registration-as-association, live capacity/occupancy ±1, Campaign modal) MUST NOT ship until the `X-REDESIGN-001` feasibility gates pass (2 free HubSpot custom-object slots; workflows can set associations; ≤10 association labels per pairing; standard security write-gate).
 - **FR-013**: The redesigned app shell MUST be **admin-only for now** (including the Overview dashboard) and MUST be role-aware by design so a future `check-in operator` role can be added without restructuring.
 - **FR-014** *(Phase B)*: Navigation MUST be event-first — staff land on an Events overview and reach any Event directly; Program MUST be an optional grouping/filter, not a required drill-down. Every Event-scoped operation MUST function with `programId` absent (standalone Events).
-- **FR-015** *(Phase B)*: Attendance MUST be modelled as a Contact↔Event association with labels `registered` / `checked-in` / `customer` / `partner`; check-in flips `registered` → `checked-in` (undo reverses). EMS's write surface is limited to check-in, undo check-in, remove attendee (blocked while `checked-in`), and catalog CRUD — EMS MUST NOT expose a public "register attendee" write.
+- **FR-015** *(Phase B)*: Attendance MUST be modelled as a Contact↔Event association with labels `registered` / `checked-in` (attendee type `customer`/`partner` deferred — derived from existing Parts-Attended flags this pass); check-in flips `registered` → `checked-in` (undo reverses). EMS's write surface is limited to check-in, undo check-in, remove attendee (blocked while `checked-in`), and catalog CRUD — EMS MUST NOT expose a public "register attendee" write. Program membership is a HubSpot 1-to-many association (type ID `286`), not a `programId` property.
 - **FR-016** *(Phase B)*: Per-registration operational detail (`checkedInAt`, scan method, QR nonce/JWT) MUST live in Record Storage keyed by `contactId + eventId`, purged on Event archive, with the audit log as the durable backstop; all check-ins MUST flow through the audited EMS path (no HubSpot-only check-in writes).
 - **FR-017** *(Phase B)*: Event status MUST follow Active / Cancelled (manual) + Completed (auto-derived when the end date passes); publish state MUST be tracked separately from status.
 - **FR-018** *(Phase B)*: Event-first routing MUST update `docs/api-contract.md`, `docs/rbac.md`, and `RouteGuard` together for the breaking `programs/{programId}/events/{eventId}/…` → event-scoped change (`X-REDESIGN-003`); no HubSpot property/schema names may be used until verified in `docs/hubspot-schema.md` (`X-REDESIGN-004`).
@@ -154,7 +154,7 @@ Attendance is modelled as a Contact↔Event association with labels (`registered
 - **Theme**: A named set of semantic-token values (`aurora` / `celebration` / `darkAurora`) applied via `data-theme`.
 - **Theme Preference**: A per-user, cross-device stored choice of theme (backend), with Celebration re-validated server-side against the allowlist.
 - **Program / Event (custom objects)** *(Phase B)*: HubSpot custom objects per ADR-007; Program is optional and Event is the primary entity (ADR-008).
-- **Registration** *(Phase B)*: a Contact↔Event association with labels (`registered` / `checked-in` / `customer` / `partner`) per ADR-007, with per-registration detail in Record Storage.
+- **Registration** *(Phase B)*: a Contact↔Event association with labels `registered` / `checked-in` (attendee type deferred) per ADR-007, with per-registration detail in Record Storage.
 
 ## Success Criteria *(mandatory)*
 

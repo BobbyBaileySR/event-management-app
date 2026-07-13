@@ -1,22 +1,15 @@
 import { CONFIG } from '../config';
 
-/** Case-insensitive match against the configured celebration email. */
+/**
+ * Case-insensitive match against the configured celebration email — used to simulate the
+ * server-side Celebration allowlist re-validation in mock mode (`data/mockData.ts`). The real
+ * gating source of truth is the backend's `celebrationAllowed` in the `user/prefs` response
+ * (research R-002); `useTheme.ts` never calls this directly.
+ */
 export function isCelebrationEmail(email: string | undefined | null): boolean {
 	const configured = CONFIG.CELEBRATION_THEME_EMAIL.trim().toLowerCase();
 	if (!configured || !email) {
 		return false;
 	}
 	return email.trim().toLowerCase() === configured;
-}
-
-export const CELEBRATION_THEME_ATTRIBUTE = 'data-theme';
-export const CELEBRATION_THEME_VALUE = 'celebration';
-
-export function applyCelebrationTheme(enabled: boolean): void {
-	const root = document.documentElement;
-	if (enabled) {
-		root.setAttribute(CELEBRATION_THEME_ATTRIBUTE, CELEBRATION_THEME_VALUE);
-		return;
-	}
-	root.removeAttribute(CELEBRATION_THEME_ATTRIBUTE);
 }

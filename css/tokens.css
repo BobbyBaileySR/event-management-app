@@ -41,5 +41,28 @@
     --shadow-card: 0 4px 6px -1px rgba(11, 5, 115, 0.06);
     --shadow-login: 0 20px 40px rgba(0, 10, 39, 0.35);
 
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    /* Self-hosted (research R-003); see src/styles/fonts.css. Falls back to system fonts until it loads. */
+    --font-sans: 'Manrope Variable', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+    /**
+     * Semantic role layer (research R-001, spec 007). Component CSS references these
+     * roles, never the primitives above or raw hex. Each theme file (theme-aurora.css,
+     * theme-celebration.css, theme-dark-aurora.css) remaps this layer under its own
+     * [data-theme] selector; the defaults below are Aurora's values (today's default look).
+     */
+    --surface: var(--color-ice);
+    --panel: var(--color-white);
+    --border: var(--color-border);
+    --text: var(--color-black);
+    --muted: var(--color-muted);
+    --accent: var(--color-orange);
+    --accent-soft: var(--color-orange-muted);
+    --ice: var(--color-ice);
+
+    --success: var(--color-success);
+    --success-bg: var(--color-success-bg);
+    --info: var(--color-info);
+    --info-bg: var(--color-info-bg);
+    --danger: var(--color-danger);
+    --danger-bg: var(--color-danger-bg);
 }
