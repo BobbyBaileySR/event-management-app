@@ -37,6 +37,8 @@
     "vitest": "^4.1.9"
   },
   "dependencies": {
+    "@fontsource-variable/manrope": "^5.2.8",
+    "@fontsource/material-symbols-outlined": "^5.2.45",
     "chart.js": "^4.5.1",
     "html5-qrcode": "^2.3.8",
     "react": "^19.2.7",

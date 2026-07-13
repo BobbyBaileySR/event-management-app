@@ -1,18 +1,27 @@
 import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
+import { hasRequiredRole } from '../config/shellAccess';
 import { catalogPath, auditPath, eventPath, isEventScopedRoute, sliceModulePath, useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
 import { useCatalogSelection } from '../state/catalogContext';
+import { ThemeSwitcher } from './ThemeSwitcher';
+import type { ThemeId } from '../theme/themeTokens';
 import styles from './Sidebar.module.css';
+
+/** All Events / Overview + Catalog admin / Audit log are admin-only for now (FR-013). */
+const TOP_LEVEL_MIN_ROLES = ['admin'] as const;
 
 interface SidebarProps {
 	onLogout: () => void;
 	/** Display name for the selected event; falls back to a generic label. */
 	eventName?: string | null;
+	theme: ThemeId;
+	celebrationAllowed: boolean;
+	onThemeChange: (theme: ThemeId) => void;
 }
 
-export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
+export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationAllowed, onThemeChange }: SidebarProps) {
 	const navigate = useNavigate();
 	const { session } = useSession();
 	const { name: activeRoute, eventId } = useActiveRoute();
@@ -26,15 +35,14 @@ export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 			</div>
 
 			<nav className={styles.nav} aria-label="Main navigation">
-				<NavButton
-					label="All Events"
-					icon="🏢"
-					active={activeRoute === 'events'}
-					onClick={() => navigate('/events')}
-				/>
-
-				{session?.role === 'admin' ? (
+				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
 					<>
+						<NavButton
+							label="All Events"
+							icon="🏢"
+							active={activeRoute === 'events'}
+							onClick={() => navigate('/events')}
+						/>
 						<NavButton
 							label="Catalog admin"
 							icon="🗂️"
@@ -50,7 +58,7 @@ export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 					</>
 				) : null}
 
-				{session?.role === 'admin' && programId && evId ? (
+				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) && programId && evId ? (
 					<div className={styles.section}>
 						<p className={styles.sectionLabel}>
 							{programName && catalogEventName
@@ -81,20 +89,24 @@ export function Sidebar({ onLogout, eventName: hubEventName }: SidebarProps) {
 				{eventId && isEventScopedRoute(activeRoute) ? (
 					<div className={styles.section}>
 						<p className={styles.sectionLabel}>{hubEventName ?? 'Selected event'}</p>
-						{SIDEBAR_EVENT_MODULES.map((item: EventModule) => (
-							<NavButton
-								key={item.id}
-								label={item.label}
-								icon={item.icon}
-								active={activeRoute === item.id}
-								onClick={() => navigate(eventPath(eventId, item.id))}
-							/>
-						))}
+						{SIDEBAR_EVENT_MODULES.filter((item: EventModule) => hasRequiredRole(session?.role, item.minRoles)).map(
+							(item: EventModule) => (
+								<NavButton
+									key={item.id}
+									label={item.label}
+									icon={item.icon}
+									active={activeRoute === item.id}
+									onClick={() => navigate(eventPath(eventId, item.id))}
+								/>
+							),
+						)}
 					</div>
 				) : null}
 			</nav>
 
 			<div className={styles.footer}>
+				<p className={styles.sectionLabel}>Theme</p>
+				<ThemeSwitcher theme={theme} celebrationAllowed={celebrationAllowed} onSelect={onThemeChange} />
 				<p>Adaptavist staff only · verified session</p>
 				<button type="button" className={styles.signOut} onClick={onLogout}>
 					Sign out

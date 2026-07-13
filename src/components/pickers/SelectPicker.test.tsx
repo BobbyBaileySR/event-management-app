@@ -1,0 +1,61 @@
+import { useState } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { SelectPicker } from './SelectPicker';
+
+const OPTIONS = [
+	{ value: 'a', label: 'Option A' },
+	{ value: 'b', label: 'Option B' },
+	{ value: 'c', label: 'Option C' },
+];
+
+function Harness() {
+	const [value, setValue] = useState('a');
+	return <SelectPicker id="fruit" label="Fruit" value={value} placeholder="Select…" options={OPTIONS} onChange={setValue} />;
+}
+
+describe('SelectPicker', () => {
+	it('opens on click, exposes a labelled listbox, and closes on Escape (focus returns to trigger)', () => {
+		render(<Harness />);
+		const trigger = screen.getByRole('button', { name: /Fruit: Option A/i });
+
+		fireEvent.click(trigger);
+		const listbox = screen.getByRole('listbox');
+		expect(listbox).toHaveAttribute('aria-labelledby', 'fruit-label');
+		expect(screen.getAllByRole('option')).toHaveLength(3);
+
+		fireEvent.keyDown(listbox, { key: 'Escape' });
+		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		expect(trigger).toHaveFocus();
+	});
+
+	it('navigates with ArrowDown and selects with Enter', () => {
+		const onChange = vi.fn();
+		render(
+			<SelectPicker id="fruit" label="Fruit" value="a" placeholder="Select…" options={OPTIONS} onChange={onChange} />,
+		);
+		fireEvent.click(screen.getByRole('button', { name: /Fruit/i }));
+		const listbox = screen.getByRole('listbox');
+
+		fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+		fireEvent.keyDown(listbox, { key: 'Enter' });
+
+		expect(onChange).toHaveBeenCalledWith('b');
+	});
+
+	it('closes on outside click without changing the value', () => {
+		const onChange = vi.fn();
+		render(
+			<div>
+				<SelectPicker id="fruit" label="Fruit" value="a" placeholder="Select…" options={OPTIONS} onChange={onChange} />
+				<button type="button">outside</button>
+			</div>,
+		);
+		fireEvent.click(screen.getByRole('button', { name: /Fruit/i }));
+		expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+		fireEvent.mouseDown(screen.getByRole('button', { name: 'outside' }));
+		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		expect(onChange).not.toHaveBeenCalled();
+	});
+});

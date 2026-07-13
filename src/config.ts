@@ -52,6 +52,6 @@ export const CONFIG: EmsConfig = {
 	/** Simulated network delay for mock API (ms). */
 	MOCK_API_DELAY_MS: 350,
 
-	CELEBRATION_THEME_EMAIL: 'rbailey@adaptavist.com',//'kjohnston@adaptavist.com',
+	CELEBRATION_THEME_EMAIL: 'kjohnston@adaptavist.com',
 	CELEBRATION_TOAST_MESSAGE: 'Just for you',
 };

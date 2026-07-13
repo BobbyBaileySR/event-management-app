@@ -1,8 +1,8 @@
 # Contract: Event-First Routing + Registration (Phase B — GATED)
 
-**Feature**: 007 Redesign · **Phase**: B · **Status**: ⛔ **BLOCKED on `X-REDESIGN-001`** + design-it-twice `X-REDESIGN-002/003` · **Date**: 2026-07-13
+**Feature**: 007 Redesign · **Phase**: B · **Status**: ⛔ **GATED** (objects created in UAT; write-gates remain) + design-it-twice `X-REDESIGN-002/003` · **Date**: 2026-07-13
 
-> **Provisional.** Do not implement or merge until: (1) HubSpot frees 2 custom-object slots + workflow associations + ≤10 labels confirmed (`X-REDESIGN-001`); (2) `CustomObjectAdapter` interface design-it-twice done (`X-REDESIGN-002`); (3) event-first routing shape design-it-twice done (`X-REDESIGN-003`); (4) HubSpot schema verified in [docs/hubspot-schema.md](../../../docs/hubspot-schema.md) (`X-REDESIGN-004`). No HubSpot property/label names are authoritative here.
+> **Gate status (2026-07-13):** custom objects created in **UAT** — Program `2-65757052`, Event `2-65757130`, Program→Event association `286` (gate #1/#3 ✔). **Do not implement or merge writes until:** (1) workflow-association test confirms a HubSpot workflow can set the Contact↔Event `registered` label (gate #2, `X-REDESIGN-001`); (2) `CustomObjectAdapter` interface design-it-twice done (`X-REDESIGN-002`); (3) event-first routing shape design-it-twice done (`X-REDESIGN-003`); (4) HubSpot attributes + Contact↔Event association/labels created and verified in [docs/hubspot-schema.md](../../../docs/hubspot-schema.md) (`X-REDESIGN-004`). Object/association IDs are read from **ScriptRunner Connect Parameters** (research R-012), never hardcoded. Proposed property/label names live in hubspot-schema.md; confirm on creation.
 
 **Conventions**: `X-EMS-Route` header; `Authorization: Bearer`; JSON errors `{ "message", "code"? }`.
 
@@ -17,15 +17,15 @@ Slice 1 routes are `programs/{programId}/events/{eventId}/…`. Event-first navi
 | `programs/{programId}/events/{eventId}/attendees` | `events/{eventId}/attendees` |
 | `programs/{programId}/events/{eventId}/checkin` | `events/{eventId}/checkin` |
 | `programs/{programId}/events/{eventId}/capacity` | `events/{eventId}/capacity` |
-| `catalog` (Program→Event tree) | `catalog` (Programs optional; Events top-level, optional `programId`) |
+| `catalog` (Program→Event tree) | `catalog` (Programs optional; Events top-level; Program membership via **association `286`**, resolved by adapter — no `programId` property) |
 
-Decision on whether `programId` becomes an **optional query/body field** vs routes drop it entirely is the `X-REDESIGN-003` design-it-twice output. **The api-contract.md + rbac.md + `RouteGuard.ts` change must land together.** A dual-read window supports existing `programs/.../events/...` callers during migration (`X-REDESIGN-005`).
+Program membership is a **1-to-many HubSpot association (type ID `286`, Parameter `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`)** resolved inside `CustomObjectAdapter`, **not** a route param or `programId` property. Whether the wire still exposes an optional `programId` field for grouping is the `X-REDESIGN-003` design-it-twice output. **The api-contract.md + rbac.md + `RouteGuard.ts` change must land together.** A dual-read window supports existing `programs/.../events/...` callers during migration (`X-REDESIGN-005`).
 
 ---
 
 ## EMS write surface (association-label writes)
 
-EMS writes are limited to check-in / undo / remove / catalog CRUD. **No public "register attendee" write** (registration is workflow-side).
+EMS writes are limited to check-in / undo / remove / catalog CRUD. **No public "register attendee" write** (registration is workflow-side). Writes target the Contact↔Event association (Parameter `HUBSPOT_ASSOC_CONTACT_EVENT`) and flip labels `registered`↔`checked-in` (Parameters `HUBSPOT_ASSOC_LABEL_REGISTERED` / `HUBSPOT_ASSOC_LABEL_CHECKED_IN`).
 
 ### `POST events/{eventId}/checkin` · flip `registered` → `checked-in`
 

@@ -99,7 +99,7 @@
 .sidebar-header__user {
     margin-top: 8px;
     font-size: 0.75rem;
-    color: rgba(236, 241, 255, 0.75);
+    color: color-mix(in srgb, var(--ice) 75%, transparent);
     word-break: break-all;
 }
 
@@ -114,7 +114,7 @@
 .nav-item {
     display: block;
     padding: 12px 24px;
-    color: rgba(236, 241, 255, 0.85);
+    color: color-mix(in srgb, var(--ice) 85%, transparent);
     font-weight: 500;
     transition: background 0.2s, color 0.2s;
     border: none;
@@ -135,12 +135,12 @@
 
 .sidebar-footer {
     padding: 20px 24px;
-    border-top: 1px solid rgba(236, 241, 255, 0.15);
+    border-top: 1px solid color-mix(in srgb, var(--ice) 15%, transparent);
 }
 
 .sidebar-footer p {
     font-size: 0.75rem;
-    color: rgba(236, 241, 255, 0.6);
+    color: color-mix(in srgb, var(--ice) 60%, transparent);
     margin-bottom: 12px;
 }
 

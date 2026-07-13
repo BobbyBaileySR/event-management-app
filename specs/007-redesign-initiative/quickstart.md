@@ -28,6 +28,24 @@ Validation guide for the redesign. **Phase A is deliverable now**; **Phase B is 
 
 Run `npm run lint` (both repos) and `npm audit --audit-level=high` before deploy.
 
+### Baseline (T003, pre-implementation, 2026-07-13)
+
+| Repo | `npm test` | `npm run lint` |
+| :--- | :--- | :--- |
+| Frontend | 34 test files, 215 tests passed | 0 errors, 4 pre-existing warnings (`mockData.ts` unused args) |
+| Backend | 21 test suites, 236 tests passed | 0 errors, 3 pre-existing warnings (`apiRegistry.ts`, `Slice1Routes.test.ts` unused args) |
+
+### After Phase 1 (Setup) + Phase 2 (Foundational) — T001–T011, 2026-07-13
+
+| Check | Result |
+| :--- | :--- |
+| Frontend `npm test` | 38 test files, 225 tests passed (+4 files / +10 tests: `SelectPicker`, `CalendarPicker`, `TimePicker`, `AppLayout` role-gate) |
+| Frontend `npm run lint` | 0 errors, same 4 pre-existing warnings |
+| Frontend `tsc --noEmit` | clean |
+| Frontend `npm audit --audit-level=high` | 0 vulnerabilities (incl. new `@fontsource-variable/manrope`, `@fontsource/material-symbols-outlined`) |
+| Frontend `vite build` | succeeds; self-hosted fonts bundle into `dist/assets/*.woff2` (verified, then `dist/` removed — not committed) |
+| Backend | unchanged (no Backend work in Foundational; Foundational touches Frontend only) |
+
 ---
 
 ## B. Manual functional smoke (UAT)

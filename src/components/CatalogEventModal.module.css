@@ -22,7 +22,7 @@
 .form input,
 .form textarea {
 	padding: 8px 10px;
-	border: 1px solid rgba(11, 5, 115, 0.2);
+	border: 1px solid var(--border);
 	border-radius: 6px;
 	font: inherit;
 }
@@ -36,13 +36,13 @@
 	margin: 0;
 	font-size: 0.8rem;
 	font-weight: 400;
-	color: #b42318;
+	color: var(--danger);
 }
 
 .readOnlyProgram {
 	margin: 0;
 	font-size: 0.9rem;
-	color: rgba(0, 10, 39, 0.85);
+	color: var(--muted);
 }
 
 .programField {
@@ -63,9 +63,9 @@
 	width: 100%;
 	min-height: 44px;
 	padding: 8px 36px 8px 10px;
-	border: 1px solid rgba(11, 5, 115, 0.2);
+	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: #fff;
+	background: var(--panel);
 	color: var(--color-black);
 	font: inherit;
 	font-weight: 400;
@@ -90,9 +90,9 @@
 	margin: 0;
 	padding: 4px;
 	list-style: none;
-	border: 1px solid rgba(11, 5, 115, 0.2);
+	border: 1px solid var(--border);
 	border-radius: 8px;
-	background: #fff;
+	background: var(--panel);
 	box-shadow: 0 8px 24px rgba(0, 10, 39, 0.12);
 	max-height: min(200px, 40vh);
 	overflow-y: auto;

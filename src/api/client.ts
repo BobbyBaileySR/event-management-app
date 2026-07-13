@@ -53,9 +53,15 @@ export async function apiRequest<T = unknown>(
 	}
 
 	const { route, query } = splitApiPath(path);
-	headers.set('X-EMS-Route', route);
 
-	const requestUrl = query ? `${CONFIG.API_BASE_URL}?${query}` : CONFIG.API_BASE_URL;
+	// Route travels as the `route` query param, not a custom header: a cross-origin call
+	// from GitHub Pages triggers a CORS preflight, and the ScriptRunner gateway's canned
+	// preflight response does not allow custom headers like X-EMS-Route (it does allow
+	// Authorization + Content-Type). Query params need no such allowance.
+	const params = new URLSearchParams(query);
+	params.set('route', route);
+
+	const requestUrl = `${CONFIG.API_BASE_URL}?${params.toString()}`;
 	const response = await fetch(requestUrl, { ...options, headers });
 
 	if (!response.ok) {

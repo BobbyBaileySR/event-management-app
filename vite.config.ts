@@ -19,6 +19,8 @@ const PRODUCTION_CSP = [
 	"img-src 'self' data: https://*.googleusercontent.com https://*.gstatic.com https://accounts.google.com",
 	// US3 walk-in iframe — must match `isAllowedHubSpotFormUrl` allowlist (NFR-004).
 	'frame-src https://accounts.google.com https://*.hubspot.com https://*.hsforms.com https://share.hsforms.com',
+	// Self-hosted Manrope + Material Symbols (research R-003) — no Google Fonts / icon CDN.
+	"font-src 'self'",
 ].join('; ');
 
 function injectProductionCsp(): Plugin {

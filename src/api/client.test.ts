@@ -25,6 +25,7 @@ describe('apiRequest', () => {
 	const fetchMock = vi.fn();
 
 	beforeEach(() => {
+		fetchMock.mockReset();
 		fetchMock.mockResolvedValue({
 			ok: true,
 			status: 200,
@@ -37,18 +38,23 @@ describe('apiRequest', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('sets X-EMS-Route to path only and forwards query on the listener URL', async () => {
+	it('sends the route as a query param alongside existing query, and no X-EMS-Route header', async () => {
 		await apiRequest('/catalog?includeArchived=true');
 
-		expect(fetchMock).toHaveBeenCalledWith(
-			'https://event.scriptrunnerconnect.com/listener?includeArchived=true',
-			expect.objectContaining({
-				headers: expect.any(Headers),
-			}),
-		);
+		const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+		const parsed = new URL(url);
+		expect(parsed.origin + parsed.pathname).toBe('https://event.scriptrunnerconnect.com/listener');
+		expect(parsed.searchParams.get('route')).toBe('catalog');
+		expect(parsed.searchParams.get('includeArchived')).toBe('true');
 
-		const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
 		const headers = init.headers as Headers;
-		expect(headers.get('X-EMS-Route')).toBe('catalog');
+		expect(headers.has('X-EMS-Route')).toBe(false);
+	});
+
+	it('sends the route param when the path has no query string', async () => {
+		await apiRequest('auth/logout');
+
+		const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+		expect(new URL(url).searchParams.get('route')).toBe('auth/logout');
 	});
 });

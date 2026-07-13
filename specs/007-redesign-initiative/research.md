@@ -38,7 +38,12 @@ Most decisions here are already settled by the grilling session (2026-07-12) and
 
 - **Decision**: Phase B does not start implementation until all four gates pass: (1) HubSpot frees **2 custom-object slots** (Program + Event); (2) workflows can **create/set custom-object associations** on the tier; (3) association-label model fits within **≤10 labels** per object pairing for `registered`/`checked-in`/`customer`/`partner`; (4) standard security write-gate (schema verified, RBAC, audit, validation + rate limit, handler order).
 - **Rationale**: The whole event-first data model depends on registration living on the Event ([ADR-007] Gates; [ADR-008] dependency).
-- **Status**: **OPEN** — user is chasing the slot quota with HubSpot. Tracked as `X-REDESIGN-001` (blocked) and `X-REDESIGN-004` (schema verify, blocked on #1).
+- **Status (updated 2026-07-13)**: **PARTIALLY UNBLOCKED** — HubSpot team created the two custom objects in **UAT**:
+  - **Gate #1 (slots) ✔** — Program (`2-65757052`, "Event Programs") + Event (`2-65757130`, "Event Items") exist as shells.
+  - **Gate #2 (workflow can set Contact↔Event association)**: **ASSUMED-PENDING-TEST** — must confirm with a test workflow before EMS writes (task added in tasks.md).
+  - **Gate #3 (label limit)** ✔ — Program→Event is a **1-to-many association, type ID `286`**; Contact↔Event needs only **2** labels (`registered`, `checked-in`), well under the ≤10 limit.
+  - **Gate #4 / `X-REDESIGN-004` (schema verify)**: **OPEN** — attributes + Contact↔Event association/labels not yet created; property API names are proposed in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) pending HubSpot creation + confirmation.
+  - **Target env = UAT.** Object/association IDs stored as **ScriptRunner Connect Parameters** (see R-012), not hardcoded.
 - **Alternatives rejected**: a third "registration" join object (needs a slot the account can't spare); association-level properties (not a real HubSpot feature — labels only, verified 2026-07-12).
 
 ## R-006 — `CustomObjectAdapter` interface (Phase B design-it-twice — `X-REDESIGN-002`) — OPEN
@@ -49,7 +54,7 @@ Most decisions here are already settled by the grilling session (2026-07-12) and
 
 ## R-007 — Event-first routing shape (Phase B design-it-twice — `X-REDESIGN-003`) — OPEN
 
-- **Decision**: Move from `programs/{programId}/events/{eventId}/…` to **event-scoped routes** (`events/{eventId}/…`) or make `programId` optional throughout. Breaking contract change; update `api-contract.md` + `rbac.md` + `RouteGuard` in the **same change**. Every Event-scoped operation must work with `programId` absent.
+- **Decision**: Move from `programs/{programId}/events/{eventId}/…` to **event-scoped routes** (`events/{eventId}/…`). Program membership is a **HubSpot association (ID `286`)** resolved by the adapter, **not** a route param or `programId` property. Breaking contract change; update `api-contract.md` + `rbac.md` + `RouteGuard` in the **same change**. Every Event-scoped operation must work with no Program association present.
 - **Rationale**: Standalone Events + event-first navigation ([ADR-008] §2–§4).
 - **Status**: **OPEN** — design-it-twice first; captured provisionally in [contracts/event-first-routes-api.md](./contracts/event-first-routes-api.md).
 
@@ -74,6 +79,12 @@ Most decisions here are already settled by the grilling session (2026-07-12) and
 
 - **Decision**: No persisted draft-campaign state this pass; the prototype's Drafts stat is omitted/zeroed. Parked as `FE-REDESIGN-008`.
 - **Rationale**: [ADR-009] §9; keeps the settled send-now/scheduled Campaign model unchanged.
+
+## R-012 — HubSpot object/association IDs via ScriptRunner Connect Parameters (Phase B)
+
+- **Decision**: Store **portal-specific** HubSpot object type IDs and association type/label IDs in **ScriptRunner Connect Parameters** (`HUBSPOT_OBJECT_TYPE_PROGRAM`, `HUBSPOT_OBJECT_TYPE_EVENT`, `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`, `HUBSPOT_ASSOC_CONTACT_EVENT`, `HUBSPOT_ASSOC_LABEL_REGISTERED`, `HUBSPOT_ASSOC_LABEL_CHECKED_IN`). The `CustomObjectAdapter` reads them at runtime; stable property **API names** + label conventions live in code (`HubSpotSchema.ts`) + [docs/hubspot-schema.md](../../docs/hubspot-schema.md). Never hardcode IDs.
+- **Rationale**: IDs differ between UAT and Prod; Parameters give env portability with no code change, matching how existing secrets/config are handled ([ADR-005] seam; hubspot-schema.md).
+- **Alternatives rejected**: hardcoding IDs (breaks UAT→Prod promotion); a checked-in config file (leaks env-specific IDs into VCS).
 
 ---
 

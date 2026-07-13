@@ -1,3 +1,5 @@
+import type { ThemeId } from './theme/themeTokens';
+
 export type EmsRole = 'viewer' | 'operator' | 'communications' | 'admin';
 
 export interface Session {
@@ -480,4 +482,13 @@ export interface PatchEmailDispatchBody {
 	timezone: string | null;
 	/** Required when recipientCountPlanned >= largeSendThreshold (FR-010). */
 	largeSendConfirmed?: true;
+}
+
+/** `GET user/prefs` / `PUT user/prefs/theme` response (contracts/theme-preference-api.md). */
+export interface ThemePreference {
+	/** Resolved theme after server-side Celebration allowlist re-validation. */
+	theme: ThemeId;
+	/** Whether the switcher should offer Celebration to this user. */
+	celebrationAllowed: boolean;
+	updatedAt?: string;
 }

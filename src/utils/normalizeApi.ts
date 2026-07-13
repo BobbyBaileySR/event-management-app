@@ -26,7 +26,9 @@ import type {
 	HubSpotSegmentOption,
 	MarketingTemplateOption,
 	SliceAttendeesResponse,
+	ThemePreference,
 } from '../types';
+import { DEFAULT_THEME_ID, isThemeId } from '../theme/themeTokens';
 
 const ATTENDEE_STATUS_FROM_API: Record<string, Attendee['status']> = {
 	registered: 'Registered',
@@ -281,6 +283,16 @@ export function normalizeCapacityStatusResponse(response: Record<string, unknown
 		checkedInCount: Number(response.checkedInCount ?? 0),
 		departureCount: Number(response.departureCount ?? 0),
 		liveAttendance: Number(response.liveAttendance ?? 0),
+	};
+}
+
+/** Never trust a raw `theme` value for gating (research R-002) — fall back to Aurora if unrecognized. */
+export function normalizeThemePreferenceResponse(response: Record<string, unknown>): ThemePreference {
+	const rawTheme = String(response.theme ?? '');
+	return {
+		theme: isThemeId(rawTheme) ? rawTheme : DEFAULT_THEME_ID,
+		celebrationAllowed: Boolean(response.celebrationAllowed),
+		updatedAt: typeof response.updatedAt === 'string' ? response.updatedAt : undefined,
 	};
 }
 

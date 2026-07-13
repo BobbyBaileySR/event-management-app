@@ -1,7 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import './styles/fonts.css';
 import '../css/tokens.css';
+import '../css/theme-aurora.css';
 import '../css/theme-celebration.css';
+import '../css/theme-dark-aurora.css';
 import '../css/base.css';
 import '../css/layout.css';
 import '../css/components.css';
