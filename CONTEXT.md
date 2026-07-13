@@ -2,7 +2,15 @@
 
 Ubiquitous language for Adaptavist EMS. **Glossary only** — no implementation, API shapes, or storage choices. See `docs/hubspot-schema.md`, `docs/api-contract.md`, and `docs/decisions/` for technical detail.
 
-> **Last updated:** 2026-07-07 (Slice 3 — public registration grilling)
+> **Last updated:** 2026-07-12 (UI-redesign grilling — target-model transition banner + [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md))
+
+---
+
+> ## ⚠️ Redesign transition — two models in flight
+>
+> A UI redesign + HubSpot **custom-objects** migration is in progress. The terms below (Program, Event, Parts Attended, Registered attendee, Checked-in attendee, Email dispatch, navigation, …) describe the **shipped "Plan C" model** ([ADR-003](docs/decisions/003-phase1-attendees-checkin.md)) and remain accurate **until [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) ship** (gated on freeing two HubSpot custom-object slots).
+>
+> The **target model** is captured in the [**Redesign transition — target model**](#redesign-transition--target-model) section at the end of this glossary. Where the two disagree, the target model is the intended future; the Plan-C terms are today's reality. Do **not** delete the Plan-C terms yet — they document Live behaviour during the dual-read migration window.
 
 ---
 
@@ -287,3 +295,65 @@ First shipped slice (stakeholder priority): **B**
 *QR JWT minting for registrant emails — **not confirmed**; likely HubSpot-driven, possible future EMS control.*
 
 *Check-in uses per-Event `attendanceProperty` from catalog — see `docs/hubspot-schema.md`.*
+
+---
+
+# Redesign transition — target model
+
+Target-model vocabulary from the 2026-07-12 UI-redesign grilling. **Not yet Live** — gated on [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) feasibility (two custom-object slots freed). Until then the Plan-C terms above describe actual behaviour. Where a term below **replaces** a Plan-C term, that is called out.
+
+## Program (target)
+
+Optional grouping of related **Events** for a multi-part effort. **No longer mandatory** — an Event may stand alone with no Program ([ADR-008](docs/decisions/008-standalone-events-event-first-nav.md)). Becomes a **HubSpot custom object** ([ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md)); catalog metadata lives on object properties. **Replaces** the Plan-C rule that every Event sits under a Program and that a Program holds registration `hubspotFormIds`.
+
+## Event (target)
+
+The **primary entity**. May belong to a Program (optional `programId`) but does not require one — a **standalone Event** is fully functional (attendees, check-in, capacity, campaigns). Becomes a **HubSpot custom object**. **Retires** `partsAttendedOption` and the global `attendanceProperty`; keeps a **walk-in form reference** and **public registration URL**. **Replaces** the Plan-C Event (a Parts-Attended option under a Program).
+
+## Registration / attendee (target)
+
+An attendee **is a Contact↔Event association**. Registration exists ⇔ the association exists. **Attendee lifecycle and type are association labels**: `registered`, `checked-in`, `customer`, `partner`. **Replaces** the Plan-C "two-leg" **Registered attendee** (Program form submission + Parts-Attended option) and the derived `attendeeType`.
+
+## Association label (target)
+
+A HubSpot **association label** on a Contact↔Event association carrying attendee state/type (`registered`, `checked-in`, `customer`, `partner`). HubSpot has **no general "association properties"** (verified 2026-07-12 — labels only); richer per-registration detail lives in Record Storage instead.
+
+## Standalone Event (target)
+
+An Event with **no Program** ([ADR-008](docs/decisions/008-standalone-events-event-first-nav.md)). First-class; the redesign's **event-first navigation** lands staff on Events, with Program as an **optional filter/grouping** rather than a mandatory first step. **Replaces** the Plan-C Program-first navigation.
+
+## Checked-in (target)
+
+Attendance is the **per-Event `checked-in` association label** (flip `registered` → `checked-in`; **undo** reverses it). Rich detail (`checkedInAt`, scan method, QR JWT/nonce) lives in a **Record Storage per-registration cache** keyed by `contactId + eventId`, **purged on Event archive**; the **audit log is the durable backstop** for "when". **Replaces** the Plan-C global Yes/No `attendanceProperty` on the Contact.
+
+## Status (target)
+
+Event **status = Active / Cancelled** (set manually) + **Completed** (auto-derived once the end date passes). **Publish state** (registration draft/published) is tracked **separately** from status. **Replaces** the Plan-C `active/draft/cancelled` catalog status (drops `draft`).
+
+## Remove attendee (target)
+
+Deletes the **Contact↔Event association only** (the Contact is untouched), **audited**, behind a confirm. **Blocked while `checked-in`** — staff must **undo check-in** first.
+
+## Undo check-in (target)
+
+Error-correction only: flips `checked-in` → `registered`, **audited**. **Not** presence/check-out tracking. Distinct from the Check-in screen's **±1 Live Capacity** walk-out adjustment (occupancy, not registration state).
+
+## Campaign (target)
+
+**Renames Slice-2 "Email dispatch" → "Campaign"** (accepting the HubSpot marketing-term collision, per the grilling vocab decision). Preserves all Slice-2 richness — staff-entered name, timezone-aligned 15-minute scheduling, edit/cancel before lock, audience filtering, and a **campaign log** with per-Contact outcome. Compose/edit move into a **modal** (edit reopens the modal, which offers delete). **Replaces** the "Email dispatch" / "dispatch log" naming above and the earlier _Avoid: "Campaign"_ guidance.
+
+## Live capacity / occupancy (target)
+
+Two distinct capacity views, **both may exceed 100%** (overbooking shown, not capped): **Event Details "Filled %"** = registration fill (registered ÷ capacity); **Check-in "Live Capacity"** = occupancy (checked-in − walk-outs) with **±1** controls. The ±1 walk-out adjustment and **undo check-in** stay separate concepts.
+
+## Archive vs delete (target)
+
+**Archive-by-default** for Programs/Events: a soft, restorable hidden flag; the record is **retained** for audit and historical attendee/check-in context. **Hard delete is permitted only for *empty* records** (no registrations/associations and no history). The redesign's "Delete" control is therefore **context-sensitive** — it archives when a record has history, and only offers a true delete when the record is empty.
+
+## Walk-in (target)
+
+Walk-in is a **mode within Check-in** ("+ Add walk-in"). An **embedded HubSpot form (iframe) + workflow registers only** (creates the `registered` association) — it does **not** auto-check-in; staff then check the person in through the audited EMS path. **UX caveat:** there is a **propagation lag** between the HubSpot form submit and the new attendee appearing on the EMS roster (workflow + read latency), so the walk-in UI must set that expectation rather than imply an instant roster update.
+
+## No bulk "import attendees" (target)
+
+The redesign's proposed **"import attendees"** action is **dropped**. Registration is **HubSpot-workflow-side** ([ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) §4) — EMS has no register/import write path; attendees enter via public forms or walk-in registration, not an EMS-side bulk import.
