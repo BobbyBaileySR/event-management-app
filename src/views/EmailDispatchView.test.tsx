@@ -245,7 +245,12 @@ describe('EmailDispatchView', () => {
 		fireEvent.change(screen.getByLabelText(/dispatch name/i), {
 			target: { value: 'Large audience send' },
 		});
-		fireEvent.click(screen.getByRole('button', { name: /send now/i }));
+
+		const sendButton = screen.getByRole('button', { name: /send now/i });
+		await waitFor(() => {
+			expect(sendButton).toBeEnabled();
+		});
+		fireEvent.click(sendButton);
 
 		await waitFor(() => {
 			expect(screen.getByRole('dialog')).toBeInTheDocument();

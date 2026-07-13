@@ -8,6 +8,10 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-13
 
+### Fix — flaky `EmailDispatchView` large-send test in CI
+
+- **`src/views/EmailDispatchView.test.tsx`**: "shows a confirm modal before accepting large sends" now waits for the "Send now" button to be enabled before clicking. The button is disabled while the on-mount recipient preview is in flight (`previewLoading`), so in slower CI runs the click landed on a disabled button and was dropped — `handleSendNow` never ran and the confirm dialog never appeared, causing an intermittent `Unable to find role="dialog"` failure. Passed locally due to faster preview timing. No component behaviour change; test-only determinism fix.
+
 ### Docs — `/speckit-analyze` remediation for slice 007 (redesign initiative)
 
 - **`specs/007-redesign-initiative/`** — applied cross-artifact analysis fixes (user-approved): **A1** theme-save rate limit now specified (`USER_PREFS_RATE_LIMIT_PER_HOUR`, default 60/user/hour) in spec FR-009 + contract + data-model + quickstart C7.1.2; **U1** theme preference keyed by **Google subject ID (non-PII)** not email (spec FR-009, data-model, contract); **U2** redesign visual QA is against **live** HubSpot data (quickstart §B); **G1** added task **T063** (click-count parity, SC-003); **I1** added task **T064** (re-verify Slice 004 capacity ±1 under the custom-object model); **G2** extended **T036** to also assert self-hosted fonts are the only new front-end asset (no CDN). D1 (duplicate picker-a11y wording) and N1 (task order) left as-is by decision. Now 64 tasks.
