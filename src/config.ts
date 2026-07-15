@@ -46,11 +46,13 @@ export const CONFIG: EmsConfig = {
 	GOOGLE_CLIENT_ID: '391161511150-ejvh658fsqb4cato9a58iq1ad4l3olsh.apps.googleusercontent.com',
 
 	/**
-	 * API path on the same origin as the UI.
-	 * Local dev: `/api/ems` proxied to ScriptRunner via vite.config.ts (needs dev-server.config.js).
-	 * Production: same path via Cloudflare Worker/Pages Function, or a CORS-capable proxy URL.
+	 * ScriptRunner listener base URL.
+	 * Local dev: falls back to `/api/ems`, proxied to ScriptRunner via vite.config.ts (needs dev-server.config.js).
+	 * Deployed (GitHub Pages has no proxy): set `VITE_API_BASE_URL` to the absolute cross-origin
+	 * listener URL in the deploy workflow. `client.ts` sends the logical route as the `route` query
+	 * param specifically so this cross-origin call needs no custom-header CORS preflight allowance.
 	 */
-	API_BASE_URL: '/api/ems',
+	API_BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api/ems',
 
 	/** When true, uses local mock auth exchange (not for production). */
 	USE_MOCK_AUTH: false,

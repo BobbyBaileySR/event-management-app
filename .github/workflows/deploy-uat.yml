@@ -28,6 +28,10 @@ jobs:
       - name: Build UAT bundle
         env:
           VITE_EMS_ENV: uat
+          # Absolute ScriptRunner Connect listener base URL. Set as an Actions
+          # repo variable (Settings → Secrets and variables → Actions → Variables)
+          # on this source repo — GitHub Pages has no proxy for the relative /api/ems path.
+          VITE_API_BASE_URL: ${{ vars.UAT_API_BASE_URL }}
         run: npm run build
       - name: Deploy to UAT GitHub Pages repo
         uses: peaceiris/actions-gh-pages@v4

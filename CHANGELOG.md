@@ -8,6 +8,13 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-15
 
+### Fix — UAT login 405: wire absolute API base URL for deployed builds
+
+- **`config.ts`**: `API_BASE_URL` now reads `import.meta.env.VITE_API_BASE_URL`, falling back to the relative `/api/ems` for local dev. On GitHub Pages there is no proxy, so the previously-hardcoded relative path meant the login `POST` hit the static Pages host itself → **405 Method Not Allowed** (with a compressed HTML error body, not JSON), never reaching ScriptRunner.
+- **`deploy-uat.yml`**: build step now passes `VITE_API_BASE_URL` from the `UAT_API_BASE_URL` Actions repo variable, so the UAT bundle targets the absolute cross-origin ScriptRunner listener URL.
+- **`vite-env.d.ts`**: typed the new `VITE_API_BASE_URL` env var.
+- Note: cross-origin UAT calls also require the Pages origin in the backend `ALLOWED_ORIGINS` Parameter and in Google OAuth authorized origins.
+
 ### Feature — Undo check-in UI (`FE-REDESIGN-001` / T056)
 
 - **`dataService.undoCheckIn`** + mock + live `POST events/{eventId}/checkin/undo` mapping; createDataService binding.
