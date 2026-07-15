@@ -274,7 +274,7 @@ const INITIAL_MOCK_CATALOG: MockCatalogProgramNode[] = [
 ];
 
 const mockCatalogState: MockCatalogProgramNode[] = structuredClone(INITIAL_MOCK_CATALOG);
-let mockStandaloneEvents: CatalogEvent[] = [];
+const mockStandaloneEvents: CatalogEvent[] = [];
 
 function flattenMockCatalog(
 	programs: MockCatalogProgramNode[],
