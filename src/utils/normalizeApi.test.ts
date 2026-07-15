@@ -147,23 +147,24 @@ describe('normalizeAttendeesResponse', () => {
 });
 
 describe('normalizeCatalogResponse', () => {
-	it('maps API catalog tree fields to UI types', () => {
+	it('maps API flat catalog fields to UI types', () => {
 		const result = normalizeCatalogResponse({
 			programs: [
 				{
 					id: 'prog-1',
 					name: 'Atlassian Event 2026',
-					hubspotFormIds: ['form-1', 'form-2'],
 					archived: false,
-					events: [
-						{
-							id: 'ev-1',
-							name: 'Meeting Room',
-							partsAttendedOption: 'Meeting Room',
-							attendanceProperty: 'atlassian_event__customer_event_attendance',
-							archived: false,
-						},
-					],
+				},
+			],
+			events: [
+				{
+					id: 'ev-1',
+					name: 'Meeting Room',
+					start: '2026-09-02T09:00:00.000Z',
+					status: 'active',
+					publishState: 'published',
+					archived: false,
+					programId: 'prog-1',
 				},
 			],
 		});
@@ -171,33 +172,38 @@ describe('normalizeCatalogResponse', () => {
 		expect(result.programs[0]).toMatchObject({
 			id: 'prog-1',
 			name: 'Atlassian Event 2026',
-			hubspotFormIds: ['form-1', 'form-2'],
-			events: [
-				{
-					id: 'ev-1',
-					name: 'Meeting Room',
-					partsAttendedOption: 'Meeting Room',
-					attendanceProperty: 'atlassian_event__customer_event_attendance',
-					archived: false,
-				},
-			],
+			archived: false,
+		});
+		expect(result.events[0]).toMatchObject({
+			id: 'ev-1',
+			name: 'Meeting Room',
+			start: '2026-09-02T09:00:00.000Z',
+			status: 'active',
+			publishState: 'published',
+			archived: false,
+			programId: 'prog-1',
 		});
 	});
 
-	it('migrates legacy hubspotFormId to hubspotFormIds array', () => {
+	it('defaults missing Event status/publishState and null programId for standalone', () => {
 		const result = normalizeCatalogResponse({
-			programs: [
+			programs: [],
+			events: [
 				{
-					id: 'prog-legacy',
-					name: 'Legacy Program',
-					hubspotFormId: 'legacy-form',
+					id: 'ev-solo',
+					name: 'Standalone',
+					start: '2026-10-01T09:00:00.000Z',
 					archived: false,
-					events: [],
+					programId: null,
 				},
 			],
 		});
 
-		expect(result.programs[0]?.hubspotFormIds).toEqual(['legacy-form']);
+		expect(result.events[0]).toMatchObject({
+			programId: null,
+			status: 'active',
+			publishState: 'draft',
+		});
 	});
 
 	it('passes through optional Program metadata fields', () => {
@@ -206,25 +212,22 @@ describe('normalizeCatalogResponse', () => {
 				{
 					id: 'prog-meta',
 					name: 'Meta Program',
-					hubspotFormIds: ['form-meta'],
 					archived: false,
 					description: 'Annual flagship',
 					startDate: '2026-09-01',
 					endDate: '2026-09-05',
-					location: 'London',
-					timezone: 'Europe/London',
-					events: [],
 				},
 			],
+			events: [],
 		});
 
 		expect(result.programs[0]).toMatchObject({
 			description: 'Annual flagship',
 			startDate: '2026-09-01',
 			endDate: '2026-09-05',
-			location: 'London',
-			timezone: 'Europe/London',
 		});
+		expect(result.programs[0]).not.toHaveProperty('location');
+		expect(result.programs[0]).not.toHaveProperty('hubspotFormIds');
 	});
 
 	it('passes through optional Event metadata fields', () => {
@@ -234,31 +237,42 @@ describe('normalizeCatalogResponse', () => {
 				{
 					id: 'prog-1',
 					name: 'Host',
-					hubspotFormIds: ['form-1'],
 					archived: false,
-					events: [
-						{
-							id: 'ev-1',
-							name: 'Keynote',
-							partsAttendedOption: 'Keynote',
-							attendanceProperty: 'atlassian_event__customer_event_attendance',
-							archived: false,
-							owner: 'Events Team',
-							date: '2026-09-02',
-							capacity: 12.5,
-							walkInFormUrl,
-						},
-					],
+				},
+			],
+			events: [
+				{
+					id: 'ev-1',
+					name: 'Keynote',
+					start: '2026-09-02T09:00:00.000Z',
+					end: '2026-09-02T17:00:00.000Z',
+					status: 'cancelled',
+					publishState: 'draft',
+					archived: false,
+					programId: 'prog-1',
+					owner: 'Events Team',
+					location: 'London',
+					capacity: 12.5,
+					walkInFormUrl,
+					registrationFormUrl: 'https://share.hsforms.com/reg',
+					registrationSlug: 'keynote-2026',
 				},
 			],
 		});
 
-		expect(result.programs[0]?.events[0]).toMatchObject({
+		expect(result.events[0]).toMatchObject({
 			owner: 'Events Team',
-			date: '2026-09-02',
+			start: '2026-09-02T09:00:00.000Z',
+			end: '2026-09-02T17:00:00.000Z',
+			status: 'cancelled',
+			location: 'London',
 			capacity: 12.5,
 			walkInFormUrl,
+			registrationFormUrl: 'https://share.hsforms.com/reg',
+			registrationSlug: 'keynote-2026',
 		});
+		expect(result.events[0]).not.toHaveProperty('partsAttendedOption');
+		expect(result.events[0]).not.toHaveProperty('date');
 	});
 
 	it('treats legacy catalog nodes without metadata keys as unset', () => {
@@ -267,23 +281,24 @@ describe('normalizeCatalogResponse', () => {
 				{
 					id: 'legacy-prog',
 					name: 'Legacy Program',
-					hubspotFormId: 'legacy-form',
 					archived: false,
-					events: [
-						{
-							id: 'legacy-ev',
-							name: 'Legacy Event',
-							partsAttendedOption: 'Legacy Event',
-							attendanceProperty: 'atlassian_event__customer_event_attendance',
-							archived: false,
-						},
-					],
+				},
+			],
+			events: [
+				{
+					id: 'legacy-ev',
+					name: 'Legacy Event',
+					start: '2026-09-01T09:00:00.000Z',
+					archived: false,
+					programId: 'legacy-prog',
 				},
 			],
 		});
 
 		expect(result.programs[0]?.description).toBeUndefined();
-		expect(result.programs[0]?.events[0]?.owner).toBeUndefined();
+		expect(result.events[0]?.owner).toBeUndefined();
+		expect(result.events[0]?.status).toBe('active');
+		expect(result.events[0]?.publishState).toBe('draft');
 	});
 });
 

@@ -18,7 +18,7 @@ function renderAt(path: string) {
 describe('RoutePlaceholder', () => {
 	it('shows the module label for the active route', () => {
 		renderAt('/events/evt-1/attendees');
-		expect(screen.getByRole('heading', { name: 'Attendees' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 		expect(screen.getByText('Event: evt-1')).toBeInTheDocument();
 	});
 

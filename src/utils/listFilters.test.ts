@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { AttendeeStatus, Event } from '../types';
+import type { PortfolioEvent } from './catalogEventPresentation';
 import {
 	countSegment,
 	filterAttendees,
 	filterEventsByStatus,
+	filterPortfolioByStatus,
 	getPortfolioStats,
 	searchAttendees,
 	searchEvents,
+	searchPortfolioEvents,
 } from './listFilters';
 
 const attendees = [
@@ -47,6 +50,35 @@ const events: Event[] = [
 	},
 ];
 
+const portfolioEvents: PortfolioEvent[] = [
+	{
+		id: 'evt-1',
+		name: 'London Summit',
+		date: 'Oct 15, 2026',
+		dateIso: '2026-10-15',
+		location: 'London',
+		status: 'active',
+		publishState: 'published',
+		attendeeCount: 10,
+		capacity: 100,
+		owner: 'events@adaptavist.com',
+		hubspotId: 'evt-1',
+	},
+	{
+		id: 'evt-2',
+		name: 'Draft Webinar',
+		date: 'Nov 02, 2026',
+		dateIso: '2026-11-02',
+		location: 'Virtual',
+		status: 'active',
+		publishState: 'draft',
+		attendeeCount: 5,
+		capacity: 50,
+		owner: 'events@adaptavist.com',
+		hubspotId: 'evt-2',
+	},
+];
+
 describe('listFilters', () => {
 	it('filters attendees by status', () => {
 		expect(filterAttendees('All', attendees)).toHaveLength(2);
@@ -69,6 +101,18 @@ describe('listFilters', () => {
 	});
 
 	it('summarises portfolio stats', () => {
-		expect(getPortfolioStats(events)).toEqual({ total: 2, active: 1, registrations: 15 });
+		expect(getPortfolioStats(portfolioEvents)).toEqual({ total: 2, active: 2, registrations: 15 });
+	});
+
+	it('filters portfolio events by derived lifecycle status', () => {
+		expect(filterPortfolioByStatus('all', portfolioEvents)).toHaveLength(2);
+		expect(filterPortfolioByStatus('active', portfolioEvents)).toEqual(portfolioEvents);
+		expect(filterPortfolioByStatus('cancelled', portfolioEvents)).toEqual([]);
+		expect(filterPortfolioByStatus('completed', portfolioEvents)).toEqual([]);
+	});
+
+	it('searches portfolio events by name, location, or hubspotId', () => {
+		expect(searchPortfolioEvents('draft', portfolioEvents)).toEqual([portfolioEvents[1]]);
+		expect(searchPortfolioEvents('evt-1', portfolioEvents)).toEqual([portfolioEvents[0]]);
 	});
 });

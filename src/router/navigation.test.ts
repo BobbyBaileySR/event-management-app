@@ -1,13 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eventPath, isEventScopedRoute, sliceModulePath } from './navigation';
-
-describe('sliceModulePath', () => {
-	it('builds catalog-scoped slice routes without a legacy event id', () => {
-		expect(sliceModulePath('attendees')).toBe('/events/attendees');
-		expect(sliceModulePath('check-in')).toBe('/events/check-in');
-		expect(sliceModulePath('email')).toBe('/events/email');
-	});
-});
+import { eventPath, isEventScopedRoute } from './navigation';
 
 describe('eventPath', () => {
 	it('builds the event hub path when no module (or the hub) is given', () => {
@@ -19,6 +11,7 @@ describe('eventPath', () => {
 	it('builds a module path for event-scoped modules', () => {
 		expect(eventPath('evt-1', 'attendees')).toBe('/events/evt-1/attendees');
 		expect(eventPath('evt-1', 'email')).toBe('/events/evt-1/email');
+		expect(eventPath('evt-1', 'check-in')).toBe('/events/evt-1/check-in');
 	});
 });
 

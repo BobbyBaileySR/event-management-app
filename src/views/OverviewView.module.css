@@ -1,0 +1,141 @@
+.view {
+	/* inherits global view spacing from layout.css */
+}
+
+.cardHeaderRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.cardHeaderRow h2 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.linkButton {
+	border: none;
+	background: none;
+	color: var(--accent);
+	font-size: 0.85rem;
+	font-weight: 700;
+	cursor: pointer;
+	padding: 6px 4px;
+	min-height: 44px;
+}
+
+.eventList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.eventRow {
+	border-bottom: 1px solid var(--border);
+}
+
+.eventRow:last-child {
+	border-bottom: none;
+}
+
+.eventRowButton {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 44px 1fr auto auto;
+	align-items: center;
+	gap: 14px;
+	padding: 11px 0;
+	border: none;
+	background: none;
+	font: inherit;
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+	min-height: 44px;
+}
+
+.eventDate {
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.eventInfo {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.eventName {
+	font-size: 0.9rem;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.eventLocation {
+	font-size: 0.78rem;
+	color: var(--muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.eventCapacity {
+	width: 110px;
+	flex-shrink: 0;
+}
+
+.eventCapacityLabel {
+	display: block;
+	font-size: 0.72rem;
+	color: var(--muted);
+	margin-bottom: 3px;
+	white-space: nowrap;
+}
+
+.miniBarTrack {
+	display: block;
+	height: 5px;
+	border-radius: 3px;
+	background: var(--ice);
+	overflow: hidden;
+}
+
+.miniBarFill {
+	display: block;
+	height: 100%;
+	border-radius: 3px;
+	background: var(--accent);
+}
+
+.miniBarFillWarning {
+	background: var(--warning);
+}
+
+.activityRow {
+	display: flex;
+	gap: 10px;
+}
+
+.activityDot {
+	width: 6px;
+	height: 6px;
+	margin-top: 6px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: var(--accent);
+}
+
+@media (max-width: 600px) {
+	.eventCapacity {
+		display: none;
+	}
+
+	.eventRowButton {
+		grid-template-columns: 40px 1fr auto;
+	}
+}

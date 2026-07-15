@@ -1,3 +1,381 @@
 .view {
-	/* inherits global view spacing from layout.css */
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+
+.tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/* design_handoff 2 `pillStyle()`: inactive pills are flush/transparent (no fill, no visible
+   border) — only the active option gets a container at all. Same visual language as the
+   status filter pills below. */
+.tab,
+.tabActive {
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	border-radius: 9px;
+	padding: 8px 12px;
+	font: inherit;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+	min-height: 40px;
+}
+
+.tabActive {
+	background: var(--accent-soft);
+	color: var(--accent);
+	border-color: var(--accent);
+}
+
+.panel,
+.eventsPanel {
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	background: var(--panel);
+	box-shadow: var(--shadow-card);
+	padding: 20px;
+}
+
+.eventsPanel {
+	padding: 0;
+	overflow: hidden;
+}
+
+.eventsHeader {
+	padding: 20px;
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.panelHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.panelTitle {
+	margin: 0;
+	font-size: 0.9rem;
+	font-weight: 700;
+}
+
+.panelTools {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
+/* Sized to match the "+ New program"/"+ New event" button next to it (`.btn.btn-sm`:
+   6px vertical padding, no explicit height) rather than the other way around. */
+.searchField {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	border: 1px solid var(--border);
+	background: var(--ice);
+	border-radius: 9px;
+	padding: 6px 11px;
+}
+
+.searchField .material-symbols-outlined {
+	color: var(--muted);
+	font-size: 1.1rem;
+}
+
+.searchField input {
+	border: none;
+	background: transparent;
+	outline: none;
+	font: inherit;
+	font-size: 0.8rem;
+	color: var(--text);
+	width: 140px;
+}
+
+.createButton {
+	white-space: nowrap;
+}
+
+.programGrid {
+	display: grid;
+	gap: 10px;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	max-height: 220px;
+	overflow-y: auto;
+	margin-top: 14px;
+}
+
+.programCardWrap {
+	position: relative;
+}
+
+.programCard {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	width: 100%;
+	text-align: left;
+	border-radius: 12px;
+	padding: 12px 14px;
+	cursor: pointer;
+	border: 1px solid var(--border);
+	background: var(--ice);
+	color: var(--text);
+	font: inherit;
+	min-height: 64px;
+}
+
+.programCardActive {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+
+.programCardText {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-right: 48px;
+}
+
+.programCardName {
+	font-size: 0.85rem;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.programCardMeta {
+	font-size: 0.7rem;
+	color: var(--muted);
+}
+
+.programCardChevron {
+	color: var(--muted);
+	flex-shrink: 0;
+}
+
+.programEditWrap {
+	position: absolute;
+	top: 4px;
+	right: 28px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.12s ease;
+}
+
+.programEditVisible {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.programEditButton {
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	border: none;
+	background: none;
+	color: var(--muted);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.programEditButton .material-symbols-outlined {
+	font-size: 1.1rem;
+}
+
+.filterChipRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.filterChipLabel {
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.filterChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	border-radius: 999px;
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-size: 0.75rem;
+	font-weight: 700;
+	padding: 5px 10px;
+}
+
+.filterChipDismiss {
+	border: none;
+	background: none;
+	color: var(--accent);
+	cursor: pointer;
+	font-weight: 800;
+	font-size: 0.9rem;
+	line-height: 1;
+	padding: 0;
+	min-width: 24px;
+	min-height: 24px;
+}
+
+.statusFilters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/* design_handoff 2 `pillStyle()`: inactive pills are flush/transparent — see `.tab` above. */
+.statusPill,
+.statusPillActive {
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	border-radius: 9px;
+	padding: 8px 12px;
+	font: inherit;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+	min-height: 40px;
+}
+
+.statusPillActive {
+	background: var(--accent-soft);
+	color: var(--accent);
+	border-color: var(--accent);
+}
+
+.eventsTable {
+	width: 100%;
+}
+
+.eventsTable th {
+	white-space: nowrap;
+	padding: 13px 18px;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--muted);
+	border-bottom: 1px solid var(--border);
+}
+
+.eventsTable td {
+	padding: 14px 18px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: middle;
+}
+
+/* design_handoff 2: trailing chevron column reinforces the row's own click-through —
+   the row already carries the accessible name via role="link"/aria-label. */
+.eventChevron {
+	text-align: right;
+	color: var(--muted);
+}
+
+.eventRow {
+	cursor: pointer;
+}
+
+.eventRow:hover {
+	background: var(--ice);
+}
+
+.eventRow:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: -2px;
+}
+
+.eventName {
+	display: block;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+.eventSub {
+	display: block;
+	margin-top: 2px;
+	font-size: 0.7rem;
+	color: var(--muted);
+}
+
+.capacityCell {
+	width: 120px;
+}
+
+.capacityMeta {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.7rem;
+	color: var(--muted);
+	margin-bottom: 3px;
+}
+
+.capacityTrack {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--ice);
+	overflow: hidden;
+}
+
+.capacityFill {
+	height: 100%;
+	border-radius: 3px;
+	background: var(--accent);
+}
+
+.pager {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 14px 18px;
+	border-top: 1px solid var(--border);
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.pagerActions {
+	display: flex;
+	gap: 8px;
+}
+
+.emptyNote {
+	margin: 14px 0 0;
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+
+@media (max-width: 767px) {
+	.programCardText {
+		padding-right: 56px;
+	}
+
+	.programEditWrap {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.searchField input {
+		width: 110px;
+	}
 }

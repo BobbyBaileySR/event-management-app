@@ -12,7 +12,6 @@ This is the React + Vite frontend. It provides an easier interface for day-to-da
 
 - **React 19 + TypeScript + Vite** — production build → `dist/`
 - Google Identity Services for sign-in
-- Chart.js self-hosted via npm (bundled, no CDN)
 - Deployed via Git to GitHub Pages (GitHub Actions builds `dist/`)
 
 ---

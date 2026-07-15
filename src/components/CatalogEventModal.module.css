@@ -3,20 +3,69 @@
 	width: 100%;
 }
 
+/* design_handoff 2: header bleeds to the modal's own edges (the global `.modal` class has
+   no section-level padding of its own — one flat 28px inset — so the header/footer here
+   cancel it and re-apply their own). */
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin: -28px -28px 16px;
+	padding: 20px 22px;
+	border-bottom: 1px solid var(--border);
+}
+
+.header h3 {
+	margin: 0;
+}
+
+.subtitle {
+	margin: 2px 0 0;
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.closeButton {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border);
+	border-radius: 9px;
+	background: none;
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+	color: var(--text);
+	outline: none;
+}
+
+.closeButton:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+}
+
 .form {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
-	margin-top: 12px;
 }
 
 .form label {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
-	font-size: 0.85rem;
+	font-size: 0.75rem;
 	font-weight: 600;
-	color: var(--color-denim);
+	color: var(--muted);
 }
 
 .form input,
@@ -24,12 +73,27 @@
 	padding: 8px 10px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
+	background: var(--input-bg);
+	color: var(--text);
 	font: inherit;
+	font-size: 0.85rem;
 }
 
 .form textarea {
 	resize: vertical;
 	min-height: 72px;
+}
+
+/* Start/End Date + Time pairs sit side by side (Pickers.module.css's shared `.trigger`
+   already uses `--input-bg` app-wide — see its own comment — so no override needed here). */
+.fieldRow {
+	display: flex;
+	gap: 12px;
+}
+
+.fieldRow > * {
+	flex: 1;
+	min-width: 0;
 }
 
 .fieldError {
@@ -41,92 +105,35 @@
 
 .readOnlyProgram {
 	margin: 0;
-	font-size: 0.9rem;
+	font-size: 0.85rem;
+	font-weight: 600;
 	color: var(--muted);
 }
 
-.programField {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	font-size: 0.85rem;
-	font-weight: 600;
-	color: var(--color-denim);
-}
-
-.selectWrap {
-	position: relative;
-	width: 100%;
-}
-
-.programTrigger {
-	width: 100%;
-	min-height: 44px;
-	padding: 8px 36px 8px 10px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	background: var(--panel);
-	color: var(--color-black);
-	font: inherit;
-	font-weight: 400;
-	text-align: left;
-	cursor: pointer;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%230B0573' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-	background-repeat: no-repeat;
-	background-position: right 12px center;
-}
-
-.programTrigger:focus-visible {
-	outline: 2px solid var(--color-link);
-	outline-offset: 2px;
-}
-
-.programMenu {
-	position: absolute;
-	top: calc(100% + 4px);
-	left: 0;
-	right: 0;
-	z-index: 20;
-	margin: 0;
-	padding: 4px;
-	list-style: none;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	background: var(--panel);
-	box-shadow: 0 8px 24px rgba(0, 10, 39, 0.12);
-	max-height: min(200px, 40vh);
-	overflow-y: auto;
-}
-
-.programOption {
-	width: 100%;
-	min-height: 44px;
-	padding: 10px 12px;
-	border: none;
-	border-radius: 6px;
-	background: transparent;
-	color: var(--color-black);
-	font: inherit;
-	font-weight: 400;
-	text-align: left;
-	cursor: pointer;
-}
-
-.programOption[aria-selected='true'] {
-	background: var(--color-ice);
-	color: var(--color-denim);
+.readOnlyProgram strong {
+	color: var(--text);
 	font-weight: 600;
 }
 
-.programOption:hover,
-.programOption:focus-visible {
-	background: var(--color-ice);
-	outline: none;
+.archiveButton {
+	margin-right: auto;
+	color: var(--danger);
+	border-color: var(--danger);
 }
 
-@media (max-width: 900px) {
-	.programTrigger,
-	.programOption {
-		font-size: 16px;
+/* design_handoff 2: footer divider + tinted background, bled to the modal's edges same
+   as `.header` — bottom corners matched to `.modal`'s own radius so the bled background
+   doesn't square off past the modal's rounded corners. */
+.modal :global(.modal__actions) {
+	margin: 4px -28px -28px;
+	padding: 16px 28px;
+	border-top: 1px solid var(--border);
+	background: var(--input-bg);
+	border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+@media (max-width: 480px) {
+	.fieldRow {
+		flex-direction: column;
 	}
 }

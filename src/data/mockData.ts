@@ -1,13 +1,10 @@
 import type {
-	ActivityItem,
-	AgendaSession,
-	AnalyticsConversion,
 	Attendee,
 	AuditEntry,
 	AuditLogEntry,
-	CampaignMetrics,
 	CancelEmailDispatchResponse,
 	CatalogEvent,
+	CatalogEventSummary,
 	CatalogProgram,
 	CatalogResponse,
 	CheckInScanResponse,
@@ -32,7 +29,6 @@ import type {
 	PatchCatalogProgramBody,
 	PatchEmailDispatchBody,
 	EmailTemplate,
-	Event,
 	ScheduledEmail,
 	SliceAttendee,
 	SliceAttendeesResponse,
@@ -40,107 +36,13 @@ import type {
 } from '../types';
 import { CONFIG } from '../config';
 import { DEFAULT_THEME_ID, type ThemeId } from '../theme/themeTokens';
-import { isCelebrationEmail } from '../utils/celebrationTheme';
+import { isCelebrationEmail, resolveMockCelebrationToastMessage } from '../utils/celebrationTheme';
 import { assertScheduleFields } from '../utils/emailSchedule';
 
 /**
  * Sample mock data for EMS PoC — replaced by ScriptRunner API in Phase 2+.
  */
 
-export const MOCK_EVENTS: Event[] = [
-    {
-        id: 'evt-london-q3',
-        name: 'London Q3 Summit',
-        date: 'Oct 15, 2026',
-        dateIso: '2026-10-15',
-        endDate: 'Oct 15, 2026',
-        location: 'The Shard, London',
-        status: 'active',
-        attendeeCount: 150,
-        capacity: 200,
-        type: 'In-person',
-        owner: 'events@adaptavist.com',
-        registrationClose: 'Oct 10, 2026',
-        hubspotId: 'HS-EVT-8842',
-        description: 'Flagship customer and partner summit for EMEA — keynotes, breakouts, and networking.',
-    },
-    {
-        id: 'evt-tech-webinar',
-        name: 'Tech Webinar Series — AI in DevOps',
-        date: 'Nov 02, 2026',
-        dateIso: '2026-11-02',
-        location: 'Virtual (Zoom)',
-        status: 'draft',
-        attendeeCount: 85,
-        capacity: 500,
-        type: 'Virtual',
-        owner: 'marketing@adaptavist.com',
-        registrationClose: 'Nov 01, 2026',
-        hubspotId: 'HS-EVT-9011',
-        description: 'Monthly technical webinar. Draft — landing page not yet published in HubSpot.',
-    },
-    {
-        id: 'evt-ams-meetup',
-        name: 'Amsterdam Partner Meetup',
-        date: 'Dec 08, 2026',
-        dateIso: '2026-12-08',
-        location: 'WeWork, Amsterdam',
-        status: 'active',
-        attendeeCount: 62,
-        capacity: 80,
-        type: 'In-person',
-        owner: 'events@adaptavist.com',
-        registrationClose: 'Dec 05, 2026',
-        hubspotId: 'HS-EVT-9156',
-        description: 'Regional partner enablement evening with product updates and roadmap preview.',
-    },
-    {
-        id: 'evt-atlassian-team',
-        name: 'Atlassian Team \'26 — Booth & Sessions',
-        date: 'Sep 18, 2026',
-        dateIso: '2026-09-18',
-        endDate: 'Sep 20, 2026',
-        location: 'Las Vegas, NV',
-        status: 'completed',
-        attendeeCount: 312,
-        capacity: 350,
-        type: 'Hybrid',
-        owner: 'events@adaptavist.com',
-        registrationClose: 'Sep 01, 2026',
-        hubspotId: 'HS-EVT-8720',
-        description: 'Conference presence — booth staff, scheduled demos, and VIP dinner.',
-    },
-    {
-        id: 'evt-roadshow-dublin',
-        name: 'Dublin Roadshow',
-        date: 'Aug 22, 2026',
-        dateIso: '2026-08-22',
-        location: 'Convention Centre Dublin',
-        status: 'cancelled',
-        attendeeCount: 48,
-        capacity: 120,
-        type: 'In-person',
-        owner: 'events@adaptavist.com',
-        registrationClose: 'Aug 15, 2026',
-        hubspotId: 'HS-EVT-8601',
-        description: 'Cancelled due to venue scheduling conflict — registrants notified via HubSpot workflow.',
-    },
-    {
-        id: 'evt-internal-townhall',
-        name: 'Adaptavist Internal Town Hall',
-        date: 'Jul 15, 2026',
-        dateIso: '2026-07-15',
-        location: 'Virtual (Google Meet)',
-        status: 'active',
-        attendeeCount: 420,
-        capacity: 500,
-        type: 'Virtual',
-        owner: 'internal-comms@adaptavist.com',
-        registrationClose: 'Jul 14, 2026',
-        hubspotId: 'HS-EVT-8422',
-        description: 'Company-wide quarterly update — staff registration only.',
-    },
-];
 
 export const MOCK_ATTENDEES: Record<string, Attendee[]> = {
     'evt-london-q3': [
@@ -286,23 +188,7 @@ export const MOCK_SLICE_AUDIT_LOG: AuditLogEntry[] = [
 	},
 ];
 
-export const MOCK_ANALYTICS: Record<string, AnalyticsConversion> = {
-    'evt-london-q3': { checkedIn: 45, registered: 98, cancelled: 7 },
-    'evt-tech-webinar': { checkedIn: 0, registered: 85, cancelled: 0 },
-    'evt-ams-meetup': { checkedIn: 18, registered: 42, cancelled: 2 },
-    'evt-atlassian-team': { checkedIn: 265, registered: 40, cancelled: 7 },
-    'evt-roadshow-dublin': { checkedIn: 0, registered: 0, cancelled: 48 },
-    'evt-internal-townhall': { checkedIn: 120, registered: 300, cancelled: 0 },
-};
 
-export const MOCK_CAMPAIGN_METRICS: Record<string, CampaignMetrics> = {
-    'evt-london-q3': { sent: 247, opened: 231, clicked: 142, bounced: 3 },
-    'evt-tech-webinar': { sent: 0, opened: 0, clicked: 0, bounced: 0 },
-    'evt-ams-meetup': { sent: 58, opened: 52, clicked: 31, bounced: 1 },
-    'evt-atlassian-team': { sent: 420, opened: 398, clicked: 210, bounced: 5 },
-    'evt-roadshow-dublin': { sent: 48, opened: 40, clicked: 12, bounced: 2 },
-    'evt-internal-townhall': { sent: 420, opened: 405, clicked: 88, bounced: 0 },
-};
 
 export const MOCK_SCHEDULED_EMAILS: Record<string, ScheduledEmail[]> = {
     'evt-london-q3': [
@@ -327,38 +213,8 @@ export const MOCK_SCHEDULED_EMAILS: Record<string, ScheduledEmail[]> = {
     ],
 };
 
-export const MOCK_AGENDA: Record<string, AgendaSession[]> = {
-    'evt-london-q3': [
-        { id: 'ag-1', time: '09:00', title: 'Registration & breakfast', speaker: '—', location: 'Level 31 foyer', track: 'General' },
-        { id: 'ag-2', time: '10:00', title: 'Opening keynote', speaker: 'CEO', location: 'Main hall', track: 'Keynote' },
-        { id: 'ag-3', time: '11:30', title: 'Breakout: Cloud migration', speaker: 'Product team', location: 'Room A', track: 'Technical' },
-        { id: 'ag-4', time: '14:00', title: 'Partner roundtable', speaker: 'Partner success', location: 'Room B', track: 'Partners' },
-        { id: 'ag-5', time: '17:00', title: 'Networking reception', speaker: '—', location: 'Terrace', track: 'General' },
-    ],
-    'evt-ams-meetup': [
-        { id: 'ag-6', time: '18:00', title: 'Doors open', speaker: '—', location: 'WeWork lounge', track: 'General' },
-        { id: 'ag-7', time: '18:30', title: 'Product roadmap preview', speaker: 'EMEA lead', location: 'Main space', track: 'Product' },
-    ],
-    'evt-atlassian-team': [
-        { id: 'ag-8', time: '10:00', title: 'Booth opens', speaker: 'Events team', location: 'Expo floor', track: 'General' },
-        { id: 'ag-9', time: '15:00', title: 'VIP demo session', speaker: 'Solutions', location: 'Meeting room 12', track: 'VIP' },
-    ],
-};
 
-export const MOCK_ACTIVITY: Record<string, ActivityItem[]> = {
-    'evt-london-q3': [
-        { id: 'act-1', timestamp: '2026-07-01T09:30:00Z', summary: 'Reminder email sent to 142 registrants', actor: 'events@adaptavist.com' },
-        { id: 'act-2', timestamp: '2026-06-30T16:00:00Z', summary: '12 new registrations synced from HubSpot', actor: 'System' },
-        { id: 'act-3', timestamp: '2026-06-28T14:15:00Z', summary: 'Invitation send scheduled for Oct 13', actor: 'events@adaptavist.com' },
-    ],
-    'evt-ams-meetup': [
-        { id: 'act-4', timestamp: '2026-06-25T11:00:00Z', summary: 'Partner invitation sent to 58 contacts', actor: 'events@adaptavist.com' },
-    ],
-};
 
-export function getEventById(eventId: string): Event | undefined {
-    return MOCK_EVENTS.find((event) => event.id === eventId);
-}
 
 export function getAuditLogForEvent(eventId: string, entries: AuditEntry[] = MOCK_AUDIT_LOG): AuditEntry[] {
     return entries.filter((entry) => entry.eventId === eventId);
@@ -383,49 +239,74 @@ export function getMockSliceAuditLog(page = 1, pageSize = 50): {
 	};
 }
 
-const INITIAL_MOCK_CATALOG: CatalogResponse = {
-	programs: [
-		{
-			id: 'prog-atlassian-2026',
-			name: 'Atlassian Event 2026',
-			hubspotFormIds: ['mock-form-2026'],
-			archived: false,
-			events: [
-				{
-					id: 'ev-mr-2026',
-					name: 'Meeting Room',
-					partsAttendedOption: 'Meeting Room',
-					attendanceProperty: 'atlassian_event__customer_event_attendance',
-					archived: false,
-					capacity: 100,
-				},
-				{
-					id: 'ev-vip-2026',
-					name: 'VIP Event',
-					partsAttendedOption: 'VIP Event',
-					attendanceProperty: 'atlassian_event__vip_event_attendance',
-					archived: false,
-				},
-			],
-		},
-	],
-};
+/** Internal Program→Event tree kept for mock CRUD ergonomics; flattened at the `getMockCatalog` boundary to mirror the real API's flat wire shape (mirrors Backend's buildCatalogTree + flattenCatalogTree). */
+interface MockCatalogProgramNode extends CatalogProgram {
+	events: CatalogEvent[];
+}
 
-const mockCatalogState: CatalogResponse = structuredClone(INITIAL_MOCK_CATALOG);
+const INITIAL_MOCK_CATALOG: MockCatalogProgramNode[] = [
+	{
+		id: 'prog-atlassian-2026',
+		name: 'Atlassian Event 2026',
+		archived: false,
+		events: [
+			{
+				id: 'ev-mr-2026',
+				programId: 'prog-atlassian-2026',
+				name: 'Meeting Room',
+				start: '2026-09-02T09:00:00.000Z',
+				status: 'active',
+				publishState: 'published',
+				archived: false,
+				capacity: 100,
+			},
+			{
+				id: 'ev-vip-2026',
+				programId: 'prog-atlassian-2026',
+				name: 'VIP Event',
+				start: '2026-09-03T09:00:00.000Z',
+				status: 'active',
+				publishState: 'draft',
+				archived: false,
+			},
+		],
+	},
+];
+
+const mockCatalogState: MockCatalogProgramNode[] = structuredClone(INITIAL_MOCK_CATALOG);
+let mockStandaloneEvents: CatalogEvent[] = [];
+
+function flattenMockCatalog(
+	programs: MockCatalogProgramNode[],
+	standalone: CatalogEvent[],
+): CatalogResponse {
+	const events: CatalogEventSummary[] = [];
+	const programSummaries: CatalogProgram[] = [];
+	for (const program of programs) {
+		const { events: programEvents, ...summary } = program;
+		programSummaries.push(summary);
+		programEvents.forEach((event) => events.push({ ...event, programId: program.id }));
+	}
+	for (const event of standalone) {
+		events.push({ ...event, programId: null });
+	}
+	return { events, programs: programSummaries };
+}
 
 export function getMockCatalog(includeArchived = false): CatalogResponse {
 	if (!includeArchived) {
-		return {
-			programs: mockCatalogState.programs
+		return flattenMockCatalog(
+			mockCatalogState
 				.filter((program) => !program.archived)
 				.map((program) => ({
 					...program,
 					events: program.events.filter((event) => !event.archived),
 				})),
-		};
+			mockStandaloneEvents.filter((event) => !event.archived),
+		);
 	}
 
-	const programs = mockCatalogState.programs
+	const programs = mockCatalogState
 		.map((program) => {
 			const archivedEvents = program.events.filter((event) => event.archived);
 			if (!program.archived && archivedEvents.length === 0) {
@@ -436,9 +317,12 @@ export function getMockCatalog(includeArchived = false): CatalogResponse {
 				events: archivedEvents,
 			};
 		})
-		.filter((program): program is CatalogProgram => program !== null);
+		.filter((program): program is MockCatalogProgramNode => program !== null);
 
-	return { programs };
+	return flattenMockCatalog(
+		programs,
+		mockStandaloneEvents.filter((event) => event.archived),
+	);
 }
 
 interface MockSliceAttendeeEntry extends SliceAttendee {}
@@ -614,6 +498,53 @@ export function mockConfirmCheckIn(
 	};
 }
 
+/** `POST events/{evId}/checkin/undo` (R-006) — flips checked-in → registered. */
+export function mockUndoCheckIn(
+	_programId: string,
+	eventId: string,
+	contactId: string,
+): ConfirmCheckInResponse {
+	const attendee = findMockSliceAttendee(eventId, contactId);
+	if (!attendee) {
+		throw new Error('contact_not_registered');
+	}
+
+	if (!attendee.checkedIn) {
+		return {
+			contactId: attendee.contactId,
+			checkedIn: false,
+			alreadyCheckedIn: false,
+			attendeeType: attendee.attendeeType,
+		};
+	}
+
+	attendee.checkedIn = false;
+	return {
+		contactId: attendee.contactId,
+		checkedIn: false,
+		alreadyCheckedIn: true,
+		attendeeType: attendee.attendeeType,
+	};
+}
+
+/** `DELETE events/{evId}/attendees/{contactId}` (R-006) — blocked while checked in (undo check-in first). */
+export function mockRemoveAttendee(
+	_programId: string,
+	eventId: string,
+	contactId: string,
+): { contactId: string; removed: boolean } {
+	const attendees = mockSliceAttendeesState[eventId];
+	const attendee = attendees?.find((entry) => entry.contactId === contactId);
+	if (!attendee) {
+		throw new Error('contact_not_registered');
+	}
+	if (attendee.checkedIn) {
+		throw new Error('attendee_checked_in');
+	}
+	mockSliceAttendeesState[eventId] = attendees!.filter((entry) => entry.contactId !== contactId);
+	return { contactId, removed: true };
+}
+
 const mockDepartureCounts: Record<string, number> = {};
 
 function mockCapacityKey(programId: string, eventId: string): string {
@@ -621,11 +552,15 @@ function mockCapacityKey(programId: string, eventId: string): string {
 }
 
 function mockEventCapacity(eventId: string): number | null {
-	for (const program of mockCatalogState.programs) {
+	for (const program of mockCatalogState) {
 		const event = program.events.find((entry) => entry.id === eventId);
 		if (event?.capacity !== undefined && Number.isFinite(event.capacity) && event.capacity > 0) {
 			return event.capacity;
 		}
+	}
+	const standalone = mockStandaloneEvents.find((entry) => entry.id === eventId);
+	if (standalone?.capacity !== undefined && Number.isFinite(standalone.capacity) && standalone.capacity > 0) {
+		return standalone.capacity;
 	}
 	return null;
 }
@@ -695,14 +630,12 @@ function applyProgramMetadataCreate(program: CatalogProgram, body: CreateCatalog
 		description: normalizeOptionalText(body.description),
 		startDate: normalizeOptionalText(body.startDate),
 		endDate: normalizeOptionalText(body.endDate),
-		location: normalizeOptionalText(body.location),
-		timezone: normalizeOptionalText(body.timezone),
 	};
 }
 
 function mergeProgramMetadata(program: CatalogProgram, patch: PatchCatalogProgramBody): CatalogProgram {
 	const next = { ...program };
-	const metadataKeys = ['description', 'startDate', 'endDate', 'location', 'timezone'] as const;
+	const metadataKeys = ['description', 'startDate', 'endDate'] as const;
 	for (const key of metadataKeys) {
 		if (!(key in patch)) {
 			continue;
@@ -721,14 +654,11 @@ function mergeProgramMetadata(program: CatalogProgram, patch: PatchCatalogProgra
 
 function applyEventMetadataCreate(event: CatalogEvent, body: CreateCatalogEventBody): CatalogEvent {
 	const next: CatalogEvent = { ...event };
+	if (body.end?.trim()) {
+		next.end = body.end.trim();
+	}
 	if (body.owner?.trim()) {
 		next.owner = body.owner.trim();
-	}
-	if (body.description?.trim()) {
-		next.description = body.description.trim();
-	}
-	if (body.date?.trim()) {
-		next.date = body.date.trim();
 	}
 	if (body.location?.trim()) {
 		next.location = body.location.trim();
@@ -739,18 +669,27 @@ function applyEventMetadataCreate(event: CatalogEvent, body: CreateCatalogEventB
 	if (body.walkInFormUrl?.trim()) {
 		next.walkInFormUrl = body.walkInFormUrl.trim();
 	}
+	if (body.registrationFormUrl?.trim()) {
+		next.registrationFormUrl = body.registrationFormUrl.trim();
+	}
+	if (body.publishState) {
+		next.publishState = body.publishState;
+	}
 	return next;
 }
 
 function mergeEventMetadata(event: CatalogEvent, patch: PatchCatalogEventBody): CatalogEvent {
 	const next = { ...event };
-	const textKeys = ['owner', 'description', 'date', 'location', 'walkInFormUrl'] as const;
+	const textKeys = ['owner', 'location', 'walkInFormUrl', 'registrationFormUrl', 'start', 'end'] as const;
 	for (const key of textKeys) {
 		if (!(key in patch)) {
 			continue;
 		}
 		const raw = patch[key];
 		if (raw === null || raw === undefined || (typeof raw === 'string' && !raw.trim())) {
+			if (key === 'start') {
+				continue;
+			}
 			delete next[key];
 			continue;
 		}
@@ -765,54 +704,60 @@ function mergeEventMetadata(event: CatalogEvent, patch: PatchCatalogEventBody): 
 			next.capacity = patch.capacity;
 		}
 	}
+	if (patch.status !== undefined) {
+		next.status = patch.status;
+	}
+	if (patch.publishState !== undefined) {
+		next.publishState = patch.publishState;
+	}
 	return next;
 }
 
 export function mockCreateProgram(body: CreateCatalogProgramBody): CatalogProgram {
 	const key = normalizeProgramName(body.name);
-	if (mockCatalogState.programs.some((program) => normalizeProgramName(program.name) === key)) {
+	if (mockCatalogState.some((program) => normalizeProgramName(program.name) === key)) {
 		throw new Error('duplicate_name');
 	}
 
-	const program = applyProgramMetadataCreate(
-		{
-			id: `prog-${Date.now()}`,
-			name: body.name.trim(),
-			hubspotFormIds: body.hubspotFormIds.map((id) => id.trim()).filter(Boolean),
-			archived: false,
-			events: [],
-		},
-		body,
-	);
-	mockCatalogState.programs.push(program);
+	const program: MockCatalogProgramNode = {
+		...applyProgramMetadataCreate(
+			{
+				id: `prog-${Date.now()}`,
+				name: body.name.trim(),
+				archived: false,
+			},
+			body,
+		),
+		events: [],
+	};
+	mockCatalogState.push(program);
 	return program;
 }
 
 export function mockUpdateProgram(id: string, patch: PatchCatalogProgramBody): CatalogProgram {
-	const program = mockCatalogState.programs.find((entry) => entry.id === id);
+	const program = mockCatalogState.find((entry) => entry.id === id);
 	if (!program) {
 		throw new Error('program_not_found');
 	}
 	if (patch.name !== undefined) {
 		const key = normalizeProgramName(patch.name);
-		if (mockCatalogState.programs.some((entry) => entry.id !== id && normalizeProgramName(entry.name) === key)) {
+		if (mockCatalogState.some((entry) => entry.id !== id && normalizeProgramName(entry.name) === key)) {
 			throw new Error('duplicate_name');
 		}
 		program.name = patch.name.trim();
-	}
-	if (patch.hubspotFormIds !== undefined) {
-		program.hubspotFormIds = patch.hubspotFormIds.map((formId) => formId.trim()).filter(Boolean);
 	}
 	if (patch.archived === true) {
 		program.archived = true;
 		program.events.forEach((event) => {
 			event.archived = true;
+			event.archivedViaProgramId = program.id;
 		});
 	}
 	if (patch.archived === false) {
 		program.archived = false;
 		program.events.forEach((event) => {
 			event.archived = false;
+			event.archivedViaProgramId = null;
 		});
 	}
 	const merged = mergeProgramMetadata(program, patch);
@@ -821,38 +766,48 @@ export function mockUpdateProgram(id: string, patch: PatchCatalogProgramBody): C
 }
 
 export function mockCreateEvent(body: CreateCatalogEventBody): CatalogEvent {
-	const program = mockCatalogState.programs.find((entry) => entry.id === body.programId);
-	if (!program) {
-		throw new Error('program_not_found');
+	const start = body.start?.trim();
+	if (!start) {
+		throw new Error('invalid_start');
 	}
-	const event = applyEventMetadataCreate(
+
+	const base = applyEventMetadataCreate(
 		{
 			id: `ev-${Date.now()}`,
+			programId: body.programId?.trim() || null,
 			name: body.name.trim(),
-			partsAttendedOption: body.partsAttendedOption.trim(),
-			attendanceProperty: body.attendanceProperty.trim(),
+			start,
+			status: 'active',
+			publishState: body.publishState ?? 'draft',
 			archived: false,
+			archivedViaProgramId: null,
 		},
 		body,
 	);
-	program.events.push(event);
-	return event;
+
+	if (body.programId?.trim()) {
+		const program = mockCatalogState.find((entry) => entry.id === body.programId);
+		if (!program) {
+			throw new Error('program_not_found');
+		}
+		const event = { ...base, programId: program.id };
+		program.events.push(event);
+		return event;
+	}
+
+	const standalone = { ...base, programId: null };
+	mockStandaloneEvents.push(standalone);
+	return standalone;
 }
 
 export function mockUpdateEvent(id: string, patch: PatchCatalogEventBody): CatalogEvent {
-	for (const program of mockCatalogState.programs) {
+	for (const program of mockCatalogState) {
 		const event = program.events.find((entry) => entry.id === id);
 		if (!event) {
 			continue;
 		}
 		if (patch.name !== undefined) {
 			event.name = patch.name.trim();
-		}
-		if (patch.partsAttendedOption !== undefined) {
-			event.partsAttendedOption = patch.partsAttendedOption.trim();
-		}
-		if (patch.attendanceProperty !== undefined) {
-			event.attendanceProperty = patch.attendanceProperty.trim();
 		}
 		if (patch.archived !== undefined) {
 			if (patch.archived === false && program.archived) {
@@ -864,6 +819,21 @@ export function mockUpdateEvent(id: string, patch: PatchCatalogEventBody): Catal
 		Object.assign(event, merged);
 		return event;
 	}
+
+	const standaloneIndex = mockStandaloneEvents.findIndex((entry) => entry.id === id);
+	if (standaloneIndex >= 0) {
+		const event = mockStandaloneEvents[standaloneIndex];
+		if (patch.name !== undefined) {
+			event.name = patch.name.trim();
+		}
+		if (patch.archived !== undefined) {
+			event.archived = patch.archived;
+		}
+		const merged = mergeEventMetadata(event, patch);
+		Object.assign(event, merged);
+		return event;
+	}
+
 	throw new Error('event_not_found');
 }
 
@@ -976,14 +946,16 @@ function emailDispatchKey(programId: string, eventId: string): string {
 	return `${programId}:${eventId}`;
 }
 
-function findMockEmailDispatch(programId: string, eventId: string, dispatchId: string): MockEmailDispatchRecord | undefined {
+/** Event-scoped lookup — programId ignored (mock calls may pass `_standalone`). */
+function findMockEmailDispatch(_programId: string, eventId: string, dispatchId: string): MockEmailDispatchRecord | undefined {
 	return mockEmailDispatchesState.find(
-		(entry) => entry.programId === programId && entry.eventId === eventId && entry.dispatchId === dispatchId,
+		(entry) => entry.eventId === eventId && entry.dispatchId === dispatchId,
 	);
 }
 
-function listMockEmailDispatches(programId: string, eventId: string): MockEmailDispatchRecord[] {
-	return mockEmailDispatchesState.filter((entry) => entry.programId === programId && entry.eventId === eventId);
+/** Event-scoped list — programId ignored (mock calls may pass `_standalone`). */
+function listMockEmailDispatches(_programId: string, eventId: string): MockEmailDispatchRecord[] {
+	return mockEmailDispatchesState.filter((entry) => entry.eventId === eventId);
 }
 
 function resolveMockRegisteredAttendees(eventId: string, audience: DispatchAudienceRequest): SliceAttendee[] {
@@ -1333,7 +1305,11 @@ let mockThemePreference: ThemeId = DEFAULT_THEME_ID;
 export function getMockThemePreference(email?: string | null): ThemePreference {
 	const celebrationAllowed = isCelebrationEmail(email);
 	const theme = mockThemePreference === 'celebration' && !celebrationAllowed ? 'aurora' : mockThemePreference;
-	return { theme, celebrationAllowed };
+	return {
+		theme,
+		celebrationAllowed,
+		celebrationToastMessage: resolveMockCelebrationToastMessage(email),
+	};
 }
 
 export function setMockThemePreference(theme: ThemeId, email?: string | null): ThemePreference {
@@ -1342,7 +1318,12 @@ export function setMockThemePreference(theme: ThemeId, email?: string | null): T
 		throw new Error('celebration_not_allowed');
 	}
 	mockThemePreference = theme;
-	return { theme, celebrationAllowed, updatedAt: new Date().toISOString() };
+	return {
+		theme,
+		celebrationAllowed,
+		celebrationToastMessage: resolveMockCelebrationToastMessage(email),
+		updatedAt: new Date().toISOString(),
+	};
 }
 
 export function resetMockThemePreference(): void {

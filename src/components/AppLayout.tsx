@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { CatalogPickers } from './CatalogPickers';
 import { PocBanner } from './PocBanner';
 import { Sidebar } from './Sidebar';
 import { useToast } from './Toast';
@@ -8,7 +7,6 @@ import { canAccessShell } from '../config/shellAccess';
 import { useDataService } from '../hooks/useDataService';
 import { useActiveRoute } from '../router/navigation';
 import { logoutRequest } from '../services/authService';
-import { CatalogProvider } from '../state/catalogContext';
 import { useSession } from '../state/appState';
 import { useTheme } from '../theme/useTheme';
 import type { ThemeId } from '../theme/themeTokens';
@@ -30,11 +28,18 @@ export function AppLayout() {
 		}
 
 		let cancelled = false;
-		data.fetchEvent(eventId).then(({ event }) => {
-			if (!cancelled) {
-				setEventName(event?.name ?? null);
-			}
-		});
+		data
+			.fetchCatalog()
+			.then(({ events }) => {
+				if (!cancelled) {
+					setEventName(events.find((event) => event.id === eventId)?.name ?? null);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setEventName(null);
+				}
+			});
 
 		return () => {
 			cancelled = true;
@@ -59,31 +64,30 @@ export function AppLayout() {
 	}
 
 	return (
-		<CatalogProvider>
+		<>
 			<a href="#main-content" className="skip-link">
 				Skip to main content
 			</a>
-			<div className={styles.shell}>
-				<PocBanner />
-				<div className={styles.layout}>
-					<Sidebar
-						onLogout={handleLogout}
-						eventName={eventName}
-						theme={theme}
-						celebrationAllowed={celebrationAllowed}
-						onThemeChange={handleThemeChange}
-					/>
-					<main id="main-content" className={styles.main} aria-live="polite" tabIndex={-1}>
-						<div className={styles.pickerDock}>
-							<CatalogPickers />
-						</div>
-						<div className={styles.content}>
-							<Outlet />
-						</div>
-					</main>
+			<div className={styles.frame}>
+				<div className={styles.shell}>
+					<PocBanner />
+					<div className={styles.layout}>
+						<Sidebar
+							onLogout={handleLogout}
+							eventName={eventName}
+							theme={theme}
+							celebrationAllowed={celebrationAllowed}
+							onThemeChange={handleThemeChange}
+						/>
+						<main id="main-content" className={styles.main} aria-live="polite" tabIndex={-1}>
+							<div className={styles.content}>
+								<Outlet />
+							</div>
+						</main>
+					</div>
 				</div>
 			</div>
-		</CatalogProvider>
+		</>
 	);
 }
 

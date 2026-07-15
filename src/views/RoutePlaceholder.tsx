@@ -3,8 +3,8 @@ import { EVENT_MODULES } from '../config/eventModules';
 import styles from './RoutePlaceholder.module.css';
 
 const ROUTE_LABELS: Record<string, string> = {
-	events: 'All Events',
-	'event-hub': 'Event Hub',
+	overview: 'Overview',
+	events: 'Programs & Events',
 	...Object.fromEntries(EVENT_MODULES.map((module) => [module.id, module.label])),
 };
 

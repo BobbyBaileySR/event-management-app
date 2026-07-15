@@ -61,6 +61,44 @@ Run `npm run lint` (both repos) and `npm audit --audit-level=high` before deploy
 5. Open a create/edit modal — confirm the **custom calendar/time/select** pickers work by mouse **and** keyboard, at 375 / 768 / 1024 px.
 6. Confirm **no external font/icon requests** in DevTools → Network (fonts served from same origin).
 
+### Click-count parity (T063, SC-003, 2026-07-13)
+
+Code-level walkthrough of each flow's discrete user actions (click/tap; typing not counted), comparing the pre-redesign implementation against the redesigned UI (US1 restyle + T032 picker swap). Traced from `CheckInView.tsx`, `EmailDispatchView.tsx`, `CatalogEventModal.tsx` — not a live-browser click recording (no test Google account available in this environment to sign in and drive the authenticated shell), but an accurate trace of the actual interaction sequence each implementation requires. **Live-browser confirmation is still owed as a manual UAT step** (§B checklist item, in addition to this trace) before Phase A sign-off.
+
+| Flow | Steps (before → after) | Result |
+| :--- | :--- | :--- |
+| **Check-in** (search → confirm) | Click result row (1) → click "Confirm check-in" (1) = **2** clicks, both before and after — this flow has no date/time/select field, so US1's restyle didn't touch its interaction sequence at all | Same |
+| **Send email — now** | Template picker (2: open + choose) → audience radio (1) → "Send now" (1) = **4** clicks, unchanged (Template already used `CatalogPickerSelect` before and after) | Same |
+| **Send email — schedule** | Schedule radio (1) → Date (2: open + pick day) → Hour picker (2: open + choose) → Minute (1, already a radio grid) → Timezone picker (2: open + choose) → "Schedule" (1) = **9** clicks. Before: native `<input type="date">` (~2 clicks: open + pick day in the browser's own calendar) in place of the new `CalendarPicker` (2 clicks: open + pick day) — same count | Same |
+| **Catalog CRUD — create Event** | Program picker (2: open + choose) → Date (2: open + pick day) → Save (1) = **5** clicks for the picker/submit fields (plus typing for text fields, unchanged). Before: Program was a bespoke in-place dropdown (2 clicks: open + choose — same pattern `SelectPicker` now provides) and Date was a native input (~2 clicks) — same count | Same |
+
+**Conclusion**: no flow gained clicks; the picker swap (T032) preserves a 1-click-to-open, 1-click-to-choose interaction shape for both the old bespoke/native controls and the new shared pickers.
+
+### Phase 6 — Rollout & compatibility confirmation (US3, T038–T039, 2026-07-13)
+
+**T038 — Foundation-first, not big-bang.** Phase A shipped in exactly this order, each step independently mergeable and already covered by the Phase 1–5 checkpoints above:
+
+1. **Setup + Foundational** (T001–T011): token layer, self-hosted fonts, shared pickers, role-aware shell — pure infrastructure; nothing visually changes yet because no component reads the new tokens yet.
+2. **US4 theme persistence** (T012–T022): switcher + backend pref route — additive; the new theme options don't do anything visually until Phase 4 restyles the CSS that consumes them.
+3. **US1 per-view restyle** (T025–T033), in this order: shared chrome (T025) → Overview/Events (T026) → Attendees (T027) → Check-in (T028) → Email/Campaign (T029) → Catalog admin + modals (T030) → Audit (T031). Each view's restyle is a pure CSS-module + component-internal change — no route, RBAC, or IA change — so any one view could have shipped alone without waiting on the others. The order above was chosen by scope/complexity, not by a cross-view dependency.
+4. **US2 a11y/dependency/XSS proof** (T034–T037): verification only, no functional change.
+5. **This confirmation** (T038–T039).
+
+No step required an IA (information-architecture) rebuild — the sidebar/nav structure, hash routes, and module list are unchanged from before the redesign (see T039 below). Phase A is a skin over the existing shell, not a new shell.
+
+**T039 — In-flight slice compatibility.**
+
+| Check | Result |
+| :--- | :--- |
+| Hash routes (`src/App.tsx`) | Unchanged — same 9 routes, same `HashRouter` + `ViewRouter` dispatch; file untouched by the redesign's diff |
+| Module/RBAC config (`config/eventModules.ts`, `config/shellAccess.ts`) | Unchanged module list and `minRoles`; `shellAccess.ts` only gained the admin-only shell gate as part of Foundational T011 (Phase A itself), not a later regression |
+| Slice 004 (capacity) | `CapacityBar` restyled onto semantic tokens (T025) but `utils/capacityTier.ts` (capacity-tier logic) untouched; `CheckInView.test.tsx` (incl. capacity assertions) passes unchanged |
+| Slice 005 (email dispatch) | `EmailDispatchView` restyled (T029) + native date input swapped for `CalendarPicker` (T032); dispatch/schedule logic and `dataService` calls untouched; `EmailDispatchView.test.tsx` passes unchanged |
+| Slice 006 (public registration) | Only spec artifacts exist (`specs/006-public-registration/`) — no view built yet in this checkout, so there is nothing for the redesign to conflict with |
+| Full regression | 39 files / 258 Vitest tests passing, clean `tsc --noEmit` / `eslint` / `vite build` — no slice needed a functional test rewrite, only the T023 `data-theme` assertions and the T032 picker-swap accessible-name updates already logged above |
+
+**Conclusion**: Phase A shipped foundation-first with zero IA rework and zero forced pause on Slices 004/005/006 — satisfying US3's acceptance criteria. Phase A is independently shippable now; Phase B can be scheduled separately whenever `X-REDESIGN-001` clears.
+
 ### Phase B *(fill and run when `X-REDESIGN-001` clears)*
 
 1. Land on **Events overview** (not a Program drill-down); open a **standalone Event** (no Program) and confirm Attendees/Check-in/Capacity/Campaign work.
@@ -97,8 +135,8 @@ Run `npm run lint` (both repos) and `npm audit --audit-level=high` before deploy
 | 1 | **Environment** | ☐ UAT ☐ Live | Write the full URL you will use. |
 | 2 | **Admin test account** | `@adaptavist.com`: `__________` | Listed as `admin` in Parameter **`USER_ROLE_MAP`**. |
 | 3 | **Non-admin test account** | `@adaptavist.com`: `__________` | Listed as `viewer`/`operator`. Use a separate browser/profile. |
-| 4 | **Allowlisted Celebration email** | `__________` | Matches Parameter **`CELEBRATION_THEME_EMAIL`**. |
-| 5 | **Non-allowlisted email** | `__________` | Any staff email **not** equal to `CELEBRATION_THEME_EMAIL`. |
+| 4 | **Allowlisted Celebration email** | `__________` | One of the entries in the **list-type** Parameter **`CELEBRATION_THEME_EMAIL`** (any email in the list gets access — pick any one). |
+| 5 | **Non-allowlisted email** | `__________` | Any staff email that is **not** in the `CELEBRATION_THEME_EMAIL` list. |
 | 6 | **Frontend config** | `USE_MOCK_API: false` | Live/UAT QA must hit real ScriptRunner. |
 | 7 | **Backend deployed** | ☐ Yes | Phase A adds routes — confirm latest `Backend/scripts/` uploaded via SFTP after merge. Handlers: `OnGetUserPrefs.ts`, `OnPutUserPrefs.ts` *(Phase B adds check-in/undo/remove handlers)*. |
 

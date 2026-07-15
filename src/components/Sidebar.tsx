@@ -2,14 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
 import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
 import { hasRequiredRole } from '../config/shellAccess';
-import { catalogPath, auditPath, eventPath, isEventScopedRoute, sliceModulePath, useActiveRoute } from '../router/navigation';
+import { auditPath, eventPath, overviewPath, useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
-import { useCatalogSelection } from '../state/catalogContext';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { WorkingEventPicker } from './WorkingEventPicker';
 import type { ThemeId } from '../theme/themeTokens';
 import styles from './Sidebar.module.css';
 
-/** All Events / Overview + Catalog admin / Audit log are admin-only for now (FR-013). */
+/** Overview / Programs & Events / Audit log are admin-only for now (FR-013). */
 const TOP_LEVEL_MIN_ROLES = ['admin'] as const;
 
 interface SidebarProps {
@@ -25,70 +25,43 @@ export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationA
 	const navigate = useNavigate();
 	const { session } = useSession();
 	const { name: activeRoute, eventId } = useActiveRoute();
-	const { programId, evId, programName, eventName: catalogEventName } = useCatalogSelection();
 
 	return (
 		<aside className={styles.sidebar} aria-label="Sidebar">
 			<div className={styles.header}>
-				<h2>{CONFIG.APP_SHORT_NAME}</h2>
-				{session?.email ? <p className={styles.user}>{session.email}</p> : null}
+				<span className={styles.logo} aria-hidden="true">
+					{CONFIG.APP_SHORT_NAME.charAt(0)}
+				</span>
+				<div>
+					<h2>{CONFIG.APP_SHORT_NAME}</h2>
+					{session?.email ? <p className={styles.user}>{session.email}</p> : null}
+				</div>
 			</div>
 
 			<nav className={styles.nav} aria-label="Main navigation">
 				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
 					<>
 						<NavButton
-							label="All Events"
+							label="Overview"
+							icon="📊"
+							active={activeRoute === 'overview'}
+							onClick={() => navigate(overviewPath())}
+						/>
+						<NavButton
+							label="Programs & Events"
 							icon="🏢"
 							active={activeRoute === 'events'}
 							onClick={() => navigate('/events')}
 						/>
-						<NavButton
-							label="Catalog admin"
-							icon="🗂️"
-							active={activeRoute === 'catalog'}
-							onClick={() => navigate(catalogPath())}
-						/>
-						<NavButton
-							label="Audit log"
-							icon="📋"
-							active={activeRoute === 'audit'}
-							onClick={() => navigate(auditPath())}
-						/>
 					</>
 				) : null}
 
-				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) && programId && evId ? (
-					<div className={styles.section}>
-						<p className={styles.sectionLabel}>
-							{programName && catalogEventName
-								? `${programName} — ${catalogEventName}`
-								: 'Catalog selection'}
-						</p>
-						<NavButton
-							label="Attendees"
-							icon="👥"
-							active={activeRoute === 'attendees'}
-							onClick={() => navigate(sliceModulePath('attendees'))}
-						/>
-						<NavButton
-							label="Check-in"
-							icon="✓"
-							active={activeRoute === 'check-in'}
-							onClick={() => navigate(sliceModulePath('check-in'))}
-						/>
-						<NavButton
-							label="Email"
-							icon="✉️"
-							active={activeRoute === 'email'}
-							onClick={() => navigate(sliceModulePath('email'))}
-						/>
-					</div>
+				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
+					<WorkingEventPicker currentEventName={eventId ? hubEventName : null} />
 				) : null}
 
-				{eventId && isEventScopedRoute(activeRoute) ? (
-					<div className={styles.section}>
-						<p className={styles.sectionLabel}>{hubEventName ?? 'Selected event'}</p>
+				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
+					<div className={styles.workingEventModules}>
 						{SIDEBAR_EVENT_MODULES.filter((item: EventModule) => hasRequiredRole(session?.role, item.minRoles)).map(
 							(item: EventModule) => (
 								<NavButton
@@ -96,10 +69,22 @@ export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationA
 									label={item.label}
 									icon={item.icon}
 									active={activeRoute === item.id}
-									onClick={() => navigate(eventPath(eventId, item.id))}
+									disabled={!eventId}
+									onClick={eventId ? () => navigate(eventPath(eventId, item.id)) : undefined}
 								/>
 							),
 						)}
+					</div>
+				) : null}
+
+				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
+					<div className={`${styles.section} ${styles.adminSection}`}>
+						<NavButton
+							label="Audit log"
+							icon="📋"
+							active={activeRoute === 'audit'}
+							onClick={() => navigate(auditPath())}
+						/>
 					</div>
 				) : null}
 			</nav>
@@ -120,13 +105,24 @@ interface NavButtonProps {
 	label: string;
 	icon: string;
 	active: boolean;
-	onClick: () => void;
+	disabled?: boolean;
+	onClick?: () => void;
 }
 
-function NavButton({ label, icon, active, onClick }: NavButtonProps) {
+function NavButton({ label, icon, active, disabled, onClick }: NavButtonProps) {
 	return (
-		<button type="button" className={`${styles.navItem} ${active ? styles.active : ''}`} onClick={onClick}>
-			<span aria-hidden="true">{icon}</span> {label}
+		<button
+			type="button"
+			className={`${styles.navItem} ${active ? styles.active : ''}`}
+			aria-current={active ? 'page' : undefined}
+			disabled={disabled}
+			onClick={onClick}
+		>
+			<span className={styles.navBar} aria-hidden="true" />
+			<span className={styles.navIcon} aria-hidden="true">
+				{icon}
+			</span>{' '}
+			{label}
 		</button>
 	);
 }

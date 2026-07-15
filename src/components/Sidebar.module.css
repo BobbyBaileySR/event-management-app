@@ -1,115 +1,208 @@
 .sidebar {
 	width: var(--sidebar-width);
 	flex-shrink: 0;
-	background: var(--color-denim);
-	color: var(--color-white);
+	background: var(--panel);
+	color: var(--text);
+	border-right: 1px solid var(--border);
 	display: flex;
 	flex-direction: column;
 }
 
 .header {
-	padding: 24px;
-	background: var(--color-sidebar-header-bg);
-	border-bottom: 3px solid var(--color-sidebar-header-border);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 20px 16px;
+}
+
+.logo {
+	flex-shrink: 0;
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	background: var(--accent);
+	color: var(--color-white, #fff);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 800;
+	font-size: 0.8rem;
 }
 
 .header h2 {
-	color: var(--color-white);
-	font-size: 1.15rem;
+	color: var(--text);
+	font-size: 0.9rem;
+	font-weight: 700;
+	line-height: 1.2;
 }
 
 .user {
-	margin-top: 8px;
-	font-size: 0.75rem;
-	color: rgba(236, 241, 255, 0.75);
+	margin: 0;
+	font-size: 0.7rem;
+	color: var(--muted);
 	word-break: break-all;
 }
 
 .nav {
-	padding: 16px 0;
+	padding: 10px 10px 16px;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
 	flex: 1;
+	overflow-y: auto;
 }
 
 .section {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 2px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--border);
+}
+
+.adminSection {
+	margin-top: auto;
+}
+
+/* design_handoff 2: the divider sits between the top-level nav (Overview / Programs &
+   Events) and the "Working event" picker — not between the picker and its module list
+   (see WorkingEventPicker.module.css `.field`, which owns that divider). This wrapper
+   itself stays undivided so the picker + its four modules read as one continuous group. */
+.workingEventModules {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
 }
 
 .sectionLabel {
-	margin-top: 8px;
-	padding: 12px 24px 8px;
-	border-top: 1px solid rgba(236, 241, 255, 0.15);
-	font-size: 0.95rem;
-	font-weight: 600;
+	margin: 0 0 4px 6px;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
 	line-height: 1.35;
-	color: var(--color-ice);
+	color: var(--muted);
 	word-break: break-word;
 }
 
 .navItem {
-	display: block;
-	padding: 12px 24px;
-	color: rgba(236, 241, 255, 0.85);
-	font-weight: 500;
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 44px;
+	padding: 10px 12px 10px 16px;
+	border-radius: 9px;
+	color: var(--text);
+	font-weight: 600;
 	transition: background 0.2s, color 0.2s;
 	border: none;
-	background: none;
+	background: transparent;
 	width: 100%;
 	text-align: left;
 	cursor: pointer;
 	font-family: inherit;
-	font-size: 0.95rem;
+	font-size: 0.875rem;
 }
 
 .navItem:hover,
 .active {
-	background: var(--color-sidebar-nav-active-bg);
-	color: var(--color-sidebar-nav-active-text);
-	border-right: 3px solid var(--color-sidebar-nav-active-border);
+	background: var(--accent-soft);
+	color: var(--accent);
 }
 
+.navItem:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: -2px;
+}
+
+/* 007 event-first: working-event module items stay visible (never hidden) when no
+   working event is selected — just muted and non-interactive until one is picked.
+   Explicit `--muted` (not just opacity on the enabled `--text` color) so the muted
+   state reads clearly against the enabled/bold nav items, not just slightly fainter. */
+.navItem:disabled {
+	color: var(--muted);
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.navItem:disabled:hover {
+	background: transparent;
+	color: var(--muted);
+}
+
+/* design_handoff 2: desktop nav is text + left accent bar only, no icon glyphs — the emoji
+   glyph stays in the DOM (still aria-hidden decoration) only for the <=900px pill-grid nav,
+   which keeps its current look/behavior untouched. */
+.navIcon {
+	display: none;
+}
+
+.navBar {
+	position: absolute;
+	left: 0;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 3px;
+	height: 16px;
+	border-radius: 0 3px 3px 0;
+	background: transparent;
+}
+
+.active .navBar {
+	background: var(--accent);
+}
+
+/* The divider here must inset the same amount as `.section`'s (10px — `.nav`'s own side
+   padding, which `.footer` doesn't share since it's a sibling of `.nav`, not a child of
+   it) so it doesn't read as a different, full-width divider next to the others. Margin
+   (10px) + padding (6px) keeps the same 16px total edge-to-content spacing as before. */
 .footer {
-	padding: 20px 24px;
-	border-top: 1px solid rgba(236, 241, 255, 0.15);
+	margin: 0 10px;
+	padding: 16px 6px;
+	border-top: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
 }
 
 .footer p {
 	font-size: 0.75rem;
-	color: rgba(236, 241, 255, 0.6);
-	margin-bottom: 12px;
+	color: var(--muted);
+	margin: 0;
 }
 
 .signOut {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	min-height: 36px;
+	min-height: 44px;
 	padding: 6px 14px;
-	border: 1px solid rgba(236, 241, 255, 0.4);
+	border: 1px solid var(--border);
 	border-radius: var(--radius-sm);
 	background: transparent;
-	color: var(--color-ice);
+	color: var(--text);
 	font-family: inherit;
 	font-size: 0.85rem;
+	font-weight: 600;
 	cursor: pointer;
 	transition: background 0.2s;
 }
 
 .signOut:hover {
-	background: rgba(236, 241, 255, 0.12);
+	background: var(--ice);
 }
 
 @media (max-width: 900px) {
 	.sidebar {
 		width: 100%;
+		border-right: none;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.header {
-		padding: 16px;
+		padding: 12px 16px;
 	}
 
 	.nav {
@@ -122,15 +215,19 @@
 	}
 
 	/* Flatten section wrappers so labels + items participate in the same wrap row. */
-	.section {
+	.section,
+	.workingEventModules {
 		display: contents;
 	}
 
 	.sectionLabel {
 		flex: 1 0 100%;
-		margin-top: 8px;
-		padding: 12px 4px 8px;
-		font-size: 0.9rem;
+		margin: 8px 0 4px;
+		font-size: 0.7rem;
+	}
+
+	.navIcon {
+		display: inline;
 	}
 
 	.navItem {
@@ -138,20 +235,18 @@
 		min-width: min(140px, 100%);
 		width: auto;
 		padding: 10px 12px;
+		justify-content: center;
 		text-align: center;
 		white-space: nowrap;
-		border-right: none;
-		border-bottom: 3px solid transparent;
-		border-radius: var(--radius-sm);
 	}
 
-	.active {
-		border-right: none;
-		border-bottom-color: var(--color-sidebar-nav-active-border);
+	.navBar {
+		display: none;
 	}
 
 	.footer {
-		display: flex;
+		margin: 0;
+		flex-direction: row;
 		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
@@ -160,7 +255,6 @@
 	}
 
 	.footer p {
-		margin-bottom: 0;
 		flex: 1 1 160px;
 	}
 }

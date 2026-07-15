@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { SelectPicker } from './SelectPicker';
+import styles from './Pickers.module.css';
 
 interface TimePickerProps {
 	id: string;
@@ -55,6 +56,7 @@ export function TimePicker({
 			options={options}
 			disabled={disabled}
 			className={className}
+			triggerClassName={styles.triggerTime}
 			testId={testId}
 			onChange={onChange}
 		/>

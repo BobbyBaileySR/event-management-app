@@ -25,7 +25,7 @@
 	flex-direction: column;
 }
 
-.tableScroll {
+.feedScroll {
 	flex: 1;
 	min-height: 200px;
 	overflow: auto;
@@ -33,14 +33,89 @@
 	-webkit-overflow-scrolling: touch;
 }
 
-.colAction {
-	min-width: 10rem;
+.empty {
+	color: var(--muted);
+	padding: 24px 0;
 }
 
-.colDetails {
-	min-width: 12rem;
-	max-width: 24rem;
+.feed {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.feedRow {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	padding: 14px 4px;
+	border-bottom: 1px solid var(--border);
+}
+
+.feedRow:last-child {
+	border-bottom: none;
+}
+
+.avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+.feedContent {
+	flex: 1;
+	min-width: 0;
+}
+
+.actionLine {
+	margin: 0 0 4px;
 	word-break: break-word;
+}
+
+.metaLine {
+	margin: 0 0 4px;
+	color: var(--muted);
+	font-size: 0.8125rem;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	word-break: break-word;
+}
+
+.detailsLine {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.75rem;
+	word-break: break-word;
+}
+
+.actionCode {
+	font-family: monospace;
+}
+
+.categoryBadge {
+	flex-shrink: 0;
+	align-self: center;
+	white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+	.feedRow {
+		flex-wrap: wrap;
+	}
+
+	.categoryBadge {
+		margin-left: 50px;
+	}
 }
 
 .pagination {
@@ -51,7 +126,7 @@
 	gap: 12px;
 	flex-shrink: 0;
 	padding-top: 16px;
-	border-top: 1px solid var(--color-border);
+	border-top: 1px solid var(--border);
 	margin-top: 16px;
 }
 

@@ -14,6 +14,8 @@ interface SelectPickerProps {
 	options: SelectPickerOption[];
 	disabled?: boolean;
 	className?: string;
+	/** Extra class on the trigger button (e.g. clock icon for TimePicker). */
+	triggerClassName?: string;
 	testId?: string;
 	onChange: (value: string) => void;
 }
@@ -24,7 +26,18 @@ interface SelectPickerProps {
  * `aria-activedescendant`, Enter/Space to select, Escape to close and return focus to the
  * trigger, outside-click to dismiss.
  */
-export function SelectPicker({ id, label, value, placeholder, options, disabled = false, className, testId, onChange }: SelectPickerProps) {
+export function SelectPicker({
+	id,
+	label,
+	value,
+	placeholder,
+	options,
+	disabled = false,
+	className,
+	triggerClassName,
+	testId,
+	onChange,
+}: SelectPickerProps) {
 	const listboxId = useId();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
@@ -106,6 +119,9 @@ export function SelectPicker({ id, label, value, placeholder, options, disabled 
 				break;
 			case 'Escape':
 				event.preventDefault();
+				// Don't let this bubble to a document-level Escape handler (e.g. a parent
+				// modal's focus trap) — Escape should close the popover, not the modal.
+				event.stopPropagation();
 				closeMenu(true);
 				break;
 			case 'Tab':
@@ -126,7 +142,7 @@ export function SelectPicker({ id, label, value, placeholder, options, disabled 
 					ref={triggerRef}
 					type="button"
 					id={id}
-					className={styles.trigger}
+					className={`${styles.trigger} ${triggerClassName ?? ''}`.trim()}
 					data-testid={testId}
 					aria-haspopup="listbox"
 					aria-expanded={open}

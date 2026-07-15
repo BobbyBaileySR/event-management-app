@@ -6,63 +6,342 @@
 .card {
 	display: flex;
 	flex-direction: column;
+	gap: 16px;
 	margin-bottom: 0;
 }
 
-.tabList {
+.statRow {
+	margin-bottom: 20px;
+}
+
+.cardHeader {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 8px;
-	margin-bottom: 16px;
-	border-bottom: 1px solid var(--border);
-	padding-bottom: 8px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
 }
 
-.tab {
-	appearance: none;
-	border: none;
-	background: transparent;
-	padding: 10px 14px;
-	min-height: 44px;
-	font: inherit;
-	cursor: pointer;
-	border-radius: 6px;
-	color: var(--color-muted);
+.cardHeader h2 {
+	margin: 0;
+	font-size: 1.1rem;
 }
 
-.tab[aria-selected='true'] {
-	color: var(--color-link);
-	background: var(--ice);
-	font-weight: 600;
+.emptySchedule {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 24px 0;
 }
 
-.panel {
+.emptySchedule p {
+	margin: 0;
+	color: var(--muted);
+}
+
+.composeModal {
+	max-width: min(40rem, calc(100vw - 2rem));
+	max-height: calc(100vh - 4rem);
+	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
 }
 
-.limits {
+/* Header bleeds to the modal's own 28px inset (global `.modal` padding), matching
+   CatalogEventModal's redesigned header treatment. */
+.composeHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin: -28px -28px 4px;
+	padding: 16px 22px;
+	border-bottom: 1px solid var(--border);
+}
+
+.composeHeader h2 {
+	margin: 0;
+	font-size: 1.15rem;
+}
+
+/* All these paragraph rules are scoped under `.composeModal` so they beat the
+   global `.modal p { margin-bottom: 20px; color: var(--muted) }` rule in
+   css/components.css — its `.modal`+`p` specificity (0,1,1) otherwise outranks a
+   bare module class (0,1,0) and silently re-inflates every paragraph's margin. */
+.composeModal .composeSubtitle {
+	margin: 2px 0 0;
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.closeButton {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border);
+	border-radius: 9px;
+	background: none;
+	color: var(--muted);
+	font-size: 1.1rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+	color: var(--text);
+}
+
+.closeButton:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.sectionHeading {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.composeModal .sectionTitle {
+	margin: 0;
+	font-weight: 700;
 	font-size: 0.95rem;
-	color: var(--color-muted);
+	color: var(--text);
+}
+
+.composeModal .sectionHint {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+/* Template / HubSpot-list pickers use a section title above the control, so the
+   picker's built-in label is present for a11y (aria) but visually hidden. */
+.templatePicker label,
+.segmentListPicker label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Segmented toggle used for Recipient source and Delivery timing. */
+.segmentToggle {
+	display: flex;
+	gap: 6px;
+	padding: 4px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--input-bg);
+}
+
+.segmentButton {
+	flex: 1;
+	min-height: 40px;
+	padding: 8px 12px;
+	border: 1px solid transparent;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--muted);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.segmentButton[aria-pressed='true'] {
+	background: var(--panel);
+	border-color: var(--border);
+	color: var(--accent);
+}
+
+.segmentButton:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+}
+
+.recipientToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.recipientSearch {
+	flex: 1 1 200px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 11px;
+	border: 1px solid var(--border);
+	border-radius: 9px;
+	background: var(--input-bg);
+}
+
+.recipientSearch .material-symbols-outlined {
+	color: var(--muted);
+	font-size: 1.1rem;
+}
+
+.recipientSearch input {
+	flex: 1;
+	min-width: 0;
+	border: none;
+	background: transparent;
+	outline: none;
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--text);
+}
+
+.recipientQuickActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.recipientList {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+	max-height: min(320px, 42vh);
+}
+
+.recipientRow {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 14px;
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+}
+
+.recipientRow:last-child {
+	border-bottom: none;
+}
+
+.recipientRow input[type='checkbox'] {
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+
+.recipientAvatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.recipientInfo {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.recipientName {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.recipientMeta {
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.selectionInfo {
+	padding: 12px 14px;
+	border-radius: 8px;
+	background: var(--info-bg);
+}
+
+.composeModal .selectionMeta {
+	margin: 2px 0 0;
+	font-size: 0.82rem;
+	color: var(--muted);
+}
+
+/* Accent-topped derived summary of the campaign about to be sent. */
+.summaryCard {
+	margin-bottom: 0;
+	border-top: 3px solid var(--accent);
+}
+
+.composeModal .summaryTitle {
+	margin: 0 0 12px;
+	font-weight: 700;
+	font-size: 0.95rem;
+}
+
+.summaryList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0;
+}
+
+.summaryRow {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.summaryRow dt {
+	margin: 0;
+	color: var(--muted);
+}
+
+.summaryRow dd {
+	margin: 0;
+	font-weight: 600;
+	text-align: right;
+	word-break: break-word;
 }
 
 .field {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	max-width: 32rem;
+	gap: 6px;
 }
 
 .field label {
-	font-weight: 600;
-	font-size: 0.85rem;
-	color: var(--color-denim);
+	font-weight: 700;
+	font-size: 0.95rem;
+	color: var(--text);
 }
 
-.audienceFieldset legend {
-	font-weight: 600;
-	font-size: 0.9rem;
+/* Picker triggers (Template / Segment / schedule selects) take the tinted field
+   fill used across the compose modal rather than the default white panel. */
+.composeModal button[aria-haspopup='listbox'] {
+	background: var(--input-bg);
 }
 
 .field input {
@@ -73,7 +352,7 @@
 	border-radius: 6px;
 	background: var(--panel);
 	font: inherit;
-	color: var(--color-black);
+	color: var(--text);
 }
 
 .field input:focus-visible {
@@ -81,55 +360,19 @@
 	outline-offset: 2px;
 }
 
-.audienceFieldset {
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 16px;
-	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.audienceModes {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 12px 20px;
-}
-
-.audienceModeLabel {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	min-height: 44px;
-	cursor: pointer;
-}
-
-.manualPicker,
 .segmentPicker {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
 }
 
-.manualHint {
+.composeModal .manualHint {
 	margin: 0;
 	font-size: 0.9rem;
-	color: var(--color-muted);
+	color: var(--muted);
 }
 
-.toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.selectionCount {
-	margin: 0;
-	font-weight: 600;
-}
-
-.recipientPreview {
+.composeModal .selectionCount {
 	margin: 0;
 	font-weight: 600;
 }
@@ -145,10 +388,6 @@
 	overflow: auto;
 	-webkit-overflow-scrolling: touch;
 	max-height: min(420px, 50vh);
-}
-
-.colSelect {
-	width: 2.5rem;
 }
 
 .rowButton {
@@ -184,7 +423,7 @@
 .detailMeta,
 .detailCount {
 	margin: 0;
-	color: var(--color-muted);
+	color: var(--muted);
 	font-size: 0.9rem;
 }
 
@@ -198,56 +437,27 @@
 
 .detailPageSummary {
 	font-size: 0.9rem;
-	color: var(--color-muted);
-}
-
-.sendModeFieldset {
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 16px;
-	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
+	color: var(--muted);
 }
 
 .scheduleFields {
 	display: grid;
+	grid-template-columns: 1fr 1fr;
 	gap: 12px;
 }
 
-.minuteGrid {
-	border: none;
-	padding: 0;
-	margin: 0;
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-}
-
-.minuteOptions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.minuteOption {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	min-height: 44px;
-	padding: 0 10px;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	cursor: pointer;
+@media (max-width: 560px) {
+	.scheduleFields {
+		grid-template-columns: 1fr;
+	}
 }
 
 .lockWarningBanner {
 	margin: 0;
 	padding: 12px 14px;
 	border-radius: 8px;
-	background: #fff4e5;
-	color: #7a4d00;
+	background: var(--warning-bg);
+	color: var(--warning);
 	font-weight: 600;
 }
 
@@ -256,8 +466,8 @@
 	margin-left: 8px;
 	padding: 2px 8px;
 	border-radius: 999px;
-	background: #fff4e5;
-	color: #7a4d00;
+	background: var(--warning-bg);
+	color: var(--warning);
 	font-size: 0.8rem;
 	font-weight: 600;
 }
@@ -266,6 +476,15 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
+}
+
+/* Footer bleeds to the modal edges with a divider + tinted band, matching the header. */
+.composeModal :global(.modal__actions) {
+	margin: 4px -28px -28px;
+	padding: 16px 28px;
+	border-top: 1px solid var(--border);
+	background: var(--input-bg);
+	border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 .editModal {
@@ -278,7 +497,7 @@
 
 .editMeta {
 	margin: 0 0 16px;
-	color: var(--color-muted);
+	color: var(--muted);
 	font-size: 0.9rem;
 }
 
@@ -291,9 +510,9 @@
 		font-size: 16px;
 	}
 
-	.audienceModes {
+	.recipientToolbar {
 		flex-direction: column;
-		gap: 4px;
+		align-items: stretch;
 	}
 
 	.tableScroll {

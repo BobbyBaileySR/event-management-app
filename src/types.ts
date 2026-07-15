@@ -29,6 +29,10 @@ export interface Event {
 	registrationClose: string;
 	hubspotId: string;
 	description: string;
+	/** Optional Program association (007 redesign R-007) — absent/null for a standalone Event. */
+	programId?: string | null;
+	/** Display name for `programId`, resolved server-side — absent/null for a standalone Event. */
+	programName?: string | null;
 }
 
 export interface Attendee {
@@ -168,6 +172,11 @@ export interface SliceAttendeesResponse {
 	total: number;
 }
 
+export interface RemoveAttendeeResponse {
+	contactId: string;
+	removed: boolean;
+}
+
 export interface CheckInContactSummary {
 	contactId: string;
 	firstName: string;
@@ -191,6 +200,9 @@ export interface ConfirmCheckInResponse {
 	alreadyCheckedIn: boolean;
 	attendeeType: 'customer' | 'partner' | null;
 }
+
+/** Same payload shape as confirm — `alreadyCheckedIn` means the contact *was* checked in before undo. */
+export type UndoCheckInResponse = ConfirmCheckInResponse;
 
 export interface CapacityStatus {
 	programId: string;
@@ -226,118 +238,122 @@ export interface EmailSendPayload {
 	idempotencyKey: string;
 }
 
+/** HubSpot CatalogAdapter Event lifecycle status (wire). */
+export type CatalogEventStatus = 'active' | 'cancelled';
+
+/** HubSpot CatalogAdapter Event publish state (wire) — independent of status. */
+export type CatalogEventPublishState = 'draft' | 'published';
+
+/**
+ * Flat catalog Event wire shape (HubSpot CatalogAdapter / T069).
+ * `programId` null = standalone Event (no Program association).
+ */
 export interface CatalogEvent {
 	id: string;
+	programId: string | null;
 	name: string;
-	partsAttendedOption: string;
-	attendanceProperty: string;
-	archived: boolean;
-	owner?: string;
-	description?: string;
-	date?: string;
+	/** ISO datetime (required on create). */
+	start: string;
+	/** ISO datetime. */
+	end?: string;
 	location?: string;
 	capacity?: number;
+	status: CatalogEventStatus;
+	publishState: CatalogEventPublishState;
 	walkInFormUrl?: string;
+	registrationFormUrl?: string;
+	registrationSlug?: string;
+	owner?: string;
+	archived: boolean;
+	archivedViaProgramId?: string | null;
 }
+
+/** Flat, event-first catalog list row — same shape as `CatalogEvent`. */
+export type CatalogEventSummary = CatalogEvent;
 
 export interface CatalogProgram {
 	id: string;
 	name: string;
-	hubspotFormIds: string[];
 	archived: boolean;
-	events: CatalogEvent[];
 	description?: string;
 	startDate?: string;
 	endDate?: string;
-	location?: string;
-	timezone?: string;
 }
 
 export interface CatalogResponse {
+	events: CatalogEventSummary[];
 	programs: CatalogProgram[];
 }
 
 export interface CatalogProgramRecord {
 	id: string;
 	name: string;
-	hubspotFormIds: string[];
 	archived: boolean;
-	createdAt?: string;
-	updatedAt?: string;
 	description?: string;
 	startDate?: string;
 	endDate?: string;
-	location?: string;
-	timezone?: string;
 }
 
 export interface CatalogEventRecord {
 	id: string;
-	programId: string;
+	programId: string | null;
 	name: string;
-	partsAttendedOption: string;
-	attendanceProperty: string;
-	archived: boolean;
-	archivedViaProgramId?: string | null;
-	createdAt?: string;
-	updatedAt?: string;
-	owner?: string;
-	description?: string;
-	date?: string;
+	start: string;
+	end?: string;
 	location?: string;
 	capacity?: number;
+	status: CatalogEventStatus;
+	publishState: CatalogEventPublishState;
 	walkInFormUrl?: string;
+	registrationFormUrl?: string;
+	registrationSlug?: string;
+	owner?: string;
+	archived: boolean;
+	archivedViaProgramId?: string | null;
 }
 
 export interface CreateCatalogProgramBody {
 	name: string;
-	hubspotFormIds: string[];
-	/** @deprecated Legacy single form — still sent for older ScriptRunner builds */
-	hubspotFormId?: string;
 	description?: string;
 	startDate?: string;
 	endDate?: string;
-	location?: string;
-	timezone?: string;
 }
 
 export interface PatchCatalogProgramBody {
 	name?: string;
-	hubspotFormIds?: string[];
-	/** @deprecated Legacy single form — still sent for older ScriptRunner builds */
-	hubspotFormId?: string;
 	archived?: boolean;
 	description?: string | null;
 	startDate?: string | null;
 	endDate?: string | null;
-	location?: string | null;
-	timezone?: string | null;
 }
 
 export interface CreateCatalogEventBody {
-	programId: string;
+	/** Optional — omit or leave unset for a standalone Event. */
+	programId?: string;
 	name: string;
-	partsAttendedOption: string;
-	attendanceProperty: string;
-	owner?: string;
-	description?: string;
-	date?: string;
+	/** ISO datetime (required). */
+	start: string;
+	end?: string;
 	location?: string;
 	capacity?: number;
 	walkInFormUrl?: string;
+	registrationFormUrl?: string;
+	owner?: string;
+	publishState?: CatalogEventPublishState;
 }
 
 export interface PatchCatalogEventBody {
 	name?: string;
-	partsAttendedOption?: string;
-	attendanceProperty?: string;
-	archived?: boolean;
-	owner?: string | null;
-	description?: string | null;
-	date?: string | null;
+	start?: string;
+	end?: string | null;
 	location?: string | null;
 	capacity?: number | null;
+	status?: CatalogEventStatus;
+	publishState?: CatalogEventPublishState;
 	walkInFormUrl?: string | null;
+	registrationFormUrl?: string | null;
+	owner?: string | null;
+	archived?: boolean;
 }
 
 // --- Email dispatch (Slice 2) ---
@@ -490,5 +506,10 @@ export interface ThemePreference {
 	theme: ThemeId;
 	/** Whether the switcher should offer Celebration to this user. */
 	celebrationAllowed: boolean;
+	/**
+	 * Login toast copy when the user is on `CELEBRATION_TOAST_EMAIL` and the message Param is set.
+	 * Independent of theme / `celebrationAllowed`; `null` means no toast.
+	 */
+	celebrationToastMessage: string | null;
 	updatedAt?: string;
 }

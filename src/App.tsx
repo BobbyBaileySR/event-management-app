@@ -39,6 +39,7 @@ function AuthGate() {
 		<HashRouter>
 			<Routes>
 				<Route element={<AppLayout />}>
+					<Route path="/overview" element={<ViewRouter />} />
 					<Route path="/events" element={<ViewRouter />} />
 					<Route path="/events/attendees" element={<ViewRouter />} />
 					<Route path="/events/check-in" element={<ViewRouter />} />

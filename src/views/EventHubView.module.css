@@ -1,3 +1,179 @@
+/* design_handoff 2: one consistent 20px gap between the header card, the stat-tile row,
+   and the Attendees/Capacity+Details row — replaces the old reliance on the global
+   `.card`'s own `margin-bottom` (24px in some places, explicitly zeroed in others),
+   which produced inconsistent spacing between rows. */
 .view {
-	/* inherits global view spacing from layout.css */
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.view :global(.card) {
+	margin-bottom: 0;
+}
+
+.badgeRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+/* The event's own name/meta/Edit button is a bespoke layout (not the shared `TopBar` —
+   that's reserved for the page-level header above, see EventHubView.tsx), matching
+   design_handoff 2 exactly: no divider, and the button top-aligned with the badges/title
+   block rather than vertically centered against it. */
+.headerRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.headerMain {
+	min-width: 0;
+}
+
+.eventName {
+	margin: 0;
+	font-size: 19px;
+	font-weight: 700;
+}
+
+.eventMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-top: 8px;
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.programBadge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 4px 10px;
+	font-size: 0.72rem;
+	font-weight: 600;
+	background: var(--ice);
+	color: var(--text);
+}
+
+.workingBadge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 4px 10px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+
+.headerActions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+.cardHeaderRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.cardHeaderRow h2 {
+	margin: 0;
+	font-size: 1rem;
+}
+
+.linkButton {
+	border: none;
+	background: none;
+	color: var(--accent);
+	font-size: 0.85rem;
+	font-weight: 700;
+	cursor: pointer;
+	padding: 6px 4px;
+	min-height: 44px;
+}
+
+/* design_handoff 2 `layout.split3`: Attendees is twice as wide as the Capacity/Details
+   column — the global `.grid-2` (used elsewhere, e.g. OverviewView) is an even 1fr 1fr,
+   so this is its own class rather than a shared-class change. */
+.detailGrid {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+	gap: 20px;
+}
+
+.detailColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+@media (max-width: 900px) {
+	.detailGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.attendeeList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.attendeeRow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: 10px 14px;
+}
+
+.attendeeAvatar {
+	width: 34px;
+	height: 34px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.attendeeInfo {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+}
+
+.attendeeName {
+	font-size: 0.85rem;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.attendeeMeta {
+	font-size: 0.75rem;
+	color: var(--muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }

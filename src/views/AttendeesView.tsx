@@ -1,60 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CatalogPickerSelect } from '../components/CatalogPickerSelect';
+import { useConfirm } from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
+import { useToast } from '../components/Toast';
 import { ViewErrorState } from '../components/ViewErrorState';
 import { useDataService } from '../hooks/useDataService';
+import { useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
-import { useCatalogSelection } from '../state/catalogContext';
 import type { EmailDispatchListItem, SliceAttendee } from '../types';
 import styles from './AttendeesView.module.css';
 
 type CheckedInFilter = 'all' | 'checked-in' | 'not-checked-in';
+type AttendeeTypeFilter = 'all' | 'customer' | 'partner';
 type DispatchOutcomeFilter = 'received' | 'not_received';
+
+function attendeeInitials(firstName: string, lastName: string): string {
+	return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
+}
 
 const DEFAULT_PAGE_SIZE = 50;
 
 export function AttendeesView() {
 	const { session } = useSession();
 	const data = useDataService();
-	const { programId, evId, programName, eventName } = useCatalogSelection();
+	const { showToast } = useToast();
+	const { confirm } = useConfirm();
+	const { eventId } = useActiveRoute();
 	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [checkedInFilter, setCheckedInFilter] = useState<CheckedInFilter>('all');
+	const [attendeeTypeFilter, setAttendeeTypeFilter] = useState<AttendeeTypeFilter>('all');
 	const [dispatchOptions, setDispatchOptions] = useState<EmailDispatchListItem[]>([]);
 	const [selectedDispatchId, setSelectedDispatchId] = useState('');
 	const [dispatchOutcomeFilter, setDispatchOutcomeFilter] = useState<DispatchOutcomeFilter>('received');
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 	const [total, setTotal] = useState(0);
+	const [registeredTotal, setRegisteredTotal] = useState(0);
+	const [checkedInCount, setCheckedInCount] = useState(0);
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [reloadKey, setReloadKey] = useState(0);
+	const [removingId, setRemovingId] = useState<string | null>(null);
+	const [undoingId, setUndoingId] = useState<string | null>(null);
 	const awaitingInitialLoadRef = useRef(true);
 
 	useEffect(() => {
 		setSearchQuery('');
 		setDebouncedSearch('');
 		setCheckedInFilter('all');
+		setAttendeeTypeFilter('all');
 		setSelectedDispatchId('');
 		setDispatchOutcomeFilter('received');
 		setPage(1);
 		awaitingInitialLoadRef.current = true;
-	}, [programId, evId]);
+	}, [eventId]);
 
 	useEffect(() => {
-		if (!programId || !evId) {
+		if (!eventId) {
 			setDispatchOptions([]);
 			return;
 		}
 
 		let cancelled = false;
 		void data
-			.fetchEmailDispatches(programId, evId, { view: 'log' })
+			.fetchEmailDispatches(eventId, { view: 'log' })
 			.then((result) => {
 				if (!cancelled) {
 					setDispatchOptions(result.dispatches);
@@ -69,7 +84,38 @@ export function AttendeesView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId]);
+	}, [data, eventId]);
+
+	/** Stat tiles reflect the whole event, independent of the filters applied below. */
+	useEffect(() => {
+		if (!eventId) {
+			setRegisteredTotal(0);
+			setCheckedInCount(0);
+			return;
+		}
+
+		let cancelled = false;
+		void Promise.all([
+			data.fetchEventAttendees(eventId, { page: 1, pageSize: 1 }),
+			data.fetchEventCapacityStatus(eventId),
+		])
+			.then(([attendeesResult, capacityResult]) => {
+				if (!cancelled) {
+					setRegisteredTotal(attendeesResult.total);
+					setCheckedInCount(capacityResult.checkedInCount);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setRegisteredTotal(0);
+					setCheckedInCount(0);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [data, eventId, reloadKey]);
 
 	useEffect(() => {
 		const handle = window.setTimeout(() => {
@@ -80,7 +126,7 @@ export function AttendeesView() {
 	}, [searchQuery]);
 
 	useEffect(() => {
-		if (!programId || !evId) {
+		if (!eventId) {
 			setLoading(false);
 			return;
 		}
@@ -101,7 +147,7 @@ export function AttendeesView() {
 				: {};
 
 		void data
-			.fetchSliceAttendees(programId, evId, {
+			.fetchEventAttendees(eventId, {
 				q: debouncedSearch || undefined,
 				checkedIn,
 				page,
@@ -132,11 +178,19 @@ export function AttendeesView() {
 		return () => {
 			cancelled = true;
 		};
-	}, [data, programId, evId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page, reloadKey]);
+	}, [data, eventId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page, reloadKey]);
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
 		[attendees],
+	);
+
+	const visibleAttendees = useMemo(
+		() =>
+			attendeeTypeFilter === 'all'
+				? sortedAttendees
+				: sortedAttendees.filter((person) => person.attendeeType === attendeeTypeFilter),
+		[sortedAttendees, attendeeTypeFilter],
 	);
 
 	const dispatchSelectOptions = useMemo(
@@ -151,31 +205,88 @@ export function AttendeesView() {
 	);
 
 	const totalPages = Math.max(1, Math.ceil(total / pageSize));
-	const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
-	const rangeEnd = Math.min(page * pageSize, total);
 	const showPagination = total > pageSize;
 
-	if (session?.role !== 'admin') {
+	async function handleRemove(person: SliceAttendee) {
+		if (!eventId) {
+			return;
+		}
+		const name = `${person.firstName} ${person.lastName}`.trim() || 'This attendee';
+		const confirmed = await confirm({
+			title: 'Remove attendee?',
+			message: `${name} will be removed from the registered attendee list for this event. This cannot be undone.`,
+			confirmLabel: 'Remove',
+			cancelLabel: 'Cancel',
+		});
+		if (!confirmed) {
+			return;
+		}
+		setRemovingId(person.contactId);
+		try {
+			await data.removeAttendee(eventId, person.contactId);
+			showToast('Attendee removed', 'success');
+			setReloadKey((current) => current + 1);
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error && err.message === 'attendee_checked_in'
+					? 'This attendee is checked in — undo check-in before removing.'
+					: err instanceof Error && err.message === 'contact_not_registered'
+						? 'This attendee is no longer registered.'
+						: 'Failed to remove attendee';
+			showToast(message, 'error');
+		} finally {
+			setRemovingId(null);
+		}
+	}
+
+	async function handleUndoCheckIn(person: SliceAttendee) {
+		if (!eventId) {
+			return;
+		}
+		const name = `${person.firstName} ${person.lastName}`.trim() || 'This attendee';
+		const confirmed = await confirm({
+			title: 'Undo check-in?',
+			message: `${name} will return to Registered for this event. Capacity will update.`,
+			confirmLabel: 'Undo check-in',
+			cancelLabel: 'Cancel',
+		});
+		if (!confirmed) {
+			return;
+		}
+		setUndoingId(person.contactId);
+		try {
+			await data.undoCheckIn(eventId, person.contactId);
+			showToast('Check-in undone', 'success');
+			setReloadKey((current) => current + 1);
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error && err.message === 'contact_not_registered'
+					? 'This attendee is no longer registered.'
+					: 'Failed to undo check-in';
+			showToast(message, 'error');
+		} finally {
+			setUndoingId(null);
+		}
+	}
+
+	if (session && session.role !== 'admin') {
 		return <Navigate to="/events" replace />;
 	}
 
-	if (!programId || !evId) {
+	if (!eventId) {
 		return (
 			<EmptyState
 				viewId="view-attendees"
-				message="Select a Program and Event using the catalog pickers to view registered attendees."
-				action={{ label: 'Go to All Events', to: '/events' }}
+				message="Open an event from Programs & Events or the working-event picker to view registered attendees."
+				action={{ label: 'Go to Programs & Events', to: '/events' }}
 			/>
 		);
 	}
 
-	const title =
-		programName && eventName ? `${programName} — ${eventName} — Attendees` : 'Registered attendees';
-
 	if (loading) {
 		return (
 			<section id="view-attendees" className={styles.view}>
-				<TopBar title={title} meta="Loading registered attendees…" />
+				<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" />
 				<div className={`card ${styles.card}`}>
 					<LoadingState
 						message="Loading attendees…"
@@ -192,7 +303,8 @@ export function AttendeesView() {
 		return (
 			<ViewErrorState
 				viewId="view-attendees"
-				title={title}
+				title="Registered Attendees"
+				meta="Full attendee roster for the working event"
 				message={error}
 				onRetry={() => {
 					setError(null);
@@ -203,23 +315,66 @@ export function AttendeesView() {
 		);
 	}
 
-	const meta =
-		total > 0
-			? `${total} registered · showing ${rangeStart}–${rangeEnd} · HubSpot live`
-			: '0 registered · HubSpot live';
-
 	return (
 		<section id="view-attendees" className={styles.view}>
-			<TopBar title={title} meta={meta} />
+			<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" />
+
+			<div className={styles.statsGrid}>
+				<div className={styles.statTile}>
+					<p className={styles.statValue}>{registeredTotal.toLocaleString()}</p>
+					<p className={styles.statLabel}>Registered</p>
+				</div>
+				<div className={styles.statTile}>
+					<p className={styles.statValue}>{checkedInCount.toLocaleString()}</p>
+					<p className={styles.statLabel}>Checked in</p>
+				</div>
+				<div className={styles.statTile}>
+					<p className={styles.statValue}>{Math.max(0, registeredTotal - checkedInCount).toLocaleString()}</p>
+					<p className={styles.statLabel}>Not checked in</p>
+				</div>
+			</div>
 
 			<div className={`card ${styles.card}`}>
-				<div className="toolbar">
-					<div className="form-row">
+				<label className={styles.searchField}>
+					<span className="material-symbols-outlined" aria-hidden="true">
+						search
+					</span>
+					<input
+						type="search"
+						placeholder="Search name, email or company"
+						value={searchQuery}
+						onChange={(changeEvent) => {
+							setSearchQuery(changeEvent.target.value);
+							setPage(1);
+						}}
+						aria-label="Search attendees"
+					/>
+				</label>
+
+				<div className={styles.filterGroup}>
+					<p className={styles.filterLabel}>Attendee type</p>
+					<div className={styles.filterRow} role="group" aria-label="Attendee type filter">
+						{(['all', 'customer', 'partner'] as AttendeeTypeFilter[]).map((filter) => (
+							<button
+								key={filter}
+								type="button"
+								className={attendeeTypeFilter === filter ? styles.pillActive : styles.pill}
+								onClick={() => setAttendeeTypeFilter(filter)}
+							>
+								{filter === 'all' ? 'All' : filter === 'customer' ? 'Customer' : 'Partner'}
+							</button>
+						))}
+					</div>
+				</div>
+
+				<div className={styles.filterGroup}>
+					<p className={styles.filterLabel}>Status</p>
+					<div className={styles.filterRow} role="group" aria-label="Check-in status filter">
 						{(['all', 'checked-in', 'not-checked-in'] as CheckedInFilter[]).map((filter) => (
 							<button
 								key={filter}
 								type="button"
-								className={`btn btn-outline${checkedInFilter === filter ? ' active' : ''}`}
+								className={checkedInFilter === filter ? styles.pillActive : styles.pill}
 								onClick={() => {
 									setCheckedInFilter(filter);
 									setPage(1);
@@ -256,7 +411,7 @@ export function AttendeesView() {
 								<button
 									key={value}
 									type="button"
-									className={`btn btn-outline btn-sm${dispatchOutcomeFilter === value ? ' active' : ''}`}
+									className={dispatchOutcomeFilter === value ? styles.pillActive : styles.pill}
 									onClick={() => {
 										setDispatchOutcomeFilter(value);
 										setPage(1);
@@ -269,18 +424,6 @@ export function AttendeesView() {
 					) : null}
 				</div>
 
-				<input
-					type="search"
-					className="search-input"
-					placeholder="Search name or company…"
-					value={searchQuery}
-					onChange={(changeEvent) => {
-						setSearchQuery(changeEvent.target.value);
-						setPage(1);
-					}}
-					aria-label="Search attendees"
-				/>
-
 				<div className={styles.tableWrap}>
 					<div
 						className={`table-scroll ${styles.tableScroll}${refreshing ? ` ${styles.tableScrollLoading}` : ''}`}
@@ -291,26 +434,66 @@ export function AttendeesView() {
 								<tr>
 									<th scope="col">Name</th>
 									<th scope="col" className={styles.colCompany}>Company</th>
-									<th scope="col" className={styles.colEmail}>Email</th>
 									<th scope="col" className={styles.colAccountManager}>Account manager</th>
-									<th scope="col" className={styles.colTrack}>Track</th>
-									<th scope="col">Checked in</th>
+									<th scope="col" className={styles.colType}>Type</th>
+									<th scope="col">Status</th>
+									<th scope="col" className={styles.colAction}>
+										<span className="sr-only">Actions</span>
+									</th>
 								</tr>
 							</thead>
 							<tbody>
-								{sortedAttendees.length === 0 ? (
+								{visibleAttendees.length === 0 ? (
 									<tr>
 										<td colSpan={6}>No registered attendees match this view.</td>
 									</tr>
 								) : (
-									sortedAttendees.map((person) => (
+									visibleAttendees.map((person) => (
 										<tr key={person.contactId}>
-											<td>{`${person.firstName} ${person.lastName}`.trim()}</td>
+											<td>
+												<div className={styles.nameCell}>
+													<span className={styles.avatar} aria-hidden="true">
+														{attendeeInitials(person.firstName, person.lastName)}
+													</span>
+													<span className={styles.nameInfo}>
+														<span>{`${person.firstName} ${person.lastName}`.trim()}</span>
+														<span className={styles.nameEmail}>{person.email}</span>
+													</span>
+												</div>
+											</td>
 											<td className={styles.colCompany}>{person.company}</td>
-											<td className={styles.colEmail}>{person.email}</td>
 											<td className={styles.colAccountManager}>{person.accountManager}</td>
-											<td className={styles.colTrack}>{person.attendeeType}</td>
-											<td>{person.checkedIn ? 'Yes' : 'No'}</td>
+											<td className={styles.colType}>
+												<span className={`badge ${styles.typeBadge}`}>
+													{person.attendeeType === 'partner' ? 'Partner' : 'Customer'}
+												</span>
+											</td>
+											<td>
+												<span className={`badge ${person.checkedIn ? 'badge--checked-in' : 'badge--registered'}`}>
+													{person.checkedIn ? 'Checked in' : 'Registered'}
+												</span>
+											</td>
+											<td className={styles.colAction}>
+												{person.checkedIn ? (
+													<button
+														type="button"
+														className={`btn btn-outline btn-sm ${styles.removeButton}`}
+														onClick={() => void handleUndoCheckIn(person)}
+														disabled={undoingId === person.contactId}
+													>
+														{undoingId === person.contactId ? 'Undoing…' : 'Undo check-in'}
+													</button>
+												) : (
+													<button
+														type="button"
+														className={`btn btn-outline btn-sm ${styles.removeButton}`}
+														onClick={() => void handleRemove(person)}
+														disabled={removingId === person.contactId}
+													>
+														{removingId === person.contactId ? 'Removing…' : 'Remove'}
+													</button>
+												)}
+											</td>
 										</tr>
 									))
 								)}
@@ -327,7 +510,7 @@ export function AttendeesView() {
 				{showPagination ? (
 					<nav className={`toolbar ${styles.pagination}`} aria-label="Attendee list pages">
 						<span className={styles.pageSummary}>
-							{refreshing ? 'Loading page…' : `Page ${page} of ${totalPages}`}
+							{refreshing ? 'Loading page…' : `Page ${page} of ${totalPages} · ${total} attendees`}
 						</span>
 						<div className="filter-row">
 							<button
@@ -336,7 +519,7 @@ export function AttendeesView() {
 								disabled={page <= 1 || refreshing}
 								onClick={() => setPage((current) => Math.max(1, current - 1))}
 							>
-								Previous
+								‹ Prev
 							</button>
 							<button
 								type="button"
@@ -344,7 +527,7 @@ export function AttendeesView() {
 								disabled={page >= totalPages || refreshing}
 								onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
 							>
-								Next
+								Next ›
 							</button>
 						</div>
 					</nav>

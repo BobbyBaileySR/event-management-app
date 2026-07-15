@@ -1,7 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { sliceModulePath } from '../router/navigation';
 
-/** Legacy `#/events/:eventId/email` — redirect to catalog-scoped Slice 2 route. */
+/** Legacy redirect — email is event-scoped at `#/events/{eventId}/email`. */
 export function EmailView() {
-	return <Navigate to={sliceModulePath('email')} replace />;
+	return <Navigate to="/events" replace />;
 }

@@ -24,7 +24,6 @@ Do **not** add Tailwind, Shadcn, Tremor, or Mantine. EMS uses CSS modules + bran
 | No data | `EmptyState` |
 | Success / error feedback | `useToast()` |
 | Destructive confirm | `useConfirm()` / `ConfirmModal` |
-| Charts | `ConversionChart` only (Chart.js via npm bundle) |
 | Modal focus trap | `useModalFocusTrap` |
 
 ## Patterns

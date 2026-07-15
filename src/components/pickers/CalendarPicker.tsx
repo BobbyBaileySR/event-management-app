@@ -145,6 +145,9 @@ export function CalendarPicker({ id, label, value, placeholder = 'Select date…
 				break;
 			case 'Escape':
 				event.preventDefault();
+				// Don't let this bubble to a document-level Escape handler (e.g. a parent
+				// modal's focus trap) — Escape should close the popover, not the modal.
+				event.stopPropagation();
 				closeCalendar(true);
 				break;
 			case 'Tab':
@@ -168,7 +171,7 @@ export function CalendarPicker({ id, label, value, placeholder = 'Select date…
 					ref={triggerRef}
 					type="button"
 					id={id}
-					className={styles.trigger}
+					className={`${styles.trigger} ${styles.triggerDate}`}
 					data-testid={testId}
 					aria-haspopup="dialog"
 					aria-expanded={open}

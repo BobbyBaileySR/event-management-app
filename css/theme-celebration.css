@@ -29,17 +29,26 @@
 	--color-link: #D45C82;
 	--color-border: #F6D6E0;
 
-	--color-cobalt: #F2A0BE;
+	/* #F2A0BE (pastel pink) read at ~2:1 against white/panel — fails WCAG 1.4.11 non-text
+	   contrast (3:1) for the global :focus-visible ring (components.css) that reads this
+	   token. Deepened to the theme's existing rose accent (already used for denim/link) so
+	   the shared focus ring clears 3:1 in all three themes (ui-a11y-audit.md, T034). */
+	--color-cobalt: #D45C82;
 
 	--shadow-card: 0 4px 20px -8px rgba(212, 92, 130, 0.12);
 	--shadow-login: 0 30px 80px -40px rgba(212, 92, 130, 0.35);
+	--shadow-frame: 0 30px 80px -40px rgba(212, 92, 130, 0.35);
+	--input-bg: #FEF8FA;
 
 	/* Semantic role layer (T004/R-001) */
 	--surface: #FEF8FA;
 	--panel: #FFFFFF;
 	--border: #F6D6E0;
 	--text: #3D2530;
-	--muted: #93707E;
+	/* #93707E read at 4.1-4.3:1 against panel/surface — fails WCAG 1.4.3 (4.5:1 minimum for
+	   normal text). Darkened to clear AA while staying in the same rose-brown hue
+	   (ui-a11y-audit.md, T034). */
+	--muted: #846571;
 	--accent: #EC6C93;
 	--accent-soft: #FCE4EA;
 	--ice: #FDF1F5;
@@ -50,4 +59,6 @@
 	--info-bg: #E0F2FE;
 	--danger: #991B1B;
 	--danger-bg: #FEE2E2;
+	--warning: #7A4D00;
+	--warning-bg: #FFF4E5;
 }

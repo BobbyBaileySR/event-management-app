@@ -20,7 +20,7 @@ The session token lives in memory (`src/state/appState.tsx`). Any XSS can read i
 
 - Render all dynamic text (HubSpot data, user input, API responses, URL/hash values) with JSX `{text}` — **never** `dangerouslySetInnerHTML`, `innerHTML`, `insertAdjacentHTML`, `outerHTML`, or `document.write` with dynamic content.
 - Build attributes with React props / `setAttribute`; never interpolate dynamic values into an HTML string. Never put untrusted data in `href`/`src`/`on*`/`style`.
-- Do not loosen the production CSP (no `*`, no broad `https:` in `script-src`/`connect-src`, no `unsafe-eval`). Chart.js is self-hosted via npm in the Vite bundle.
+- Do not loosen the production CSP (no `*`, no broad `https:` in `script-src`/`connect-src`, no `unsafe-eval`). Bundle third-party UI assets via npm (no CDN scripts).
 
 Deploy via Git only. Register OAuth origins for every hosting URL.
 
