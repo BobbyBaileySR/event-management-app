@@ -13,8 +13,8 @@ html {
 body {
     min-height: 100%;
     font-family: var(--font-sans);
-    color: var(--color-black);
-    background: var(--color-ice);
+    color: var(--text);
+    background: var(--surface);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
 }
@@ -22,7 +22,7 @@ body {
 h1,
 h2,
 h3 {
-    color: var(--color-denim);
+    color: var(--text);
     font-weight: 700;
     letter-spacing: -0.02em;
 }
@@ -80,7 +80,9 @@ a:hover {
 
 .skip-link:focus-visible {
     transform: translateY(0);
-    outline: 2px solid var(--color-gold);
+    /* --color-gold vs --color-denim reads at ~2.4:1 in the Celebration remap (D45C82) —
+       fails WCAG 1.4.11 (3:1). White clears 3:1 against every theme's denim (ui-a11y-audit.md, T034). */
+    outline: 2px solid var(--color-white);
     outline-offset: 2px;
 }
 

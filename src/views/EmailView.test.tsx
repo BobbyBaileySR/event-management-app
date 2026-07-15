@@ -4,16 +4,16 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { EmailView } from './EmailView';
 
 describe('EmailView', () => {
-	it('redirects legacy event-scoped email URL to catalog-scoped route', () => {
+	it('redirects legacy email URL to Programs & Events', () => {
 		render(
 			<MemoryRouter initialEntries={['/events/evt-london-q3/email']}>
 				<Routes>
 					<Route path="/events/:eventId/:module" element={<EmailView />} />
-					<Route path="/events/email" element={<div>Email dispatch module</div>} />
+					<Route path="/events" element={<div>Programs & Events</div>} />
 				</Routes>
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText('Email dispatch module')).toBeInTheDocument();
+		expect(screen.getByText('Programs & Events')).toBeInTheDocument();
 	});
 });

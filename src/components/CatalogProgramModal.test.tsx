@@ -19,7 +19,7 @@ describe('CatalogProgramModal', () => {
 			<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />,
 		);
 
-		expect(container.querySelectorAll(`.${styles.requiredMark}`)).toHaveLength(2);
+		expect(container.querySelectorAll(`.${styles.requiredMark}`)).toHaveLength(1);
 	});
 
 	it('renders create dialog with a11y attributes and focuses first field', async () => {
@@ -38,14 +38,11 @@ describe('CatalogProgramModal', () => {
 		const user = userEvent.setup();
 
 		await user.type(screen.getByLabelText(/^Program name/), 'Summit 2026');
-		await user.type(screen.getByLabelText(/HubSpot form IDs/i), 'form-123');
 		await user.type(screen.getByLabelText('Description'), 'Annual event');
 		await user.click(screen.getByRole('button', { name: 'Save Program' }));
 
 		expect(onSave).toHaveBeenCalledWith({
 			name: 'Summit 2026',
-			hubspotFormIds: ['form-123'],
-			hubspotFormId: 'form-123',
 			description: 'Annual event',
 		});
 	});
@@ -58,11 +55,9 @@ describe('CatalogProgramModal', () => {
 				program={{
 					id: 'prog-1',
 					name: 'Summit',
-					hubspotFormIds: ['form-1'],
 					archived: false,
-					events: [],
 					description: 'Old blurb',
-					location: 'London',
+					startDate: '2026-09-01',
 				}}
 				onCancel={onCancel}
 				onSave={onSave}
@@ -76,7 +71,6 @@ describe('CatalogProgramModal', () => {
 		expect(onSave).toHaveBeenCalledWith(
 			expect.objectContaining({
 				description: null,
-				location: 'London',
 			}),
 		);
 	});
@@ -89,9 +83,7 @@ describe('CatalogProgramModal', () => {
 				program={{
 					id: 'prog-xss',
 					name: 'XSS Program',
-					hubspotFormIds: ['form-xss'],
 					archived: false,
-					events: [],
 					description: '<img onerror=alert(1)>',
 				}}
 				onCancel={onCancel}
@@ -101,6 +93,22 @@ describe('CatalogProgramModal', () => {
 
 		expect(screen.getByLabelText('Description')).toHaveValue('<img onerror=alert(1)>');
 		expect(document.querySelector('img')).toBeNull();
+	});
+
+	it('shows Archive Program in edit mode and calls onArchive', async () => {
+		const onArchive = vi.fn().mockResolvedValue(undefined);
+		render(
+			<CatalogProgramModal
+				mode="edit"
+				open
+				program={{ id: 'prog-1', name: 'Summit', archived: false }}
+				onCancel={onCancel}
+				onSave={onSave}
+				onArchive={onArchive}
+			/>,
+		);
+		await userEvent.setup().click(screen.getByRole('button', { name: 'Archive Program' }));
+		expect(onArchive).toHaveBeenCalled();
 	});
 
 	it('calls onCancel from cancel button', async () => {

@@ -7,7 +7,13 @@ import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
 import type { AuditLogEntry } from '../types';
 import { isAuditLogListResult } from '../types';
-import { formatAuditMetadata, formatAuditResource } from '../utils/auditDisplay';
+import {
+	actorInitials,
+	categorizeAuditAction,
+	describeAuditAction,
+	formatAuditMetadata,
+	formatAuditResource,
+} from '../utils/auditDisplay';
 import { capitalizeStatus, formatDateTime } from '../utils/format';
 import styles from './AuditView.module.css';
 
@@ -108,43 +114,46 @@ export function AuditView() {
 
 			<div className={`card ${styles.card}`}>
 				<div className={styles.tableWrap}>
-					<div className={`table-scroll ${styles.tableScroll}`}>
-						<table>
-							<thead>
-								<tr>
-									<th scope="col">Time</th>
-									<th scope="col" className={styles.colAction}>Action</th>
-									<th scope="col">Actor</th>
-									<th scope="col">Outcome</th>
-									<th scope="col">Resource</th>
-									<th scope="col" className={styles.colDetails}>Details</th>
-								</tr>
-							</thead>
-							<tbody>
-								{entries.length === 0 ? (
-									<tr>
-										<td colSpan={6}>No audit entries recorded yet.</td>
-									</tr>
-								) : (
-									entries.map((entry) => {
-										const metadataLine = formatAuditMetadata(entry.metadata);
-										return (
-											<tr key={entry.id}>
-												<td>{formatDateTime(entry.timestamp)}</td>
-												<td className={styles.colAction}>{entry.action}</td>
-												<td>{entry.actor}</td>
-												<td>{capitalizeStatus(entry.outcome)}</td>
-												<td>
-													{formatAuditResource(entry)}
-													{entry.eventId ? ` · event ${entry.eventId}` : null}
-												</td>
-												<td className={styles.colDetails}>{metadataLine ?? '—'}</td>
-											</tr>
-										);
-									})
-								)}
-							</tbody>
-						</table>
+					<div className={styles.feedScroll}>
+						{entries.length === 0 ? (
+							<p className={styles.empty}>No audit entries recorded yet.</p>
+						) : (
+							<ul className={styles.feed}>
+								{entries.map((entry) => {
+									const metadataLine = formatAuditMetadata(entry.metadata);
+									const resourceLine = `${formatAuditResource(entry)}${entry.eventId ? ` · event ${entry.eventId}` : ''}`;
+									const isFailure = entry.outcome.toLowerCase() !== 'success';
+									return (
+										<li key={entry.id} className={styles.feedRow}>
+											<span className={styles.avatar} aria-hidden="true">
+												{actorInitials(entry.actor)}
+											</span>
+											<div className={styles.feedContent}>
+												<p className={styles.actionLine}>
+													<strong>{entry.actor}</strong> <span>{describeAuditAction(entry.action)}</span>
+												</p>
+												<p className={styles.metaLine}>
+													{formatDateTime(entry.timestamp)} ·{' '}
+													<span
+														className={`badge ${isFailure ? 'badge--cancelled' : 'badge--checked-in'}`}
+													>
+														{capitalizeStatus(entry.outcome)}
+													</span>{' '}
+													· {resourceLine}
+												</p>
+												<p className={styles.detailsLine}>
+													<span className={styles.actionCode}>{entry.action}</span>
+													{metadataLine ? <> · {metadataLine}</> : null}
+												</p>
+											</div>
+											<span className={`badge badge--draft ${styles.categoryBadge}`}>
+												{categorizeAuditAction(entry.action)}
+											</span>
+										</li>
+									);
+								})}
+							</ul>
+						)}
 					</div>
 				</div>
 

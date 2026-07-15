@@ -33,13 +33,24 @@
     --color-info-bg: #e0f2fe;
     --color-danger: #991b1b;
     --color-danger-bg: #fee2e2;
+    --color-warning: #7a4d00;
+    --color-warning-bg: #fff4e5;
 
     --sidebar-width: 260px;
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 12px;
-    --shadow-card: 0 4px 6px -1px rgba(11, 5, 115, 0.06);
+    /* Panel/card radius (design_handoff 2 — Programs/Events/stat cards all use 16px; no
+       existing scale step matched it, so this is its own token rather than a --radius-lg bump). */
+    --radius-card: 16px;
+    --shadow-card: 0 4px 20px -8px rgba(11, 5, 115, 0.10);
     --shadow-login: 0 20px 40px rgba(0, 10, 39, 0.35);
+    /* Outer app-frame shadow (design_handoff 2 THEMES.aurora `shadow` — distinct from
+       --shadow-card/--shadow-login, which are unrelated pre-existing tokens). */
+    --shadow-frame: 0 30px 80px -40px rgba(11, 5, 115, 0.35);
+    /* Form field fill (design_handoff 2 THEMES.aurora `inputBg`) — distinct from --panel so
+       text/number/select/date/time fields read as a subtly tinted "field", not blank white. */
+    --input-bg: #F5F7FE;
 
     /* Self-hosted (research R-003); see src/styles/fonts.css. Falls back to system fonts until it loads. */
     --font-sans: 'Manrope Variable', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -65,4 +76,17 @@
     --info-bg: var(--color-info-bg);
     --danger: var(--color-danger);
     --danger-bg: var(--color-danger-bg);
+    --warning: var(--color-warning);
+    --warning-bg: var(--color-warning-bg);
+
+    /**
+     * Theme-swatch reference colors (FE-REDESIGN-013) — NOT swapped per [data-theme]. The
+     * theme switcher needs to show every theme's own accent dot at once, including the two
+     * themes that aren't currently active, so it can't read the live (single-active) --accent
+     * role token. These mirror each theme file's own --accent value exactly (theme-aurora.css /
+     * theme-celebration.css / theme-dark-aurora.css) — keep in sync if a theme's accent changes.
+     */
+    --theme-swatch-aurora: #FF6633;
+    --theme-swatch-celebration: #EC6C93;
+    --theme-swatch-dark-aurora: #FF6633;
 }

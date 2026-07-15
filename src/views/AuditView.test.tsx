@@ -119,4 +119,21 @@ describe('AuditView', () => {
 		expect(screen.queryByRole('heading', { name: 'Audit log' })).toBeNull();
 		expect(mockFetchAuditLog).not.toHaveBeenCalled();
 	});
+
+	it('renders under the darkAurora theme with no hardcoded inline hex colors', async () => {
+		document.documentElement.setAttribute('data-theme', 'darkAurora');
+
+		try {
+			renderAuditView();
+
+			await waitFor(() => {
+				expect(screen.getByRole('heading', { name: 'Audit log' })).toBeInTheDocument();
+			});
+
+			expect(screen.getByText('checkin.confirm')).toBeInTheDocument();
+			expect(document.body.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,8}/i);
+		} finally {
+			document.documentElement.removeAttribute('data-theme');
+		}
+	});
 });

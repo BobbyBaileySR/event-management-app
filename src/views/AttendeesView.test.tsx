@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { ConfirmProvider } from '../components/ConfirmModal';
+import { ToastProvider } from '../components/Toast';
 import { SessionProvider, useSession } from '../state/appState';
-import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
 import type { Session, SliceAttendee } from '../types';
 import { AttendeesView } from './AttendeesView';
 
@@ -33,11 +34,20 @@ const mockSliceAttendees: SliceAttendee[] = [
 	},
 ];
 
-const mockFetchSliceAttendees = vi.fn().mockResolvedValue({
+const mockFetchEventAttendees = vi.fn().mockResolvedValue({
 	attendees: mockSliceAttendees,
 	page: 1,
 	pageSize: 50,
 	total: 2,
+});
+
+const mockFetchEventCapacityStatus = vi.fn().mockResolvedValue({
+	programId: '_standalone',
+	eventId: 'ev-1',
+	capacity: 100,
+	checkedInCount: 1,
+	departureCount: 0,
+	liveAttendance: 1,
 });
 
 const mockFetchEmailDispatches = vi.fn().mockResolvedValue({
@@ -61,9 +71,20 @@ const mockFetchEmailDispatches = vi.fn().mockResolvedValue({
 	total: 1,
 });
 
+const mockRemoveAttendee = vi.fn().mockResolvedValue({ contactId: 'c-001', removed: true });
+const mockUndoCheckIn = vi.fn().mockResolvedValue({
+	contactId: 'c-002',
+	checkedIn: false,
+	alreadyCheckedIn: true,
+	attendeeType: 'partner',
+});
+
 const mockDataService = {
-	fetchSliceAttendees: mockFetchSliceAttendees,
+	fetchEventAttendees: mockFetchEventAttendees,
+	fetchEventCapacityStatus: mockFetchEventCapacityStatus,
 	fetchEmailDispatches: mockFetchEmailDispatches,
+	removeAttendee: mockRemoveAttendee,
+	undoCheckIn: mockUndoCheckIn,
 };
 
 vi.mock('../hooks/useDataService', () => ({
@@ -92,30 +113,19 @@ function SessionHarness({ session }: { session: Session }) {
 	return null;
 }
 
-function CatalogHarness() {
-	const { setSelection } = useCatalogSelection();
-	useEffect(() => {
-		setSelection({
-			programId: 'prog-1',
-			evId: 'ev-1',
-			programName: 'Atlassian Event 2026',
-			eventName: 'Meeting Room',
-			walkInFormUrl: null,
-			capacity: null,
-		});
-	}, [setSelection]);
-	return null;
-}
-
-function renderAttendees(session: Session = adminSession) {
+function renderAttendees(session: Session = adminSession, path = '/events/ev-1/attendees') {
 	return render(
-		<MemoryRouter>
+		<MemoryRouter initialEntries={[path]}>
 			<SessionProvider>
-				<CatalogProvider>
-					<SessionHarness session={session} />
-					<CatalogHarness />
-					<AttendeesView />
-				</CatalogProvider>
+				<ConfirmProvider>
+					<ToastProvider>
+						<SessionHarness session={session} />
+						<Routes>
+							<Route path="/events/:eventId/:module" element={<AttendeesView />} />
+							<Route path="*" element={<AttendeesView />} />
+						</Routes>
+					</ToastProvider>
+				</ConfirmProvider>
 			</SessionProvider>
 		</MemoryRouter>,
 	);
@@ -123,11 +133,25 @@ function renderAttendees(session: Session = adminSession) {
 
 describe('AttendeesView', () => {
 	beforeEach(() => {
-		mockFetchSliceAttendees.mockResolvedValue({
+		mockFetchEventAttendees.mockReset();
+		mockFetchEventCapacityStatus.mockReset();
+		mockFetchEmailDispatches.mockReset();
+		mockRemoveAttendee.mockReset();
+		mockUndoCheckIn.mockReset();
+
+		mockFetchEventAttendees.mockResolvedValue({
 			attendees: mockSliceAttendees,
 			page: 1,
 			pageSize: 50,
 			total: 2,
+		});
+		mockFetchEventCapacityStatus.mockResolvedValue({
+			programId: '_standalone',
+			eventId: 'ev-1',
+			capacity: 100,
+			checkedInCount: 1,
+			departureCount: 0,
+			liveAttendance: 1,
 		});
 		mockFetchEmailDispatches.mockResolvedValue({
 			dispatches: [
@@ -149,44 +173,62 @@ describe('AttendeesView', () => {
 			pageSize: 50,
 			total: 1,
 		});
+		mockRemoveAttendee.mockResolvedValue({ contactId: 'c-001', removed: true });
+		mockUndoCheckIn.mockResolvedValue({
+			contactId: 'c-002',
+			checkedIn: false,
+			alreadyCheckedIn: true,
+			attendeeType: 'partner',
+		});
 	});
 
-	it('renders the attendee table and checked-in filters', async () => {
+	it('renders fixed title/meta, attendee table, and check-in filters', async () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(
-				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Attendees' }),
-			).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 		});
 
+		expect(screen.getByText('Full attendee roster for the working event')).toBeInTheDocument();
 		expect(screen.getByText('Jane Doe')).toBeInTheDocument();
 		expect(screen.getByText('John Smith')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Checked in' })).toBeInTheDocument();
-		expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-1', 'ev-1', expect.any(Object));
+		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', expect.any(Object));
 	});
 
-	it('shows catalog selection prompt when no Program or Event is selected', async () => {
-		render(
-			<MemoryRouter>
-				<SessionProvider>
-					<CatalogProvider>
-						<SessionHarness session={adminSession} />
-						<AttendeesView />
-					</CatalogProvider>
-				</SessionProvider>
-			</MemoryRouter>,
-		);
+	it('shows unfiltered Registered / Checked in / Not checked in stat tiles', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		function statValueFor(label: string): string {
+			const labelEl = screen.getAllByText(label).find((el) => el.tagName === 'P');
+			expect(labelEl).toBeTruthy();
+			return labelEl!.previousElementSibling?.textContent ?? '';
+		}
+
+		expect(statValueFor('Registered')).toBe('2');
+		expect(statValueFor('Checked in')).toBe('1');
+		expect(statValueFor('Not checked in')).toBe('1');
+
+		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', { page: 1, pageSize: 1 });
+		expect(mockFetchEventCapacityStatus).toHaveBeenCalledWith('ev-1');
+	});
+
+	it('shows empty state when no eventId is in the URL', async () => {
+		renderAttendees(adminSession, '/events');
 
 		expect(
-			await screen.findByText(/Select a Program and Event using the catalog pickers/i),
+			await screen.findByText(/Open an event from Programs & Events or the working-event picker/i),
 		).toBeInTheDocument();
 	});
 
 	it('renders hostile attendee data as text, never as markup (XSS guard)', async () => {
 		const hostile = '"><img src=x onerror=alert(1)>';
-		mockFetchSliceAttendees.mockResolvedValue({
-			attendees: [{ ...mockSliceAttendees[0]!, firstName: hostile, lastName: '' }],
+		mockFetchEventAttendees.mockResolvedValue({
+			attendees: [{ ...mockSliceAttendees[0]!, firstName: hostile, lastName: '', email: hostile }],
 			page: 1,
 			pageSize: 50,
 			total: 1,
@@ -195,14 +237,48 @@ describe('AttendeesView', () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(screen.getByText(hostile)).toBeInTheDocument();
+			expect(screen.getAllByText(hostile).length).toBeGreaterThan(0);
 		});
 
 		expect(document.querySelector('img')).toBeNull();
 	});
 
-	it('shows total count and pagination when more than one page exists', async () => {
-		mockFetchSliceAttendees.mockResolvedValue({
+	it('puts email under the name and keeps Account manager (no Email column)', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		expect(screen.queryByRole('columnheader', { name: 'Email' })).not.toBeInTheDocument();
+		expect(screen.getByRole('columnheader', { name: 'Account manager' })).toBeInTheDocument();
+		expect(screen.getByText('jane@example.com')).toBeInTheDocument();
+		expect(screen.getByText('john@example.com')).toBeInTheDocument();
+	});
+
+	it('restyles filters as pills with search above them', async () => {
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByLabelText('Search attendees')).toBeInTheDocument();
+		});
+
+		const search = screen.getByLabelText('Search attendees');
+		const typeGroup = screen.getByRole('group', { name: 'Attendee type filter' });
+		expect(search.compareDocumentPosition(typeGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+		expect(within(typeGroup).getByRole('button', { name: 'All' })).toBeInTheDocument();
+		expect(within(typeGroup).getByRole('button', { name: 'Customer' })).toBeInTheDocument();
+		expect(within(typeGroup).getByRole('button', { name: 'Partner' })).toBeInTheDocument();
+
+		const statusGroup = screen.getByRole('group', { name: 'Check-in status filter' });
+		expect(within(statusGroup).getByRole('button', { name: 'All' })).toBeInTheDocument();
+		expect(within(statusGroup).getByRole('button', { name: 'Checked in' })).toBeInTheDocument();
+		expect(within(statusGroup).getByRole('button', { name: 'Not checked in' })).toBeInTheDocument();
+	});
+
+	it('shows page summary with total count and ‹ Prev / Next › when multipage', async () => {
+		mockFetchEventAttendees.mockResolvedValue({
 			attendees: mockSliceAttendees,
 			page: 1,
 			pageSize: 50,
@@ -212,12 +288,11 @@ describe('AttendeesView', () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(screen.getByText(/120 registered · showing 1–50/i)).toBeInTheDocument();
+			expect(screen.getByText('Page 1 of 3 · 120 attendees')).toBeInTheDocument();
 		});
 
-		expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+		expect(screen.getByRole('button', { name: '‹ Prev' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: 'Next ›' })).toBeEnabled();
 	});
 
 	it('shows loading feedback while fetching the next page', async () => {
@@ -236,7 +311,7 @@ describe('AttendeesView', () => {
 			resolvePage2 = resolve;
 		});
 
-		mockFetchSliceAttendees.mockImplementation(async (_programId, _eventId, query) => {
+		mockFetchEventAttendees.mockImplementation(async (_eventId, query) => {
 			if (query?.page === 2) {
 				return page2Promise;
 			}
@@ -251,15 +326,15 @@ describe('AttendeesView', () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+			expect(screen.getByRole('button', { name: 'Next ›' })).toBeEnabled();
 		});
 
-		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Next ›' }));
 
 		expect(await screen.findByText('Loading page…')).toBeInTheDocument();
-		expect(screen.getByRole('status')).toHaveTextContent('Updating…');
-		expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
-		expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+		expect(screen.getByText('Updating…')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Next ›' })).toBeDisabled();
+		expect(screen.getByRole('button', { name: '‹ Prev' })).toBeDisabled();
 
 		resolvePage2!({
 			attendees: [mockSliceAttendees[0]!],
@@ -269,14 +344,12 @@ describe('AttendeesView', () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText(/120 registered · showing 51–100/i)).toBeInTheDocument();
+			expect(screen.getByText('Page 2 of 3 · 120 attendees')).toBeInTheDocument();
 		});
-
-		expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
 	});
 
-	it('requests the next page when Next is clicked', async () => {
-		mockFetchSliceAttendees.mockImplementation(async (_programId, _eventId, query) => {
+	it('requests the next page when Next › is clicked', async () => {
+		mockFetchEventAttendees.mockImplementation(async (_eventId, query) => {
 			if (query?.page === 2) {
 				return {
 					attendees: [mockSliceAttendees[0]!],
@@ -296,13 +369,13 @@ describe('AttendeesView', () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+			expect(screen.getByRole('button', { name: 'Next ›' })).toBeEnabled();
 		});
 
-		fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+		fireEvent.click(screen.getByRole('button', { name: 'Next ›' }));
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', {
 				q: undefined,
 				checkedIn: undefined,
 				page: 2,
@@ -310,7 +383,7 @@ describe('AttendeesView', () => {
 			});
 		});
 
-		expect(await screen.findByText(/120 registered · showing 51–100/i)).toBeInTheDocument();
+		expect(await screen.findByText('Page 2 of 3 · 120 attendees')).toBeInTheDocument();
 	});
 
 	it('keeps the attendees layout mounted while typing in search', async () => {
@@ -325,12 +398,10 @@ describe('AttendeesView', () => {
 		});
 
 		expect(screen.queryByText('Loading attendees…')).not.toBeInTheDocument();
-		expect(
-			screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Attendees' }),
-		).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', {
 				q: 'Jane',
 				checkedIn: undefined,
 				page: 1,
@@ -341,29 +412,30 @@ describe('AttendeesView', () => {
 
 	it('redirects non-admin users to the events list', async () => {
 		render(
-			<MemoryRouter initialEntries={['/events/attendees']}>
+			<MemoryRouter initialEntries={['/events/ev-1/attendees']}>
 				<SessionProvider>
-					<CatalogProvider>
-						<Routes>
-							<Route path="/events" element={<div>Events list</div>} />
-							<Route
-								path="/events/attendees"
-								element={
-									<>
-										<SessionHarness session={staffSession} />
-										<CatalogHarness />
-										<AttendeesView />
-									</>
-								}
-							/>
-						</Routes>
-					</CatalogProvider>
+					<ConfirmProvider>
+						<ToastProvider>
+							<Routes>
+								<Route path="/events" element={<div>Events list</div>} />
+								<Route
+									path="/events/:eventId/:module"
+									element={
+										<>
+											<SessionHarness session={staffSession} />
+											<AttendeesView />
+										</>
+									}
+								/>
+							</Routes>
+						</ToastProvider>
+					</ConfirmProvider>
 				</SessionProvider>
 			</MemoryRouter>,
 		);
 
 		expect(await screen.findByText('Events list')).toBeInTheDocument();
-		expect(screen.queryByRole('heading', { name: /Attendees/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('heading', { name: 'Registered Attendees' })).not.toBeInTheDocument();
 	});
 
 	it('loads dispatch options and filters attendees by received outcome', async () => {
@@ -374,13 +446,13 @@ describe('AttendeesView', () => {
 			expect(screen.getByLabelText('Email dispatch')).toBeInTheDocument();
 		});
 
-		expect(mockFetchEmailDispatches).toHaveBeenCalledWith('prog-1', 'ev-1', { view: 'log' });
+		expect(mockFetchEmailDispatches).toHaveBeenCalledWith('ev-1', { view: 'log' });
 
 		await user.click(screen.getByRole('button', { name: 'Email dispatch: No dispatch filter' }));
 		await user.click(screen.getByRole('option', { name: 'Meeting Room reminder' }));
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', {
 				q: undefined,
 				checkedIn: undefined,
 				page: 1,
@@ -393,7 +465,7 @@ describe('AttendeesView', () => {
 		fireEvent.click(screen.getByRole('button', { name: 'Did not receive' }));
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', {
 				q: undefined,
 				checkedIn: undefined,
 				page: 1,
@@ -423,7 +495,7 @@ describe('AttendeesView', () => {
 		await user.click(screen.getByRole('option', { name: 'No dispatch filter' }));
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-1', 'ev-1', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', {
 				q: undefined,
 				checkedIn: undefined,
 				page: 1,
@@ -434,6 +506,81 @@ describe('AttendeesView', () => {
 		expect(screen.queryByRole('button', { name: 'Did not receive' })).not.toBeInTheDocument();
 	});
 
+	it('shows Remove only for non-checked-in attendees and confirms before removing', async () => {
+		const user = userEvent.setup();
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
+		expect(removeButtons).toHaveLength(1);
+
+		await user.click(removeButtons[0]!);
+
+		const dialog = await screen.findByRole('dialog', { name: 'Remove attendee?' });
+		expect(within(dialog).getByText(/Jane Doe will be removed/i)).toBeInTheDocument();
+
+		await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+		expect(mockRemoveAttendee).not.toHaveBeenCalled();
+
+		await user.click(screen.getByRole('button', { name: 'Remove' }));
+		await user.click(within(await screen.findByRole('dialog', { name: 'Remove attendee?' })).getByRole('button', { name: 'Remove' }));
+
+		await waitFor(() => {
+			expect(mockRemoveAttendee).toHaveBeenCalledWith('ev-1', 'c-001');
+		});
+
+		expect(await screen.findByText('Attendee removed')).toBeInTheDocument();
+	});
+
+	it('toasts a checked-in error when remove fails with attendee_checked_in', async () => {
+		const user = userEvent.setup();
+		mockRemoveAttendee.mockRejectedValue(new Error('attendee_checked_in'));
+
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+		});
+
+		await user.click(screen.getByRole('button', { name: 'Remove' }));
+		await user.click(
+			within(await screen.findByRole('dialog', { name: 'Remove attendee?' })).getByRole('button', {
+				name: 'Remove',
+			}),
+		);
+
+		expect(
+			await screen.findByText('This attendee is checked in — undo check-in before removing.'),
+		).toBeInTheDocument();
+	});
+
+	it('shows Undo check-in for checked-in attendees and confirms before undoing', async () => {
+		const user = userEvent.setup();
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('John Smith')).toBeInTheDocument();
+		});
+
+		const undoButtons = screen.getAllByRole('button', { name: 'Undo check-in' });
+		expect(undoButtons).toHaveLength(1);
+
+		await user.click(undoButtons[0]!);
+		await user.click(
+			within(await screen.findByRole('dialog', { name: 'Undo check-in?' })).getByRole('button', {
+				name: 'Undo check-in',
+			}),
+		);
+
+		await waitFor(() => {
+			expect(mockUndoCheckIn).toHaveBeenCalledWith('ev-1', 'c-002');
+		});
+		expect(await screen.findByText('Check-in undone')).toBeInTheDocument();
+	});
+
 	it('does not overflow body horizontally at 375px viewport', async () => {
 		Object.defineProperty(document.body, 'clientWidth', { configurable: true, value: 375 });
 		document.documentElement.style.width = '375px';
@@ -441,11 +588,26 @@ describe('AttendeesView', () => {
 		renderAttendees();
 
 		await waitFor(() => {
-			expect(
-				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Attendees' }),
-			).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 		});
 
 		expect(document.body.scrollWidth).toBeLessThanOrEqual(document.body.clientWidth + 1);
+	});
+
+	it('renders correctly under the darkAurora theme with no hardcoded inline hex colors', async () => {
+		document.documentElement.setAttribute('data-theme', 'darkAurora');
+
+		try {
+			const { container } = renderAttendees();
+
+			await waitFor(() => {
+				expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
+			});
+
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+			expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,8}/i);
+		} finally {
+			document.documentElement.removeAttribute('data-theme');
+		}
 	});
 });

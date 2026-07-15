@@ -1,22 +1,25 @@
 import { createElement, useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from 'react-router-dom';
+import { ConfirmProvider } from '../components/ConfirmModal';
 import { ToastProvider } from '../components/Toast';
 import { SessionProvider, useSession } from '../state/appState';
-import { CatalogProvider, useCatalogSelection, type CatalogSelection } from '../state/catalogContext';
 import type { Session, SliceAttendee } from '../types';
 import { CheckInView } from './CheckInView';
 
 const {
-	mockFetchSliceAttendees,
+	mockFetchEventAttendees,
 	mockConfirmCheckIn,
+	mockUndoCheckIn,
 	mockCheckInScan,
-	mockFetchCapacityStatus,
+	mockFetchEventCapacityStatus,
 	mockAdjustCapacity,
+	mockFetchCatalog,
 	mockDataService,
 } = vi.hoisted(() => {
-	const fetchSliceAttendees = vi.fn().mockResolvedValue({
+	const fetchEventAttendees = vi.fn().mockResolvedValue({
 		attendees: [
 			{
 				contactId: 'mock-101',
@@ -51,8 +54,14 @@ const {
 		alreadyCheckedIn: false,
 		attendeeType: 'customer',
 	});
+	const undoCheckIn = vi.fn().mockResolvedValue({
+		contactId: 'mock-202',
+		checkedIn: false,
+		alreadyCheckedIn: true,
+		attendeeType: 'partner',
+	});
 	const checkInScan = vi.fn().mockResolvedValue({
-		programId: 'prog-atlassian-2026',
+		programId: '_standalone',
 		eventId: 'ev-mr-2026',
 		contact: {
 			contactId: 'mock-101',
@@ -65,8 +74,8 @@ const {
 			checkedIn: false,
 		},
 	});
-	const fetchCapacityStatus = vi.fn().mockResolvedValue({
-		programId: 'prog-atlassian-2026',
+	const fetchEventCapacityStatus = vi.fn().mockResolvedValue({
+		programId: '_standalone',
 		eventId: 'ev-mr-2026',
 		capacity: 100,
 		checkedInCount: 1,
@@ -74,26 +83,46 @@ const {
 		liveAttendance: 1,
 	});
 	const adjustCapacity = vi.fn().mockResolvedValue({
-		programId: 'prog-atlassian-2026',
+		programId: '_standalone',
 		eventId: 'ev-mr-2026',
 		capacity: 100,
 		checkedInCount: 1,
 		departureCount: 1,
 		liveAttendance: 0,
 	});
+	const fetchCatalog = vi.fn().mockResolvedValue({
+		events: [
+			{
+				id: 'ev-mr-2026',
+				programId: 'prog-atlassian-2026',
+				name: 'Meeting Room',
+				start: '2026-10-01T09:00:00.000Z',
+				status: 'active',
+				publishState: 'published',
+				archived: false,
+				walkInFormUrl: null,
+				capacity: 100,
+			},
+		],
+		programs: [{ id: 'prog-atlassian-2026', name: 'Atlassian Event 2026', archived: false }],
+	});
 
 	return {
-		mockFetchSliceAttendees: fetchSliceAttendees,
+		mockFetchEventAttendees: fetchEventAttendees,
 		mockConfirmCheckIn: confirmCheckIn,
+		mockUndoCheckIn: undoCheckIn,
 		mockCheckInScan: checkInScan,
-		mockFetchCapacityStatus: fetchCapacityStatus,
+		mockFetchEventCapacityStatus: fetchEventCapacityStatus,
 		mockAdjustCapacity: adjustCapacity,
+		mockFetchCatalog: fetchCatalog,
 		mockDataService: {
-			fetchSliceAttendees,
+			fetchEventAttendees,
 			confirmCheckIn,
+			undoCheckIn,
 			checkInScan,
-			fetchCapacityStatus,
+			fetchEventCapacityStatus,
 			adjustCapacity,
+			fetchCatalog,
 		},
 	};
 });
@@ -150,8 +179,6 @@ const staffSession: Session = {
 
 const WALK_IN_URL = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
 
-let applyCatalogSelection: ((selection: CatalogSelection) => void) | null = null;
-
 function SessionHarness({ session }: { session: Session }) {
 	const { setSession } = useSession();
 	useEffect(() => {
@@ -160,51 +187,46 @@ function SessionHarness({ session }: { session: Session }) {
 	return null;
 }
 
-function CatalogHarness({
-	walkInFormUrl = null,
-	evId = 'ev-mr-2026',
-	capacity = 100,
-}: {
-	walkInFormUrl?: string | null;
-	evId?: string;
-	capacity?: number | null;
-} = {}) {
-	const { setSelection } = useCatalogSelection();
-	useEffect(() => {
-		setSelection({
-			programId: 'prog-atlassian-2026',
-			evId,
-			programName: 'Atlassian Event 2026',
-			eventName: 'Meeting Room',
-			walkInFormUrl,
-			capacity,
-		});
-	}, [setSelection, walkInFormUrl, evId, capacity]);
-	return null;
-}
-
-function CatalogSelectionBridge() {
-	const { setSelection } = useCatalogSelection();
-	useEffect(() => {
-		applyCatalogSelection = setSelection;
-	}, [setSelection]);
-	return null;
-}
-
 function renderCheckIn(
 	session: Session = adminSession,
-	catalog: { walkInFormUrl?: string | null; evId?: string; capacity?: number | null } = {},
+	options: { walkInFormUrl?: string | null; eventId?: string | null; capacity?: number | null } = {},
 ) {
+	const eventId = options.eventId === undefined ? 'ev-mr-2026' : options.eventId;
+	const walkInFormUrl = options.walkInFormUrl ?? null;
+	const capacity = options.capacity === undefined ? 100 : options.capacity;
+
+	mockFetchCatalog.mockResolvedValue({
+		events: eventId
+			? [
+					{
+						id: eventId,
+						programId: 'prog-atlassian-2026',
+						name: 'Meeting Room',
+						start: '2026-10-01T09:00:00.000Z',
+						status: 'active',
+						publishState: 'published',
+						archived: false,
+						walkInFormUrl,
+						capacity,
+					},
+				]
+			: [],
+		programs: [{ id: 'prog-atlassian-2026', name: 'Atlassian Event 2026', archived: false }],
+	});
+
+	const path = eventId ? `/events/${eventId}/check-in` : '/events';
 	return render(
-		<MemoryRouter>
+		<MemoryRouter initialEntries={[path]}>
 			<ToastProvider>
-				<SessionProvider>
-					<CatalogProvider>
+				<ConfirmProvider>
+					<SessionProvider>
 						<SessionHarness session={session} />
-						<CatalogHarness {...catalog} />
-						<CheckInView />
-					</CatalogProvider>
-				</SessionProvider>
+						<Routes>
+							<Route path="/events/:eventId/:module" element={<CheckInView />} />
+							<Route path="*" element={<CheckInView />} />
+						</Routes>
+					</SessionProvider>
+				</ConfirmProvider>
 			</ToastProvider>
 		</MemoryRouter>,
 	);
@@ -213,13 +235,19 @@ function renderCheckIn(
 describe('CheckInView', () => {
 	beforeEach(() => {
 		vi.useRealTimers();
-		applyCatalogSelection = null;
-		mockFetchSliceAttendees.mockClear();
+		mockFetchEventAttendees.mockClear();
 		mockConfirmCheckIn.mockClear();
+		mockUndoCheckIn.mockClear();
 		mockCheckInScan.mockClear();
-		mockFetchCapacityStatus.mockClear();
+		mockFetchEventCapacityStatus.mockClear();
 		mockAdjustCapacity.mockClear();
-		mockFetchSliceAttendees.mockResolvedValue({
+		mockUndoCheckIn.mockResolvedValue({
+			contactId: 'mock-202',
+			checkedIn: false,
+			alreadyCheckedIn: true,
+			attendeeType: 'partner',
+		});
+		mockFetchEventAttendees.mockResolvedValue({
 			attendees: mockSliceAttendees,
 			page: 1,
 			pageSize: 50,
@@ -245,7 +273,7 @@ describe('CheckInView', () => {
 				checkedIn: false,
 			},
 		});
-		mockFetchCapacityStatus.mockResolvedValue({
+		mockFetchEventCapacityStatus.mockResolvedValue({
 			programId: 'prog-atlassian-2026',
 			eventId: 'ev-mr-2026',
 			capacity: 100,
@@ -263,55 +291,8 @@ describe('CheckInView', () => {
 		});
 	});
 
-	it('renders attendee search, summary card, and confirm check-in', async () => {
-		renderCheckIn();
-
-		await waitFor(() => {
-			expect(
-				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
-			).toBeInTheDocument();
-		});
-
-		expect(screen.getByText(/Type at least 2 characters to search registrants/i)).toBeInTheDocument();
-		expect(mockFetchSliceAttendees).not.toHaveBeenCalled();
-
-		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
-			target: { value: 'Jane' },
-		});
-
-		await waitFor(() => {
-			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-		});
-
-		expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
-			q: 'Jane',
-			page: 1,
-			pageSize: 200,
-		});
-
-		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
-
-		await waitFor(() => {
-			expect(screen.getByText('jane.doe@acme.com')).toBeInTheDocument();
-		});
-		expect(screen.getByText('owner-1')).toBeInTheDocument();
-
-		fireEvent.click(screen.getByRole('button', { name: 'Confirm check-in' }));
-
-		await waitFor(() => {
-			expect(mockConfirmCheckIn).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', 'mock-101');
-			expect(screen.getByRole('status')).toHaveTextContent('Jane Doe checked in successfully.');
-		});
-	});
-
-	it('shows idempotent message when contact is already checked in', async () => {
-		mockConfirmCheckIn.mockResolvedValue({
-			contactId: 'mock-202',
-			checkedIn: true,
-			alreadyCheckedIn: true,
-			attendeeType: 'partner',
-		});
-
+	it('offers Undo check-in for already-checked-in search results', async () => {
+		const user = userEvent.setup();
 		renderCheckIn();
 
 		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
@@ -322,50 +303,152 @@ describe('CheckInView', () => {
 			expect(screen.getByText('Pat Lee')).toBeInTheDocument();
 		});
 
-		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[1]!);
+		await user.click(screen.getByRole('button', { name: 'Undo check-in' }));
+		await user.click(
+			within(await screen.findByRole('dialog', { name: 'Undo check-in?' })).getByRole('button', {
+				name: 'Undo check-in',
+			}),
+		);
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'Confirm check-in' })).toBeInTheDocument();
+			expect(mockUndoCheckIn).toHaveBeenCalledWith('ev-mr-2026', 'mock-202');
 		});
+		expect(await screen.findByText(/check-in undone/i)).toBeInTheDocument();
+	});
+
+	it('opens a confirm-check-in modal from the search results and confirms', async () => {
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Check-in' }),
+			).toBeInTheDocument();
+		});
+
+		expect(screen.getByText(/Type at least 2 characters to search registrants/i)).toBeInTheDocument();
+		expect(mockFetchEventAttendees).not.toHaveBeenCalled();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Jane' },
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
+			q: 'Jane',
+			page: 1,
+			pageSize: 200,
+		});
+
+		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
+
+		const dialog = await screen.findByRole('dialog', { name: 'Confirm check-in' });
+		expect(dialog).toHaveTextContent('Name');
+		expect(dialog).toHaveTextContent('Company');
+		expect(dialog).toHaveTextContent('Email');
+		expect(dialog).toHaveTextContent('Account manager');
+		expect(dialog).toHaveTextContent('Attendee type');
+		expect(dialog).toHaveTextContent('Current status');
+		expect(dialog).toHaveTextContent('jane.doe@acme.com');
+		expect(dialog).toHaveTextContent('owner-1');
+		expect(dialog).toHaveTextContent('Registered');
+		expect(dialog).not.toHaveTextContent(/auto-checks in/i);
 
 		fireEvent.click(screen.getByRole('button', { name: 'Confirm check-in' }));
 
 		await waitFor(() => {
-			expect(screen.getByRole('status')).toHaveTextContent('Pat Lee is already checked in.');
+			expect(mockConfirmCheckIn).toHaveBeenCalledWith('ev-mr-2026', 'mock-101');
+			expect(screen.getByRole('status')).toHaveTextContent('Jane Doe checked in successfully.');
 		});
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 	});
 
-	it('calls checkInScan when QR panel decodes a token', async () => {
+	it('offers Undo check-in in the confirm modal when scan finds an already-checked-in contact', async () => {
+		mockCheckInScan.mockResolvedValue({
+			programId: '_standalone',
+			eventId: 'ev-mr-2026',
+			contact: {
+				contactId: 'mock-202',
+				firstName: 'Pat',
+				lastName: 'Lee',
+				company: 'Partner Ltd',
+				email: 'pat@partner.com',
+				accountManager: 'owner-2',
+				attendeeType: 'partner',
+				checkedIn: true,
+			},
+		});
+
+		renderCheckIn();
+
+		fireEvent.click(await screen.findByRole('button', { name: 'Start scanner' }));
+		await screen.findByRole('dialog', { name: 'Scan QR code' });
+		fireEvent.click(screen.getByRole('button', { name: 'Simulate QR scan' }));
+
+		const dialog = await screen.findByRole('dialog', { name: 'Already checked in' });
+		expect(dialog).toHaveTextContent('Checked in');
+		expect(screen.getByRole('button', { name: 'Undo check-in' })).toBeEnabled();
+		expect(mockConfirmCheckIn).not.toHaveBeenCalled();
+	});
+
+	it('cancelling the confirm modal does not check the attendee in', async () => {
+		renderCheckIn();
+
+		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
+			target: { value: 'Jane' },
+		});
+		await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+
+		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
+		await screen.findByRole('dialog', { name: 'Confirm check-in' });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		expect(mockConfirmCheckIn).not.toHaveBeenCalled();
+	});
+
+	it('opens the scanner modal and calls checkInScan when the QR panel decodes a token', async () => {
 		renderCheckIn();
 
 		await waitFor(() => {
-			expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Start scanner' })).toBeInTheDocument();
 		});
+		expect(screen.queryByRole('button', { name: 'Simulate QR scan' })).not.toBeInTheDocument();
 
+		fireEvent.click(screen.getByRole('button', { name: 'Start scanner' }));
+
+		await screen.findByRole('dialog', { name: 'Scan QR code' });
 		fireEvent.click(screen.getByRole('button', { name: 'Simulate QR scan' }));
 
 		await waitFor(() => {
-			expect(mockCheckInScan).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', 'mock-jwt-token');
-			expect(screen.getByText('jane.doe@acme.com')).toBeInTheDocument();
+			expect(mockCheckInScan).toHaveBeenCalledWith('ev-mr-2026', 'mock-jwt-token');
 		});
+		expect(screen.queryByRole('dialog', { name: 'Scan QR code' })).not.toBeInTheDocument();
+		expect(await screen.findByRole('dialog', { name: 'Confirm check-in' })).toHaveTextContent(
+			'jane.doe@acme.com',
+		);
 	});
 
-	it('shows catalog selection prompt when no Program or Event is selected', async () => {
-		render(
-			<MemoryRouter>
-				<ToastProvider>
-					<SessionProvider>
-						<CatalogProvider>
-							<SessionHarness session={adminSession} />
-							<CheckInView />
-						</CatalogProvider>
-					</SessionProvider>
-				</ToastProvider>
-			</MemoryRouter>,
-		);
+	it('closes the scanner modal without side effects', async () => {
+		renderCheckIn();
+
+		fireEvent.click(await screen.findByRole('button', { name: 'Start scanner' }));
+		await screen.findByRole('dialog', { name: 'Scan QR code' });
+
+		fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		expect(mockCheckInScan).not.toHaveBeenCalled();
+	});
+
+	it('shows empty state when no eventId is in the URL', async () => {
+		renderCheckIn(adminSession, { eventId: null });
 
 		expect(
-			await screen.findByText(/Select a Program and Event using the catalog pickers/i),
+			await screen.findByText(/Open an event from Programs & Events or the working-event picker/i),
 		).toBeInTheDocument();
 	});
 
@@ -373,8 +456,8 @@ describe('CheckInView', () => {
 		render(
 			<MemoryRouter initialEntries={['/events/check-in']}>
 				<ToastProvider>
-					<SessionProvider>
-						<CatalogProvider>
+					<ConfirmProvider>
+						<SessionProvider>
 							<Routes>
 								<Route path="/events" element={<div>Events list</div>} />
 								<Route
@@ -382,14 +465,13 @@ describe('CheckInView', () => {
 									element={
 										<>
 											<SessionHarness session={staffSession} />
-											<CatalogHarness />
 											<CheckInView />
 										</>
 									}
 								/>
 							</Routes>
-						</CatalogProvider>
-					</SessionProvider>
+						</SessionProvider>
+					</ConfirmProvider>
 				</ToastProvider>
 			</MemoryRouter>,
 		);
@@ -399,7 +481,7 @@ describe('CheckInView', () => {
 
 	it('renders hostile attendee data as text, never as markup (XSS guard)', async () => {
 		const hostile = '"><img src=x onerror=alert(1)>';
-		mockFetchSliceAttendees.mockResolvedValue({
+		mockFetchEventAttendees.mockResolvedValue({
 			attendees: [{ ...mockSliceAttendees[0]!, firstName: hostile, lastName: '' }],
 			page: 1,
 			pageSize: 200,
@@ -422,24 +504,26 @@ describe('CheckInView', () => {
 	it('keeps the check-in layout mounted while typing in search', async () => {
 		renderCheckIn();
 
+		await waitFor(() => {
+			expect(
+				screen.getByRole('heading', { name: 'Check-in' }),
+			).toBeInTheDocument();
+		});
 		expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
 
-		const callsBeforeSearch = mockFetchSliceAttendees.mock.calls.length;
+		const callsBeforeSearch = mockFetchEventAttendees.mock.calls.length;
 
 		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
 			target: { value: 'Jane' },
 		});
 
 		expect(screen.queryByText('Loading check-in…')).not.toBeInTheDocument();
-		expect(
-			screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
-		).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Start scanner' })).toBeInTheDocument();
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees.mock.calls.length).toBeGreaterThan(callsBeforeSearch);
+			expect(mockFetchEventAttendees.mock.calls.length).toBeGreaterThan(callsBeforeSearch);
 		});
-		expect(mockFetchSliceAttendees).toHaveBeenLastCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+		expect(mockFetchEventAttendees).toHaveBeenLastCalledWith('ev-mr-2026', {
 			q: 'Jane',
 			page: 1,
 			pageSize: 200,
@@ -447,7 +531,7 @@ describe('CheckInView', () => {
 	});
 
 	it('searches across the full registrant list via server-side q, not page-1 browse', async () => {
-		mockFetchSliceAttendees.mockResolvedValue({
+		mockFetchEventAttendees.mockResolvedValue({
 			attendees: [mockSliceAttendees[1]!],
 			page: 1,
 			pageSize: 200,
@@ -461,7 +545,7 @@ describe('CheckInView', () => {
 		});
 
 		await waitFor(() => {
-			expect(mockFetchSliceAttendees).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', {
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
 				q: 'Zimmerman',
 				page: 1,
 				pageSize: 200,
@@ -478,118 +562,162 @@ describe('CheckInView', () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByRole('heading', { name: 'Atlassian Event 2026 — Meeting Room — Check-in' }),
+				screen.getByRole('heading', { name: 'Check-in' }),
 			).toBeInTheDocument();
 		});
 
 		expect(document.body.scrollWidth).toBeLessThanOrEqual(document.body.clientWidth + 1);
 	});
 
-	describe('walk-in mode', () => {
-		it('shows mode switch and toggles to walk-in with staff hint and iframe', async () => {
+	it('sizes the scan/walk-in action buttons at >=44px', async () => {
+		renderCheckIn();
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Start scanner' })).toBeInTheDocument();
+		});
+
+		for (const button of [
+			screen.getByRole('button', { name: 'Start scanner' }),
+			screen.getByRole('button', { name: '+ Add walk-in' }),
+		]) {
+			expect(parseFloat(getComputedStyle(button).minHeight)).toBeGreaterThanOrEqual(44);
+		}
+	});
+
+	it('renders under the darkAurora theme with no hardcoded inline hex colors', async () => {
+		document.documentElement.setAttribute('data-theme', 'darkAurora');
+
+		try {
+			const { container } = renderCheckIn();
+
+			await waitFor(() => {
+				expect(
+					screen.getByRole('heading', { name: 'Check-in' }),
+				).toBeInTheDocument();
+			});
+
+			expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,8}/i);
+		} finally {
+			document.documentElement.removeAttribute('data-theme');
+		}
+	});
+
+	describe('walk-in registration modal', () => {
+		it('opens the walk-in modal with staff hint and iframe', async () => {
 			renderCheckIn(adminSession, { walkInFormUrl: WALK_IN_URL });
 
 			await waitFor(() => {
-				expect(screen.getByRole('radiogroup', { name: 'Desk mode' })).toBeInTheDocument();
+				expect(screen.getByRole('button', { name: '+ Add walk-in' })).toBeInTheDocument();
 			});
 
-			expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
+			fireEvent.click(screen.getByRole('button', { name: '+ Add walk-in' }));
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
-
-			expect(screen.queryByLabelText('Search attendees for check-in')).not.toBeInTheDocument();
-			expect(screen.queryByRole('button', { name: 'Simulate QR scan' })).not.toBeInTheDocument();
-			expect(
-				screen.getByText(/After the guest submits the HubSpot form/i),
-			).toBeInTheDocument();
+			const dialog = await screen.findByRole('dialog', { name: 'Walk-in registration' });
+			expect(dialog).toHaveTextContent(/will not appear on the roster immediately/i);
+			expect(dialog).toHaveTextContent(/does not check them in/i);
 
 			const iframe = screen.getByTitle('HubSpot walk-in form');
 			expect(iframe).toHaveAttribute('src', WALK_IN_URL);
+			expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
 		});
 
 		it('shows empty state when walk-in URL is not configured', async () => {
 			renderCheckIn(adminSession, { walkInFormUrl: null });
 
-			await waitFor(() => {
-				expect(screen.getByRole('radio', { name: 'Walk-in' })).toBeInTheDocument();
-			});
-
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
+			fireEvent.click(await screen.findByRole('button', { name: '+ Add walk-in' }));
 
 			expect(
-				screen.getByText(/No walk-in form URL is configured for this Event/i),
+				await screen.findByText(/No walk-in form URL is configured for this Event/i),
 			).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Open catalog Settings' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'Open Event Details' })).toBeInTheDocument();
 			expect(screen.queryByTitle('HubSpot walk-in form')).not.toBeInTheDocument();
 		});
 
 		it('blocks iframe when walk-in URL fails the HubSpot allowlist', async () => {
 			renderCheckIn(adminSession, { walkInFormUrl: 'https://evil.example.com/form' });
 
-			await waitFor(() => {
-				expect(screen.getByRole('radio', { name: 'Walk-in' })).toBeInTheDocument();
-			});
+			fireEvent.click(await screen.findByRole('button', { name: '+ Add walk-in' }));
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
-
-			expect(
-				screen.getByRole('alert'),
-			).toHaveTextContent('Walk-in form URL must be a HubSpot form URL');
+			expect(await screen.findByRole('alert')).toHaveTextContent(
+				'Walk-in form URL must be a HubSpot form URL',
+			);
 			expect(screen.queryByTitle('HubSpot walk-in form')).not.toBeInTheDocument();
 		});
 
-		it('unmounts the QR panel when switching to walk-in and restores it on return', async () => {
+		it('closing the walk-in modal unmounts the iframe', async () => {
 			renderCheckIn(adminSession, { walkInFormUrl: WALK_IN_URL });
 
-			await waitFor(() => {
-				expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
-			});
+			fireEvent.click(await screen.findByRole('button', { name: '+ Add walk-in' }));
+			await screen.findByTitle('HubSpot walk-in form');
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
-			expect(screen.queryByRole('button', { name: 'Simulate QR scan' })).not.toBeInTheDocument();
+			fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Check-in' }));
-			expect(screen.getByRole('button', { name: 'Simulate QR scan' })).toBeInTheDocument();
 			expect(screen.queryByTitle('HubSpot walk-in form')).not.toBeInTheDocument();
+			expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 		});
 
-		it('resets to check-in mode when catalog context changes', async () => {
-			render(
-				<MemoryRouter>
-					<ToastProvider>
-						<SessionProvider>
-							<CatalogProvider>
+		it('resets any open modal when the URL eventId changes', async () => {
+			mockFetchCatalog.mockResolvedValue({
+				events: [
+					{
+						id: 'ev-mr-2026',
+						programId: 'prog-atlassian-2026',
+						name: 'Meeting Room',
+						start: '2026-10-01T09:00:00.000Z',
+						status: 'active',
+						publishState: 'published',
+						archived: false,
+						walkInFormUrl: WALK_IN_URL,
+						capacity: 100,
+					},
+					{
+						id: 'ev-other-2026',
+						programId: 'prog-atlassian-2026',
+						name: 'Other Room',
+						start: '2026-10-02T09:00:00.000Z',
+						status: 'active',
+						publishState: 'published',
+						archived: false,
+						walkInFormUrl: null,
+						capacity: null,
+					},
+				],
+				programs: [{ id: 'prog-atlassian-2026', name: 'Atlassian Event 2026', archived: false }],
+			});
+
+			const router = createMemoryRouter(
+				[
+					{
+						path: '/events/:eventId/:module',
+						element: (
+							<>
 								<SessionHarness session={adminSession} />
-								<CatalogSelectionBridge />
-								<CatalogHarness walkInFormUrl={WALK_IN_URL} />
 								<CheckInView />
-							</CatalogProvider>
-						</SessionProvider>
-					</ToastProvider>
-				</MemoryRouter>,
+							</>
+						),
+					},
+				],
+				{ initialEntries: ['/events/ev-mr-2026/check-in'] },
 			);
 
-			await waitFor(() => {
-				expect(applyCatalogSelection).toBeTruthy();
-			});
+			render(
+				<ToastProvider>
+					<ConfirmProvider>
+						<SessionProvider>
+							<RouterProvider router={router} />
+						</SessionProvider>
+					</ConfirmProvider>
+				</ToastProvider>,
+			);
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
+			fireEvent.click(await screen.findByRole('button', { name: '+ Add walk-in' }));
 			expect(screen.getByTitle('HubSpot walk-in form')).toBeInTheDocument();
 
-			applyCatalogSelection?.({
-				programId: 'prog-atlassian-2026',
-				evId: 'ev-other-2026',
-				programName: 'Atlassian Event 2026',
-				eventName: 'Other Room',
-				walkInFormUrl: null,
-				capacity: null,
-			});
+			await router.navigate('/events/ev-other-2026/check-in');
 
 			await waitFor(() => {
-				expect(screen.getByLabelText('Search attendees for check-in')).toBeInTheDocument();
+				expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 			});
-			expect(screen.getByRole('radio', { name: 'Check-in' })).toHaveAttribute('aria-checked', 'true');
 			expect(screen.queryByTitle('HubSpot walk-in form')).not.toBeInTheDocument();
 		});
 	});
@@ -599,16 +727,16 @@ describe('CheckInView', () => {
 			renderCheckIn();
 
 			await waitFor(() => {
-				expect(mockFetchCapacityStatus).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026');
+				expect(mockFetchEventCapacityStatus).toHaveBeenCalledWith('ev-mr-2026');
 			});
-			expect(screen.getByLabelText('Room capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
+			expect(screen.getByLabelText('Live capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
 		});
 
 		it('refetches capacity after confirm check-in', async () => {
 			renderCheckIn();
 
 			await waitFor(() => {
-				expect(mockFetchCapacityStatus).toHaveBeenCalledTimes(1);
+				expect(mockFetchEventCapacityStatus).toHaveBeenCalledTimes(1);
 			});
 
 			fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
@@ -620,15 +748,12 @@ describe('CheckInView', () => {
 			});
 
 			fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
-
-			await waitFor(() => {
-				expect(screen.getByRole('button', { name: 'Confirm check-in' })).toBeInTheDocument();
-			});
+			await screen.findByRole('dialog', { name: 'Confirm check-in' });
 
 			fireEvent.click(screen.getByRole('button', { name: 'Confirm check-in' }));
 
 			await waitFor(() => {
-				expect(mockFetchCapacityStatus).toHaveBeenCalledTimes(2);
+				expect(mockFetchEventCapacityStatus).toHaveBeenCalledTimes(2);
 			});
 		});
 
@@ -642,13 +767,13 @@ describe('CheckInView', () => {
 			fireEvent.click(screen.getByLabelText('Record one departure'));
 
 			await waitFor(() => {
-				expect(mockAdjustCapacity).toHaveBeenCalledWith('prog-atlassian-2026', 'ev-mr-2026', 'down');
+				expect(mockAdjustCapacity).toHaveBeenCalledWith('ev-mr-2026', 'down');
 			});
-			expect(screen.getByLabelText('Room capacity: 0 of 100 on site, 0 percent full')).toBeInTheDocument();
+			expect(screen.getByLabelText('Live capacity: 0 of 100 on site, 0 percent full')).toBeInTheDocument();
 		});
 
 		it('shows count-only hint when Event capacity is unset', async () => {
-			mockFetchCapacityStatus.mockResolvedValue({
+			mockFetchEventCapacityStatus.mockResolvedValue({
 				programId: 'prog-atlassian-2026',
 				eventId: 'ev-mr-2026',
 				capacity: null,
@@ -661,24 +786,24 @@ describe('CheckInView', () => {
 			await waitFor(() => {
 				expect(screen.getByText('1 checked in on site')).toBeInTheDocument();
 			});
-			expect(screen.getByText(/Set Event capacity in Catalog admin/i)).toBeInTheDocument();
+			expect(screen.getByText(/Set Event capacity on Programs & Events/i)).toBeInTheDocument();
 			expect(screen.queryByLabelText('Record one departure')).not.toBeInTheDocument();
 		});
 
-		it('keeps capacity indicator visible in walk-in mode', async () => {
+		it('keeps the capacity indicator visible while the walk-in modal is open', async () => {
 			renderCheckIn(adminSession, { walkInFormUrl: WALK_IN_URL });
 
 			await waitFor(() => {
-				expect(screen.getByLabelText('Room capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
+				expect(screen.getByLabelText('Live capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
 			});
 
-			fireEvent.click(screen.getByRole('radio', { name: 'Walk-in' }));
+			fireEvent.click(screen.getByRole('button', { name: '+ Add walk-in' }));
 
-			expect(screen.getByLabelText('Room capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
+			expect(screen.getByLabelText('Live capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
 		});
 
 		it('shows capacity error with retry when snapshot load fails', async () => {
-			mockFetchCapacityStatus.mockRejectedValueOnce(new Error('Request failed (404)'));
+			mockFetchEventCapacityStatus.mockRejectedValueOnce(new Error('Request failed (404)'));
 			renderCheckIn();
 
 			await waitFor(() => {

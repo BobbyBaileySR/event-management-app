@@ -34,35 +34,79 @@ Most decisions here are already settled by the grilling session (2026-07-12) and
 - **Alternatives rejected**: native inputs as default (accepted only as a possible future touch-device fallback); a third-party date-picker library (new dependency, theming friction).
 - **Implication**: a11y is verified in Vitest (keyboard/ARIA) + the `docs/ui-a11y-audit.md` checklist, not deferred.
 
-## R-005 — Feasibility gates (Phase B blocker — `X-REDESIGN-001`) — OPEN
+## R-005 — Feasibility gates (Phase B blocker — `X-REDESIGN-001`) — CLEARED
 
 - **Decision**: Phase B does not start implementation until all four gates pass: (1) HubSpot frees **2 custom-object slots** (Program + Event); (2) workflows can **create/set custom-object associations** on the tier; (3) association-label model fits within **≤10 labels** per object pairing for `registered`/`checked-in`/`customer`/`partner`; (4) standard security write-gate (schema verified, RBAC, audit, validation + rate limit, handler order).
 - **Rationale**: The whole event-first data model depends on registration living on the Event ([ADR-007] Gates; [ADR-008] dependency).
-- **Status (updated 2026-07-13)**: **PARTIALLY UNBLOCKED** — HubSpot team created the two custom objects in **UAT**:
-  - **Gate #1 (slots) ✔** — Program (`2-65757052`, "Event Programs") + Event (`2-65757130`, "Event Items") exist as shells.
-  - **Gate #2 (workflow can set Contact↔Event association)**: **ASSUMED-PENDING-TEST** — must confirm with a test workflow before EMS writes (task added in tasks.md).
-  - **Gate #3 (label limit)** ✔ — Program→Event is a **1-to-many association, type ID `286`**; Contact↔Event needs only **2** labels (`registered`, `checked-in`), well under the ≤10 limit.
-  - **Gate #4 / `X-REDESIGN-004` (schema verify)**: **OPEN** — attributes + Contact↔Event association/labels not yet created; property API names are proposed in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) pending HubSpot creation + confirmation.
+- **Status (updated 2026-07-14): ALL FOUR GATES CLEARED**:
+  - **Gate #1 (slots) ✔** — Program (`2-65757052`, "Event Programs") + Event (`2-65757130`, "Event Items") exist in UAT.
+  - **Gate #2 (workflow can set Contact↔Event association) ✔ CONFIRMED 2026-07-14** — tested directly with HubSpot admin access. The only association-creation workflow action available on this portal is **"Create association when there are matching property values"** (not a direct record-picker) — proved working with a manual test workflow. This shapes the registration mechanism itself; see R-008 below.
+  - **Gate #3 (label limit) ✔** — Program→Event/Event→Program are a 1-to-many pairing (type IDs `286`/`287`); Event↔Contact is a **confirmed many-to-many** pairing (type IDs `288`/`289`) needing only **2** labels (`registered` type ID `290`, `checked-in` type ID `292`), well under the ≤10 limit.
+  - **Gate #4 / `X-REDESIGN-004` (schema verify) ✔ CONFIRMED 2026-07-14** — all properties + associations created and verified directly against live HubSpot UAT (one rename: proposed `public_registration_url` → confirmed `registration_form`). Full detail in [docs/hubspot-schema.md](../../docs/hubspot-schema.md). One follow-up remains: confirm whether the `290`/`292` label type IDs are directional (a reverse-direction ID may exist) before the adapter writes labeled associations.
   - **Target env = UAT.** Object/association IDs stored as **ScriptRunner Connect Parameters** (see R-012), not hardcoded.
 - **Alternatives rejected**: a third "registration" join object (needs a slot the account can't spare); association-level properties (not a real HubSpot feature — labels only, verified 2026-07-12).
+- **`X-REDESIGN-002` (`CustomObjectAdapter` design-it-twice, R-006) DECIDED 2026-07-14** — see R-006 below.
 
-## R-006 — `CustomObjectAdapter` interface (Phase B design-it-twice — `X-REDESIGN-002`) — OPEN
+## R-006 — `CustomObjectAdapter` interface (Phase B design-it-twice — `X-REDESIGN-002`) — DECIDED
 
-- **Decision**: The **storage model** is settled (association labels + per-registration Record Storage), but the **adapter interface shape** is not. Run a `codebase-design` design-it-twice before implementing, as the **second** implementation of the ADR-005 `RegistrationAdapter`/`CheckInAdapter` seam.
-- **Rationale**: Proves the seam is real and avoids coupling the new UI to a transitional data shape ([ADR-007] consequences).
+- **Decision**: Ran a `codebase-design` design-it-twice (4 parallel designs, each under a different constraint: minimize-interface, maximize-flexibility, optimize-for-real-common-caller, explicit-ports-and-adapters) as the **second** implementation of the ADR-005 `RegistrationAdapter`/`CheckInAdapter` seam. All 4 designs independently reached the same conclusion on the biggest structural question (catalog CRUD is a separate sibling adapter, not folded in) — treated as settled. On the remaining points of difference, synthesized a hybrid, detailed below.
+- **Rationale**: Proves the seam is real and avoids coupling the new UI to a transitional data shape ([ADR-007] consequences). Design-it-twice surfaced a real fact the naive first draft missed: only 2 of the 7 current callers of `RegistrationAdapter`/`CheckInAdapter` are check-in-desk callers — the other 5 (attendee list, capacity status, capacity adjust, and 2 email-campaign audience call sites) are list/count/audience-shaped, and 2 of those 5 were actively abusing a paginated list call (`listRegisteredAttendees({checkedIn:true, page:1, pageSize:1})`, reading only `.total`) to fake a count. The chosen design fixes that misuse directly rather than perpetuating it.
+
+**Decided interface shape:**
+
+```ts
+export interface CustomObjectAdapter {
+  readonly version: string; // bump from 'contact-workaround-v1'
+
+  listRegisteredAttendees(params: ListAttendeesParams): Promise<ListAttendeesResult>;
+  getContactSummary(contactId: string, eventId: string): Promise<ContactSummary | null>;
+  countAttendees(query: AttendeeQuery): Promise<number>;              // one count method — serves capacity status/adjust AND campaign audience-estimate
+  resolveAudience(query: AttendeeQuery): Promise<AudienceRecipient[]>; // materialized array, not streamed — see "rejected" below
+
+  confirmCheckIn(contactId: string, eventId: string, input: CheckInInput): Promise<CheckInStateResult>;
+  undoCheckIn(contactId: string, eventId: string): Promise<CheckInStateResult>;   // NEW capability, didn't exist before
+  removeAttendee(contactId: string, eventId: string): Promise<RemoveAttendeeResult>; // NEW capability; internally re-reads live HubSpot state before deleting — never trusts the Record Storage cache for this gate
+}
+
+export interface AttendeeQuery {
+  eventId: string;                    // no programId — Event is self-sufficient, Program is optional
+  checkedIn?: boolean;                // undefined = both states
+  excludeContactIds?: string[];       // generic exclusion set — see "rejected" below on why this isn't campaign-specific
+}
+```
+
+**Decisions made across the 4 designs, and why:**
+1. **No `query()`/`mutate()` mega-compression** (one design proposed 2 total entry points via TypeScript-overload discriminated unions). Rejected — more compressed on paper, but worse call-site readability/greppability than named methods (`confirmCheckIn` vs. `mutate({action:'check-in',...})`) for a small team maintaining route handlers; the interface is already small enough (7 methods) that further compression wasn't worth the ergonomics cost.
+2. **`resolveAudience` returns a materialized array, not an `AsyncIterable`/stream** (two designs proposed streaming). Rejected streaming as the default — one of those two designs itself flagged that ScriptRunner Connect's bounded-execution model may not support long-lived async generators, and this was never independently verified. Materialized array is the safe default; if audience sizes ever become a real problem, ordinary cursor-based pagination is a proven fallback on this platform, unverified streaming is not.
+3. **`excludeContactIds: string[]` (generic), not `excludeCampaignId` (campaign-aware)** — one design proposed baking "already received campaign X" logic directly into this adapter. Rejected (2 of 4 designs independently reached the same rejection): this adapter has no other reason to know what a "campaign" is; `DispatchAudience.ts`/`DispatchQueue.ts` compute the exclusion set from their own campaign-log domain and hand it over as plain contact IDs, keeping this adapter's job narrowly "resolve/count the registered set, minus this set."
+4. **One `countAttendees(query)` method, not two** (`checkedInCount` + `countAudience` separately, as one design proposed) — a single parameterized count call covers both the capacity use case (`{eventId, checkedIn:true}`) and the campaign-estimate use case (`{eventId, excludeContactIds}`) without adding a second near-duplicate method.
+5. **One `HubSpotAssociationPort`, not three split ports** (one design split HubSpot access into 3 separate port interfaces — associations, contact-read, event-read). Rejected the 3-way split as unnecessary construction-time wiring complexity — nothing in this codebase needs contact-property reads swapped independently of association reads; a single port covering the whole HubSpot dependency is right-sized.
+6. **No `PortalConfig`/multi-portal support** (one design built this in from the start). Rejected as premature — EMS only ever talks to one HubSpot portal per environment (UAT xor Prod), never two simultaneously; nothing in ADR-005/ADR-007 calls for multi-portal support. Revisit only if a real multi-portal requirement appears.
+7. **Adopted as the internal (behind-the-seam) implementation strategy, not part of the public interface**: a maintained checked-in counter in Record Storage, updated via compare-and-swap (`trySet`) on every `confirmCheckIn`/`undoCheckIn`/`removeAttendee`, with a recompute-from-HubSpot fallback if drift is detected — since HubSpot's v4 Associations API has no native cheap count endpoint, and capacity status/adjust are plausibly polled repeatedly during a live event. This is invisible to callers (`countAttendees` still just returns `Promise<number>`) and can change without any interface impact.
+8. **`removeAttendee` invariant, stated explicitly since it isn't visible in the types**: must re-read the association's live label directly from HubSpot immediately before deleting — never gate on the Record Storage cache, since that cache is documented as convenience-only, not the state source. This closes a stale-cache race where a `remove` could delete an association for someone who just checked in.
+9. **Catalog CRUD is a separate `CatalogAdapter`, unanimous across all 4 designs** — different caller population (catalog-admin screens vs. attendee/check-in/campaign screens), different RBAC surface (per `docs/rbac.md`), no caller ever needs both halves. The one real coupling point — archiving an Event must purge its per-registration Record Storage cache — is an explicit, typed call from `CatalogAdapter`'s archive path into a narrow purge method (e.g. `deleteAllForEvent(eventId)`) on the shared Record Storage cache port, not a merge of the two adapters. `Catalog.ts`'s existing validation/uniqueness/archive-cascade logic (in-process, Category 1) relocates into `CatalogAdapter`'s implementation as-is — that logic never depended on where the underlying object data lives.
+- **Alternatives rejected**: see points 1–6 above.
+- **Open, not blocking**: whether ScriptRunner Connect actually supports long-lived async-generator responses was never verified either way — moot for now since the decided shape doesn't require it, but worth confirming later if a future need for true streaming arises.
 - **Status**: **OPEN** — do before Phase B build; pairs `BE-REDESIGN-001`.
 
-## R-007 — Event-first routing shape (Phase B design-it-twice — `X-REDESIGN-003`) — OPEN
+## R-007 — Event-first routing shape (Phase B design-it-twice — `X-REDESIGN-003`) — DECIDED
 
-- **Decision**: Move from `programs/{programId}/events/{eventId}/…` to **event-scoped routes** (`events/{eventId}/…`). Program membership is a **HubSpot association (ID `286`)** resolved by the adapter, **not** a route param or `programId` property. Breaking contract change; update `api-contract.md` + `rbac.md` + `RouteGuard` in the **same change**. Every Event-scoped operation must work with no Program association present.
-- **Rationale**: Standalone Events + event-first navigation ([ADR-008] §2–§4).
-- **Status**: **OPEN** — design-it-twice first; captured provisionally in [contracts/event-first-routes-api.md](./contracts/event-first-routes-api.md).
+- **Decision**: Move from `programs/{programId}/events/{eventId}/…` to **event-scoped routes** (`events/{eventId}/…`). Program membership is a **HubSpot association (ID `286`)** resolved by the adapter, **not** a route param or `programId` property. Breaking contract change; update `api-contract.md` + `rbac.md` + `RouteGuard` in the **same change**. Every Event-scoped operation must work with no Program association present. `catalog` reshapes from a Program→Event tree to a flat `events[]` (each carrying an optional `programId`) + `programs[]` for grouping/filter UI only.
+- **Rationale**: Standalone Events + event-first navigation ([ADR-008] §2–§4). Confirmed against the current codebase: `events/:eventId/audit` already proves this exact shape works alongside the Program-scoped Slice 1 routes. More decisively, today's Slice 1 handlers call `resolveCatalogEvent(programId, eventId)` because Plan-C Record Storage nests Events under their Program — that lookup constraint disappears once `CustomObjectAdapter` makes Events root-level HubSpot objects addressable by id alone, so event-scoped routing isn't just a URL preference, it's what the Phase B data model actually enables.
+- **Alternative considered (rejected)**: keep `programs/{programId}/events/{eventId}/…` with an optional/sentinel `{programId}` segment (e.g. `programs/_/events/…`). Rejected — needs new "optional path segment" capability the router doesn't have today, invents a sentinel-collision risk, and keeps Program in the URL as a structural parent, working against ADR-008's actual decision rather than expressing it.
+- **Status**: **DECIDED 2026-07-13** — full target route table + `catalog` reshape in [contracts/event-first-routes-api.md](./contracts/event-first-routes-api.md). Left open (not part of this decision): whether `checkin/scan` collapses into `checkin` — a Phase B check-in-handler question (T052/T054), not a routing-shape one.
 
 ## R-008 — Registration & check-in write surface (Phase B)
 
-- **Decision**: Registration = a Contact↔Event association; labels `registered`/`checked-in`/`customer`/`partner`. EMS write surface = **check-in** (flip `registered`→`checked-in`, write cache, audit), **undo check-in**, **remove attendee** (delete association; blocked while `checked-in`), **catalog CRUD**. Public + walk-in registration are **HubSpot-workflow-side** (EMS gains no register-attendee write). All check-ins flow through the audited EMS path.
+- **Decision**: Registration = a Contact↔Event association; labels `registered`/`checked-in` (`customer`/`partner` stay on the existing Parts-Attended contact fields, not association labels). EMS write surface = **check-in** (flip `registered`→`checked-in`, write cache, audit), **undo check-in**, **remove attendee** (delete association; blocked while `checked-in`), **catalog CRUD**. Public + walk-in registration are **HubSpot-workflow-side** (EMS gains no register-attendee write). All check-ins flow through the audited EMS path.
 - **Rationale**: One class of check-in with one governance guarantee; no HubSpot-only writes bypassing audit ([ADR-007] §2, §4, §6).
 - **Alternatives rejected**: EMS-side registration writes (breaks the single audited path); global attendance Contact property (breaks when a Contact attends >1 Event).
+- **Mechanism confirmed 2026-07-14** — the registration-side workflow can only create associations via **"matching property values"** (no direct record-picker action on this portal), so registration requires a shared key on both sides:
+  - Contact property `ems_registration_match_key` (single-line text, internal/hidden group) — set by the registration form submission at the time of Event-specific submission; cleared back to blank by the same workflow immediately after the association is created (one-shot trigger, not persistent state).
+  - Event Items property `registration_slug` (single-line text) — stable, human-readable per-Event identifier the workflow matches against.
+  - The workflow's enrollment trigger must allow **re-enrollment** so a Contact who registers for Event A can trigger it again later for Event B — the durable "registered for which events" record is the accumulated set of labeled associations, never this transient property.
+  - Full detail: [docs/hubspot-schema.md](../../docs/hubspot-schema.md) § *Registration match-key mechanism*.
+  - **Still open**: how the registration form itself gets `registration_slug` into `ems_registration_match_key` at submission time (effectively a hidden/pre-filled field per Event's registration page) — not yet designed. Also open: who populates `registration_slug` on new Events — manual today, should be auto-generated by EMS's Catalog Admin write path once it exists (Phase B build item, not yet scoped as its own task).
 
 ## R-009 — Per-registration operational detail storage (Phase B)
 
@@ -82,8 +126,9 @@ Most decisions here are already settled by the grilling session (2026-07-12) and
 
 ## R-012 — HubSpot object/association IDs via ScriptRunner Connect Parameters (Phase B)
 
-- **Decision**: Store **portal-specific** HubSpot object type IDs and association type/label IDs in **ScriptRunner Connect Parameters** (`HUBSPOT_OBJECT_TYPE_PROGRAM`, `HUBSPOT_OBJECT_TYPE_EVENT`, `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`, `HUBSPOT_ASSOC_CONTACT_EVENT`, `HUBSPOT_ASSOC_LABEL_REGISTERED`, `HUBSPOT_ASSOC_LABEL_CHECKED_IN`). The `CustomObjectAdapter` reads them at runtime; stable property **API names** + label conventions live in code (`HubSpotSchema.ts`) + [docs/hubspot-schema.md](../../docs/hubspot-schema.md). Never hardcode IDs.
+- **Decision**: Store **portal-specific** HubSpot object type IDs and association type/label IDs in **ScriptRunner Connect Parameters** (`HUBSPOT_OBJECT_TYPE_PROGRAM`, `HUBSPOT_OBJECT_TYPE_EVENT`, `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`, `HUBSPOT_ASSOC_EVENT_TO_PROGRAM`, `HUBSPOT_ASSOC_EVENT_TO_CONTACT`, `HUBSPOT_ASSOC_CONTACT_TO_EVENT`, `HUBSPOT_ASSOC_LABEL_REGISTERED`, `HUBSPOT_ASSOC_LABEL_CHECKED_IN`). The `CustomObjectAdapter` reads them at runtime; stable property **API names** + label conventions live in code (`HubSpotSchema.ts`) + [docs/hubspot-schema.md](../../docs/hubspot-schema.md). Never hardcode IDs.
 - **Rationale**: IDs differ between UAT and Prod; Parameters give env portability with no code change, matching how existing secrets/config are handled ([ADR-005] seam; hubspot-schema.md).
+- **Updated 2026-07-14**: expanded from one assumed bidirectional `HUBSPOT_ASSOC_CONTACT_EVENT` parameter to four directional parameters (`_PROGRAM_TO_EVENT`/`_EVENT_TO_PROGRAM`/`_EVENT_TO_CONTACT`/`_CONTACT_TO_EVENT`) once real values showed each direction gets its own type ID (`286`/`287`/`288`/`289`). All values confirmed in UAT; see [docs/hubspot-schema.md](../../docs/hubspot-schema.md) for the current table, including the still-open question of whether the `290`/`292` label IDs are directional too.
 - **Alternatives rejected**: hardcoding IDs (breaks UAT→Prod promotion); a checked-in config file (leaks env-specific IDs into VCS).
 
 ---

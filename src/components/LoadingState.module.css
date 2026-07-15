@@ -29,8 +29,8 @@
 .spinner {
 	width: 40px;
 	height: 40px;
-	border: 3px solid var(--color-border);
-	border-top-color: var(--color-orange);
+	border: 3px solid var(--border);
+	border-top-color: var(--accent);
 	border-radius: 50%;
 	animation: loadingSpin 0.8s linear infinite;
 	flex-shrink: 0;
@@ -44,28 +44,32 @@
 
 .message {
 	margin: 0;
-	color: var(--color-muted);
+	color: var(--muted);
 	font-size: 0.95rem;
+}
+
+.didYouKnowBox {
+	max-width: 32rem;
+	padding: 16px 20px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	background: var(--panel);
 }
 
 .didYouKnow {
 	margin: 0;
-	max-width: 36rem;
-	color: var(--color-muted);
+	color: var(--muted);
 	font-size: 0.875rem;
 	line-height: 1.5;
 }
 
-@media (min-width: 901px) {
-	.didYouKnow {
-		max-width: 54rem;
-		font-size: 1.3125rem;
-	}
-}
-
 .didYouKnowLabel {
-	color: var(--color-denim);
-	font-weight: 600;
+	margin: 0 0 4px;
+	color: var(--accent);
+	font-weight: 700;
+	font-size: 0.75rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 }
 
 .skeleton {
@@ -106,9 +110,9 @@
 .skeletonShimmer {
 	background: linear-gradient(
 		90deg,
-		var(--color-ice) 0%,
-		rgba(11, 5, 115, 0.08) 50%,
-		var(--color-ice) 100%
+		var(--ice) 0%,
+		color-mix(in srgb, var(--text) 8%, transparent) 50%,
+		var(--ice) 100%
 	);
 	background-size: 200% 100%;
 	animation: loadingShimmer 1.4s ease-in-out infinite;
@@ -146,11 +150,11 @@
 	}
 
 	.spinner {
-		border-top-color: var(--color-orange);
+		border-top-color: var(--accent);
 		opacity: 0.85;
 	}
 
 	.skeletonShimmer {
-		background: var(--color-ice);
+		background: var(--ice);
 	}
 }

@@ -10,6 +10,8 @@ interface CapacityBarProps {
 	checkedInCount?: number;
 	onAdjust?: (direction: AdjustCapacityDirection) => void;
 	adjusting?: boolean;
+	/** Net manual +/-1 corrections applied so far (live variant only) — display only, no reset action yet (FE-REDESIGN-017). */
+	manualAdjustmentCount?: number;
 }
 
 const TIER_LABELS: Record<CapacityTier, string | null> = {
@@ -27,6 +29,7 @@ export function CapacityBar({
 	checkedInCount,
 	onAdjust,
 	adjusting = false,
+	manualAdjustmentCount,
 }: CapacityBarProps) {
 	const resolvedTier = tier ?? (variant === 'live' ? getCapacityTier(value, capacity) : 'normal');
 	const pct = variant === 'live' ? getOccupancyPercent(value, capacity) : capacity > 0 ? Math.min(100, Math.round((value / capacity) * 100)) : 0;
@@ -37,24 +40,52 @@ export function CapacityBar({
 	const disableDown = value <= 0 || adjusting;
 	const disableUp = checkedInCount !== undefined && value >= checkedInCount;
 	const isLive = variant === 'live';
+	const remaining = Math.max(0, capacity - value);
 
 	return (
 		<div
 			className={`${styles.bar} ${isLive ? styles.live : ''} ${isLive ? styles[`tier-${resolvedTier}`] : ''}`}
-			aria-label={isLive ? `Room capacity: ${value} of ${capacity} on site, ${pct} percent full` : undefined}
+			aria-label={isLive ? `Live capacity: ${value} of ${capacity} on site, ${pct} percent full` : undefined}
 		>
 			{isLive ? (
 				<>
-					<p className={styles.liveLabel}>Room capacity</p>
+					<p className={styles.liveLabel}>Live capacity</p>
 					<div className={styles.liveHeader}>
-						<p className={styles.liveCount}>
-							<span className={styles.liveValue}>{value}</span>
-							<span className={styles.liveMeta}>
-								{' '}
-								/ {capacity} {unitLabel}
-							</span>
-						</p>
-						<span className={styles.livePct}>{pct}%</span>
+						<div className={styles.liveCountBlock}>
+							<p className={styles.liveCount}>
+								<span className={styles.liveValue}>{value}</span>
+								<span className={styles.liveMeta}> / {capacity}</span>
+							</p>
+							{manualAdjustmentCount ? (
+								<p className={styles.adjustmentNote}>Includes manual adjustment of {manualAdjustmentCount}</p>
+							) : null}
+						</div>
+						{showControls ? (
+							<div className={styles.controls} aria-label="Live attendance adjustment">
+								<button
+									type="button"
+									className={styles.adjustBtn}
+									disabled={disableDown}
+									onClick={() => onAdjust('down')}
+									aria-label="Record one departure"
+								>
+									−
+								</button>
+								<div className={styles.adjustHint}>
+									<p>Adjust count</p>
+									<p>for walk-outs</p>
+								</div>
+								<button
+									type="button"
+									className={styles.adjustBtn}
+									disabled={disableUp}
+									onClick={() => onAdjust('up')}
+									aria-label="Correct one departure"
+								>
+									+
+								</button>
+							</div>
+						) : null}
 					</div>
 					{tierLabel ? <p className={styles.tierLabel}>{tierLabel}</p> : null}
 				</>
@@ -71,30 +102,7 @@ export function CapacityBar({
 			<div className={styles.track}>
 				<div className={styles.fill} style={{ width: `${fillPct}%` }} />
 			</div>
-			{showControls ? (
-				<div className={styles.controls} aria-label="Live attendance adjustment">
-					<button
-						type="button"
-						className={`btn btn-outline ${styles.adjustBtn}`}
-						disabled={disableDown}
-						onClick={() => onAdjust('down')}
-						aria-label="Record one departure"
-					>
-						<span className={styles.adjustBtnSymbol}>−1</span>
-						<span className={styles.adjustBtnHint}>Left</span>
-					</button>
-					<button
-						type="button"
-						className={`btn btn-outline ${styles.adjustBtn}`}
-						disabled={disableUp}
-						onClick={() => onAdjust('up')}
-						aria-label="Correct one departure"
-					>
-						<span className={styles.adjustBtnSymbol}>+1</span>
-						<span className={styles.adjustBtnHint}>Correction</span>
-					</button>
-				</div>
-			) : null}
+			{!isLive ? <p className={styles.remaining}>{remaining} spots remaining</p> : null}
 		</div>
 	);
 }

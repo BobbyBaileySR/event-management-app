@@ -58,4 +58,52 @@ describe('SelectPicker', () => {
 		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 		expect(onChange).not.toHaveBeenCalled();
 	});
+
+	it('exposes aria-haspopup/aria-expanded on the trigger and marks the selected option (T035)', () => {
+		render(<Harness />);
+		const trigger = screen.getByRole('button', { name: /Fruit: Option A/i });
+		expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+		expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+		fireEvent.click(trigger);
+		expect(trigger).toHaveAttribute('aria-expanded', 'true');
+		expect(screen.getByRole('option', { name: 'Option A' })).toHaveAttribute('aria-selected', 'true');
+		expect(screen.getByRole('option', { name: 'Option B' })).toHaveAttribute('aria-selected', 'false');
+	});
+
+	it('tracks the keyboard-active option via aria-activedescendant, including Home/End (T035)', () => {
+		render(<Harness />);
+		fireEvent.click(screen.getByRole('button', { name: /Fruit/i }));
+		const listbox = screen.getByRole('listbox');
+
+		fireEvent.keyDown(listbox, { key: 'End' });
+		expect(listbox).toHaveAttribute('aria-activedescendant', 'fruit-option-2');
+
+		fireEvent.keyDown(listbox, { key: 'ArrowUp' });
+		expect(listbox).toHaveAttribute('aria-activedescendant', 'fruit-option-1');
+
+		fireEvent.keyDown(listbox, { key: 'Home' });
+		expect(listbox).toHaveAttribute('aria-activedescendant', 'fruit-option-0');
+	});
+
+	it('does not open when disabled', () => {
+		render(
+			<SelectPicker id="fruit" label="Fruit" value="a" placeholder="Select…" options={OPTIONS} disabled onChange={vi.fn()} />,
+		);
+		fireEvent.click(screen.getByRole('button', { name: /Fruit/i }));
+		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+	});
+
+	it('Tab closes the menu without forcing focus back onto the trigger (T035)', () => {
+		render(<Harness />);
+		const trigger = screen.getByRole('button', { name: /Fruit/i });
+		fireEvent.click(trigger);
+		const listbox = screen.getByRole('listbox');
+		const focusSpy = vi.spyOn(trigger, 'focus');
+
+		fireEvent.keyDown(listbox, { key: 'Tab' });
+
+		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+		expect(focusSpy).not.toHaveBeenCalled();
+	});
 });

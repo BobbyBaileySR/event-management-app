@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CONFIG } from '../config';
 import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
 import { useSession } from '../state/appState';
@@ -24,6 +23,9 @@ export interface UseThemeResult {
  * (research R-002 / data-model.md). Celebration is always re-validated server-side — the
  * stored/requested value is never trusted for gating; a rejected or failed write falls back
  * to Aurora, matching the `user/prefs` contract.
+ *
+ * The one-time login toast is independent of theme: it shows when prefs return a non-null
+ * `celebrationToastMessage` (toast-list + message Param), for any active theme.
  */
 export function useTheme(): UseThemeResult {
 	const data = useDataService();
@@ -48,8 +50,8 @@ export function useTheme(): UseThemeResult {
 				setCelebrationAllowed(pref.celebrationAllowed);
 				applyThemeAttribute(pref.theme);
 
-				const message = CONFIG.CELEBRATION_TOAST_MESSAGE.trim();
-				if (pref.theme === 'celebration' && message && !welcomeToastShown.current) {
+				const message = pref.celebrationToastMessage?.trim() ?? '';
+				if (message && !welcomeToastShown.current) {
 					showToast(message, 'success');
 					welcomeToastShown.current = true;
 				}

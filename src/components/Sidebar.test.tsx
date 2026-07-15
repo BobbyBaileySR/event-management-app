@@ -1,13 +1,19 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { SessionProvider, useSession } from '../state/appState';
-import { CatalogProvider, useCatalogSelection } from '../state/catalogContext';
 import type { Session } from '../types';
 
 const mockNavigate = vi.fn();
+const mockFetchCatalog = vi.fn().mockResolvedValue({
+	events: [
+		{ id: 'evt-1', programId: null, name: 'London Q3 Summit', start: '2026-10-15T09:00:00.000Z', status: 'active', publishState: 'published', archived: false },
+		{ id: 'evt-2', programId: null, name: 'Dublin Roadshow', start: '2026-11-02T09:00:00.000Z', status: 'active', publishState: 'published', archived: false },
+	],
+	programs: [],
+});
 
 vi.mock('react-router-dom', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('react-router-dom')>();
@@ -16,6 +22,12 @@ vi.mock('react-router-dom', async (importOriginal) => {
 		useNavigate: () => mockNavigate,
 	};
 });
+
+vi.mock('../hooks/useDataService', () => ({
+	useDataService: () => ({
+		fetchCatalog: mockFetchCatalog,
+	}),
+}));
 
 const adminSession: Session = {
 	token: 't',
@@ -39,69 +51,53 @@ function SessionHarness({ session }: { session: Session }) {
 	return null;
 }
 
-function CatalogHarness({
-	programId,
-	evId,
-	programName,
-	eventName,
-}: {
-	programId?: string;
-	evId?: string;
-	programName?: string;
-	eventName?: string;
-}) {
-	const { setSelection } = useCatalogSelection();
-	useEffect(() => {
-		if (programId && evId) {
-			setSelection({
-				programId,
-				evId,
-				programName: programName ?? 'Atlassian Event 2026',
-				eventName: eventName ?? 'Meeting Room',
-				walkInFormUrl: null,
-				capacity: null,
-			});
-		}
-	}, [programId, evId, programName, eventName, setSelection]);
-	return null;
-}
-
 function renderSidebar({
 	session = adminSession,
 	path = '/events',
-	catalog,
+	eventName = null,
 }: {
 	session?: Session;
 	path?: string;
-	catalog?: { programId: string; evId: string; programName?: string; eventName?: string };
+	eventName?: string | null;
 } = {}) {
+	const sidebar = (
+		<Sidebar
+			onLogout={vi.fn()}
+			eventName={eventName}
+			theme="aurora"
+			celebrationAllowed={false}
+			onThemeChange={vi.fn()}
+		/>
+	);
 	return render(
 		<MemoryRouter initialEntries={[path]}>
 			<SessionProvider>
-				<CatalogProvider>
-					<SessionHarness session={session} />
-					{catalog ? <CatalogHarness {...catalog} /> : null}
-					<Sidebar onLogout={vi.fn()} theme="aurora" celebrationAllowed={false} onThemeChange={vi.fn()} />
-				</CatalogProvider>
+				<SessionHarness session={session} />
+				<Routes>
+					<Route path="/events/:eventId/:module" element={sidebar} />
+					<Route path="/events/:eventId" element={sidebar} />
+					<Route path="*" element={sidebar} />
+				</Routes>
 			</SessionProvider>
 		</MemoryRouter>,
 	);
 }
 
-describe('Sidebar slice links', () => {
+describe('Sidebar navigation', () => {
 	beforeEach(() => {
 		mockNavigate.mockReset();
 	});
 
-	it('shows Attendees, Check-in, and Email for admin when catalog Program + Event are selected', () => {
+	it('shows event-scoped Registered Attendees, Check-in, and Email when on an event route', () => {
 		renderSidebar({
-			catalog: { programId: 'prog-1', evId: 'ev-1' },
+			path: '/events/ev-1',
+			eventName: 'Meeting Room',
 		});
 
-		expect(screen.getByRole('button', { name: /Attendees/i })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /Check-in/i })).toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /Email/i })).toBeInTheDocument();
-		expect(screen.getByText('Atlassian Event 2026 — Meeting Room')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Registered Attendees$/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Check-in$/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Email$/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Meeting Room/i })).toBeInTheDocument();
 	});
 
 	it('shows Audit log for admin users', () => {
@@ -123,39 +119,202 @@ describe('Sidebar slice links', () => {
 		expect(mockNavigate).toHaveBeenCalledWith('/audit');
 	});
 
-	it('hides Attendees and Check-in for admin when catalog selection is incomplete', () => {
+	it('shows event modules for admin, muted/disabled, when no eventId is in the URL (007 event-first)', () => {
 		renderSidebar({ session: adminSession });
 
-		expect(screen.queryByRole('button', { name: /Attendees/i })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Check-in/i })).not.toBeInTheDocument();
-		expect(screen.getByRole('button', { name: /Catalog admin/i })).toBeInTheDocument();
+		const attendees = screen.getByRole('button', { name: /^Registered Attendees$/i });
+		const checkIn = screen.getByRole('button', { name: /^Check-in$/i });
+		const email = screen.getByRole('button', { name: /^Email$/i });
+		const eventDetails = screen.getByRole('button', { name: /^Event Details$/i });
+
+		for (const button of [eventDetails, attendees, checkIn, email]) {
+			expect(button).toBeDisabled();
+		}
+		expect(screen.getByRole('button', { name: /Programs & Events/i })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Catalog admin/i })).not.toBeInTheDocument();
 	});
 
-	it('hides catalog admin, slice links, and All Events for non-admin users (FR-013: shell is admin-only for now)', () => {
+	it('does not navigate when a disabled (no working event) module is clicked', () => {
+		renderSidebar({ session: adminSession });
+
+		fireEvent.click(screen.getByRole('button', { name: /^Registered Attendees$/i }));
+		expect(mockNavigate).not.toHaveBeenCalled();
+	});
+
+	it('hides Programs & Events and event modules for non-admin users (FR-013)', () => {
 		renderSidebar({
 			session: staffSession,
-			catalog: { programId: 'prog-1', evId: 'ev-1' },
+			path: '/events/ev-1',
+			eventName: 'Meeting Room',
 		});
 
 		expect(screen.queryByRole('button', { name: /Catalog admin/i })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Attendees/i })).not.toBeInTheDocument();
-		expect(screen.queryByRole('button', { name: /Check-in/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Programs & Events/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^Registered Attendees$/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^Check-in$/i })).not.toBeInTheDocument();
+	});
+
+	it('labels the events nav item Programs & Events and omits Catalog admin (T076)', () => {
+		renderSidebar({ session: adminSession });
+
+		expect(screen.getByRole('button', { name: /Programs & Events/i })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Catalog admin/i })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /All Events/i })).not.toBeInTheDocument();
 	});
 
-	it('navigates to slice module paths when Attendees, Check-in, or Email is clicked', () => {
+	it('navigates to event-scoped module paths when Registered Attendees, Check-in, or Email is clicked', () => {
 		renderSidebar({
-			path: '/events/attendees',
-			catalog: { programId: 'prog-1', evId: 'ev-1' },
+			path: '/events/ev-1',
+			eventName: 'Meeting Room',
 		});
 
-		fireEvent.click(screen.getByRole('button', { name: /Email/i }));
-		expect(mockNavigate).toHaveBeenCalledWith('/events/email');
+		fireEvent.click(screen.getByRole('button', { name: /^Email$/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/events/ev-1/email');
 
-		fireEvent.click(screen.getByRole('button', { name: /Check-in/i }));
-		expect(mockNavigate).toHaveBeenCalledWith('/events/check-in');
+		fireEvent.click(screen.getByRole('button', { name: /^Check-in$/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/events/ev-1/check-in');
 
-		fireEvent.click(screen.getByRole('button', { name: /Attendees/i }));
-		expect(mockNavigate).toHaveBeenCalledWith('/events/attendees');
+		fireEvent.click(screen.getByRole('button', { name: /^Registered Attendees$/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/events/ev-1/attendees');
+	});
+
+	it('shows Overview for admin and navigates to /overview when clicked', () => {
+		renderSidebar({ session: adminSession });
+
+		fireEvent.click(screen.getByRole('button', { name: /Overview/i }));
+		expect(mockNavigate).toHaveBeenCalledWith('/overview');
+	});
+
+	it('hides Overview for non-admin users', () => {
+		renderSidebar({ session: staffSession });
+
+		expect(screen.queryByRole('button', { name: /Overview/i })).not.toBeInTheDocument();
+	});
+});
+
+describe('Sidebar desktop nav styling (design_handoff 2)', () => {
+	it('renders the accessible name without the decorative icon glyph text', () => {
+		renderSidebar({ session: adminSession });
+
+		expect(screen.getByRole('button', { name: 'Overview' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Programs & Events' })).toBeInTheDocument();
+	});
+
+	it('hides the decorative nav icon glyph at desktop widths, keeping only label + accent bar', () => {
+		renderSidebar({ session: adminSession });
+
+		const overviewButton = screen.getByRole('button', { name: 'Overview' });
+		const icon = overviewButton.querySelector('[class*="navIcon"]');
+		expect(icon).not.toBeNull();
+		expect(getComputedStyle(icon as Element).display).toBe('none');
+	});
+
+	it('uses the semantic accent token (not a hardcoded cool/blue leftover) for the active nav item', () => {
+		renderSidebar({ session: adminSession, path: '/events' });
+
+		const eventsButton = screen.getByRole('button', { name: 'Programs & Events' });
+		expect(getComputedStyle(eventsButton).color).toBe('var(--accent)');
+	});
+
+	it('gives enabled nav items the dark --text color and disabled ones the lighter --muted color', () => {
+		renderSidebar({ session: adminSession });
+
+		const overviewButton = screen.getByRole('button', { name: 'Overview' });
+		expect(getComputedStyle(overviewButton).color).toBe('var(--text)');
+
+		const attendeesButton = screen.getByRole('button', { name: /^Registered Attendees$/i });
+		expect(attendeesButton).toBeDisabled();
+		expect(getComputedStyle(attendeesButton).color).toBe('var(--muted)');
+	});
+
+	it('insets the footer divider (Audit log ↔ Theme) to match the other section dividers, not full-width', () => {
+		const { container } = renderSidebar({ session: adminSession });
+
+		const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+		const footer = container.querySelector('[class*="footer"]') as HTMLElement;
+		expect(footer).not.toBeNull();
+
+		// The other dividers (`.section`) are inset by `.nav`'s own side padding; `.footer`
+		// is a sibling of `.nav`, not a child of it, so it needs matching margin to line up
+		// instead of spanning full sidebar width.
+		expect(getComputedStyle(footer).marginLeft).toBe(getComputedStyle(nav).paddingLeft);
+		expect(getComputedStyle(footer).marginRight).toBe(getComputedStyle(nav).paddingRight);
+	});
+
+	it('does not render a redundant working-event label above the module list — the picker already shows it', () => {
+		renderSidebar({ session: adminSession, path: '/events/ev-1', eventName: 'Meeting Room' });
+
+		expect(screen.queryByText('Selected event')).not.toBeInTheDocument();
+		// "Meeting Room" should appear exactly once — in the working-event picker trigger —
+		// not a second time in a duplicate section label above the module list.
+		expect(screen.getAllByText('Meeting Room')).toHaveLength(1);
+	});
+});
+
+describe('Sidebar event modules (T080)', () => {
+	beforeEach(() => {
+		mockNavigate.mockReset();
+	});
+
+	it('omits Analytics, Agenda, and Settings from the working-event module list', () => {
+		renderSidebar({ session: adminSession, path: '/events/evt-1' });
+
+		expect(screen.getByRole('button', { name: /Event Details/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Registered Attendees$/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Check-in$/i })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /^Email$/i })).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Analytics/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /Agenda/i })).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: /^Settings$/i })).not.toBeInTheDocument();
+	});
+});
+
+describe('Sidebar working-event picker', () => {
+	beforeEach(() => {
+		mockNavigate.mockReset();
+		mockFetchCatalog.mockClear();
+	});
+
+	it('shows a placeholder when no event is selected', () => {
+		renderSidebar({ session: adminSession });
+
+		expect(screen.getByRole('button', { name: /Select an event/i })).toBeInTheDocument();
+	});
+
+	it('opens the search popover, filters matches, and navigates on selection', async () => {
+		renderSidebar({ session: adminSession });
+
+		fireEvent.click(screen.getByRole('button', { name: /Select an event/i }));
+
+		await waitFor(() => {
+			expect(screen.getByPlaceholderText('Type to search events…')).toBeInTheDocument();
+		});
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'London Q3 Summit' })).toBeInTheDocument();
+		});
+
+		fireEvent.change(screen.getByPlaceholderText('Type to search events…'), { target: { value: 'dublin' } });
+
+		expect(screen.queryByRole('button', { name: 'London Q3 Summit' })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Dublin Roadshow' })).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Dublin Roadshow' }));
+		expect(mockNavigate).toHaveBeenCalledWith('/events/evt-2');
+	});
+
+	it('renders a hostile event name as text, never as markup (XSS guard)', async () => {
+		const hostile = '"><img src=x onerror=alert(1)>';
+		mockFetchCatalog.mockResolvedValueOnce({
+			events: [{ id: 'evt-x', programId: null, name: hostile, start: '2026-10-15T09:00:00.000Z', status: 'active', publishState: 'published', archived: false }],
+			programs: [],
+		});
+
+		renderSidebar({ session: adminSession });
+		fireEvent.click(screen.getByRole('button', { name: /Select an event/i }));
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: hostile })).toBeInTheDocument();
+		});
+		expect(document.querySelector('img')).toBeNull();
 	});
 });

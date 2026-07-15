@@ -31,6 +31,26 @@ export function buildTimeSlot(hour: number, minute: number): string {
 	return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+/** Operator-facing schedule label, e.g. `Mar 12, 2026 at 9:00 AM`. */
+export function formatScheduleSlotLabel(date: string, hour: number, minute: number): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+	if (!match) {
+		return '';
+	}
+	const year = Number(match[1]);
+	const month = Number(match[2]);
+	const day = Number(match[3]);
+	const datePart = new Date(year, month - 1, day).toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+	const period = hour < 12 ? 'AM' : 'PM';
+	const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+	const timePart = `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
+	return `${datePart} at ${timePart}`;
+}
+
 export interface ScheduleSlot {
 	/** Calendar date in the default timezone, `YYYY-MM-DD`. */
 	date: string;

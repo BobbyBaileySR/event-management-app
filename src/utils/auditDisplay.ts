@@ -61,3 +61,54 @@ export function formatAuditResource(entry: AuditLogEntry): string {
 	const parts = [entry.resourceType, entry.resourceId].filter(Boolean);
 	return parts.join(' / ');
 }
+
+/** Known audit actions per docs/api-contract.md — plain-language phrase for the feed headline. */
+const ACTION_PHRASES: Record<string, string> = {
+	'auth.exchange': 'signed in',
+	'auth.logout': 'signed out',
+	'catalog.program.create': 'created a program',
+	'catalog.program.update': 'updated a program',
+	'catalog.event.create': 'created an event',
+	'catalog.event.update': 'updated an event',
+	'attendees.list': 'viewed the attendee list',
+	'checkin.scan': 'scanned a ticket',
+	'checkin.confirm': 'checked in an attendee',
+	'checkin.undo': 'undid a check-in',
+	'attendee.remove': 'removed an attendee',
+	'capacity.adjust': 'adjusted live capacity',
+	'email.dispatch.create': 'created an email dispatch',
+	'email.dispatch.update': 'updated an email dispatch',
+	'email.dispatch.cancel': 'cancelled an email dispatch',
+	'email.dispatch.complete': 'completed an email dispatch',
+};
+
+const CATEGORY_PREFIXES: Array<[string, string]> = [
+	['auth.', 'Auth'],
+	['catalog.program.', 'Program'],
+	['catalog.event.', 'Event'],
+	['attendees.', 'Attendees'],
+	['checkin.', 'Check-in'],
+	['capacity.', 'Capacity'],
+	['email.dispatch.', 'Email'],
+];
+
+/** Plain-language phrase for an audit action; unknown actions get a generic phrase (the raw code is always shown separately). */
+export function describeAuditAction(action: string): string {
+	return ACTION_PHRASES[action] ?? 'performed an action';
+}
+
+/** Feed category badge label derived from the action's namespace prefix. */
+export function categorizeAuditAction(action: string): string {
+	const match = CATEGORY_PREFIXES.find(([prefix]) => action.startsWith(prefix));
+	return match ? match[1] : 'Activity';
+}
+
+/** Two-letter initials for the actor avatar, derived from their email local-part (no display name is stored). */
+export function actorInitials(actor: string): string {
+	const local = actor.split('@')[0] ?? actor;
+	const segments = local.split(/[._-]/).filter(Boolean);
+	if (segments.length >= 2) {
+		return `${segments[0]?.[0] ?? ''}${segments[1]?.[0] ?? ''}`.toUpperCase();
+	}
+	return local.slice(0, 2).toUpperCase();
+}

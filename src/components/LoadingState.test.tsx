@@ -35,7 +35,7 @@ describe('LoadingState', () => {
 		expect(screen.queryByText('Did you know?')).not.toBeInTheDocument();
 	});
 
-	it('renders Did you know above the spinner for page variant', () => {
+	it('renders Did you know below the spinner for page variant', () => {
 		mockGetRandomLoadingTip.mockReturnValueOnce('A fun fact.');
 
 		render(<LoadingState message="Loading compose options…" />);

@@ -18,10 +18,12 @@ export function ThemeSwitcher({ theme, celebrationAllowed, onSelect, className }
 				<button
 					key={option.id}
 					type="button"
-					className={`${styles.swatch} ${theme === option.id ? styles.active : ''}`.trim()}
+					data-theme-option={option.id}
+					className={`${styles.option} ${theme === option.id ? styles.active : ''}`.trim()}
 					aria-pressed={theme === option.id}
 					onClick={() => onSelect(option.id)}
 				>
+					<span className={styles.dot} aria-hidden="true" />
 					{option.label}
 				</button>
 			))}

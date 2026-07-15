@@ -56,7 +56,7 @@ type EmailWorkflowDataService = Pick<
 	| 'fetchEmailTemplates'
 	| 'fetchEmailSegments'
 	| 'previewEmailDispatch'
-	| 'fetchSliceAttendees'
+	| 'fetchEventAttendees'
 	| 'fetchEmailDispatches'
 	| 'fetchEmailDispatchDetail'
 	| 'createEmailDispatch'
@@ -68,8 +68,7 @@ export interface EmailDispatchWorkflowDeps {
 	data: EmailWorkflowDataService;
 	confirm: (options: ConfirmOptions) => Promise<boolean>;
 	showToast: (message: string, type?: 'success' | 'error', durationMs?: number) => void;
-	programId: string | null;
-	evId: string | null;
+	eventId: string | null;
 }
 
 export function buildAudienceRequest(
@@ -88,13 +87,37 @@ export function buildAudienceRequest(
 }
 
 /**
+ * Whether a registered attendee is currently in the recipient set for the given
+ * audience mode. Server-resolved modes (all / checked-in) are derived from the
+ * attendee's own flags; manual mode reads the explicit selection set. Used both
+ * to render each checkbox and to seed the manual set when the operator starts
+ * hand-picking from an "all"/"checked-in" starting point.
+ */
+export function isRegisteredContactSelected(
+	person: SliceAttendee,
+	mode: AudienceMode,
+	manualIds: ReadonlySet<string>,
+): boolean {
+	switch (mode) {
+		case 'registered_all':
+			return true;
+		case 'registered_checked_in':
+			return person.checkedIn;
+		case 'registered_not_checked_in':
+			return !person.checkedIn;
+		case 'registered_manual':
+			return manualIds.has(person.contactId);
+	}
+}
+
+/**
  * Owns the email-dispatch workflow: compose/preview/send/schedule/edit/cancel
  * state plus the invariants (large-send confirmation, schedule lock warnings,
  * lock-on-processing error handling). The view renders the returned state and
  * calls the returned actions; all data access stays on the injected service.
  */
 export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
-	const { data, confirm, showToast, programId, evId } = deps;
+	const { data, confirm, showToast, eventId } = deps;
 
 	const [activeTab, setActiveTab] = useState<EmailTab>('compose');
 	const [sendMode, setSendMode] = useState<SendMode>('now');
@@ -116,9 +139,9 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [manualContactIds, setManualContactIds] = useState<string[]>([]);
 	const [pickerAttendees, setPickerAttendees] = useState<SliceAttendee[]>([]);
+	const [pickerTotal, setPickerTotal] = useState(0);
 	const [pickerSearch, setPickerSearch] = useState('');
 	const [debouncedPickerSearch, setDebouncedPickerSearch] = useState('');
-	const [pickerFilter, setPickerFilter] = useState<CheckedInFilter>('all');
 	const [pickerLoading, setPickerLoading] = useState(false);
 	const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
 	const [detailRecipients, setDetailRecipients] = useState<DispatchRecipientRow[]>([]);
@@ -151,7 +174,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		manualSelectionRef.current = new Set();
 		setRecipientCount(null);
 		setSelectedDispatchId(null);
-	}, [programId, evId]);
+	}, [eventId]);
 
 	useEffect(() => {
 		const handle = window.setTimeout(() => {
@@ -166,7 +189,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	);
 
 	const loadComposeData = useCallback(async () => {
-		if (!programId || !evId) {
+		if (!eventId) {
 			return;
 		}
 
@@ -174,9 +197,9 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		setError(null);
 		try {
 			const [limitsResult, templatesResult, segmentsResult] = await Promise.all([
-				data.fetchEmailLimits(programId, evId),
-				data.fetchEmailTemplates(programId, evId),
-				data.fetchEmailSegments(programId, evId),
+				data.fetchEmailLimits(eventId),
+				data.fetchEmailTemplates(eventId),
+				data.fetchEmailSegments(eventId),
 			]);
 			setLimits(limitsResult);
 			setTemplates(templatesResult.templates);
@@ -188,10 +211,10 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		} finally {
 			setLoading(false);
 		}
-	}, [data, evId, programId]);
+	}, [data, eventId]);
 
 	const loadRecipientPreview = useCallback(async () => {
-		if (!programId || !evId || !templateId) {
+		if (!eventId || !templateId) {
 			return;
 		}
 		if (audienceSource === 'hubspot_segment' && !segmentId) {
@@ -205,7 +228,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 
 		setPreviewLoading(true);
 		try {
-			const preview = await data.previewEmailDispatch(programId, evId, {
+			const preview = await data.previewEmailDispatch(eventId, {
 				templateId,
 				audience: audienceRequest,
 			});
@@ -216,73 +239,70 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		} finally {
 			setPreviewLoading(false);
 		}
-	}, [audienceMode, audienceRequest, audienceSource, data, evId, manualContactIds.length, programId, segmentId, showToast, templateId]);
+	}, [audienceMode, audienceRequest, audienceSource, data, eventId, manualContactIds.length, segmentId, showToast, templateId]);
 
-	const loadManualPickerAttendees = useCallback(async () => {
-		if (!programId || !evId || audienceMode !== 'registered_manual' || audienceSource !== 'registered') {
+	const loadRegisteredAttendees = useCallback(async () => {
+		if (!eventId || audienceSource !== 'registered') {
 			return;
 		}
 
 		setPickerLoading(true);
-		const checkedIn =
-			pickerFilter === 'checked-in' ? true : pickerFilter === 'not-checked-in' ? false : undefined;
-
 		try {
-			const result = await data.fetchSliceAttendees(programId, evId, {
+			const result = await data.fetchEventAttendees(eventId, {
 				q: debouncedPickerSearch || undefined,
-				checkedIn,
 				page: 1,
 				pageSize: MANUAL_PICKER_PAGE_SIZE,
 			});
 			setPickerAttendees(result.attendees);
+			setPickerTotal(result.total);
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to load attendees', 'error');
 		} finally {
 			setPickerLoading(false);
 		}
-	}, [audienceMode, audienceSource, data, debouncedPickerSearch, evId, pickerFilter, programId, showToast]);
+	}, [audienceSource, data, debouncedPickerSearch, eventId, showToast]);
 
 	const loadLogDispatches = useCallback(async () => {
-		if (!programId || !evId) {
+		if (!eventId) {
 			return;
 		}
 
 		setLogLoading(true);
 		try {
-			const result = await data.fetchEmailDispatches(programId, evId, { view: 'log' });
+			const result = await data.fetchEmailDispatches(eventId, { view: 'log' });
 			setLogDispatches(result.dispatches);
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to load dispatch log', 'error');
 		} finally {
 			setLogLoading(false);
 		}
-	}, [data, evId, programId, showToast]);
+	}, [data, eventId, showToast]);
 
 	const loadScheduledDispatches = useCallback(async () => {
-		if (!programId || !evId) {
+		if (!eventId) {
 			return;
 		}
 
 		setScheduledLoading(true);
 		try {
-			const result = await data.fetchEmailDispatches(programId, evId, { view: 'scheduled' });
+			const result = await data.fetchEmailDispatches(eventId, { view: 'scheduled' });
 			setScheduledDispatches(result.dispatches);
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to load scheduled dispatches', 'error');
 		} finally {
 			setScheduledLoading(false);
 		}
-	}, [data, evId, programId, showToast]);
+	}, [data, eventId, showToast]);
 
 	const loadDispatchDetail = useCallback(
 		async (dispatchId: string, page: number = 1) => {
-			if (!programId || !evId) {
+			if (!eventId) {
 				return;
 			}
 
 			setDetailLoading(true);
 			try {
-				const result = await data.fetchEmailDispatchDetail(programId, evId, dispatchId, {
+				const result = await data.fetchEmailDispatchDetail(eventId, dispatchId, {
 					page,
 					pageSize: DETAIL_RECIPIENTS_PAGE_SIZE,
 				});
@@ -295,21 +315,25 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 				setDetailLoading(false);
 			}
 		},
-		[data, evId, programId, showToast],
+		[data, eventId, showToast],
 	);
 
 	useEffect(() => {
 		void loadComposeData();
 	}, [loadComposeData]);
 
+	// The compose modal has no visible dispatch-name field (FE-REDESIGN); the
+	// dispatch is named after the selected template so the schedule/log list still
+	// has a human-readable label.
 	useEffect(() => {
-		if (activeTab === 'log') {
-			void loadLogDispatches();
-		}
-		if (activeTab === 'scheduled') {
-			void loadScheduledDispatches();
-		}
-	}, [activeTab, loadLogDispatches, loadScheduledDispatches]);
+		const template = templates.find((entry) => entry.id === templateId);
+		setDispatchName(template?.name ?? '');
+	}, [templateId, templates]);
+
+	useEffect(() => {
+		void loadLogDispatches();
+		void loadScheduledDispatches();
+	}, [loadLogDispatches, loadScheduledDispatches]);
 
 	useEffect(() => {
 		if (!loading && templateId) {
@@ -318,10 +342,10 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	}, [loading, templateId, audienceRequest, loadRecipientPreview]);
 
 	useEffect(() => {
-		if (audienceSource === 'registered' && audienceMode === 'registered_manual') {
-			void loadManualPickerAttendees();
+		if (audienceSource === 'registered') {
+			void loadRegisteredAttendees();
 		}
-	}, [audienceMode, audienceSource, loadManualPickerAttendees]);
+	}, [audienceSource, loadRegisteredAttendees]);
 
 	useEffect(() => {
 		if (selectedDispatchId) {
@@ -343,6 +367,45 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		}
 		manualSelectionRef.current = next;
 		setManualContactIds([...next]);
+	}
+
+	/** Recipients quick-action: everyone registered (server-resolved at send time). */
+	function selectAllRegistered() {
+		setAudienceMode('registered_all');
+	}
+
+	/** Recipients quick-action: only checked-in attendees (server-resolved). */
+	function selectCheckedInRegistered() {
+		setAudienceMode('registered_checked_in');
+	}
+
+	/** Recipients quick-action: deselect everyone (manual mode, empty set). */
+	function clearRegisteredSelection() {
+		manualSelectionRef.current = new Set();
+		setManualContactIds([]);
+		setAudienceMode('registered_manual');
+	}
+
+	/**
+	 * Toggle a single attendee. When starting from a server-resolved mode
+	 * (all / checked-in), seed the manual set from the attendees currently
+	 * selected under that mode so hand-picking edits that set rather than
+	 * discarding it, then switch to manual mode.
+	 */
+	function toggleRegisteredContact(person: SliceAttendee, selected: boolean) {
+		if (audienceMode !== 'registered_manual') {
+			const seed = new Set(
+				pickerAttendees
+					.filter((candidate) =>
+						isRegisteredContactSelected(candidate, audienceMode, new Set(manualContactIds)),
+					)
+					.map((candidate) => candidate.contactId),
+			);
+			manualSelectionRef.current = seed;
+			setManualContactIds([...seed]);
+			setAudienceMode('registered_manual');
+		}
+		toggleManualContact(person.contactId, selected);
 	}
 
 	function buildPatchBody(): PatchEmailDispatchBody {
@@ -378,27 +441,27 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		setEditingDispatch(null);
 	}
 
-	async function handleScheduleForLater() {
-		if (!programId || !evId || !templateId || !dispatchName.trim()) {
+	async function handleScheduleForLater(): Promise<boolean> {
+		if (!eventId || !templateId || !dispatchName.trim()) {
 			showToast('Enter a dispatch name and select a template.', 'error');
-			return;
+			return false;
 		}
 
 		if (recipientCount === 0) {
 			showToast('No recipients in the selected audience.', 'error');
-			return;
+			return false;
 		}
 
 		setSending(true);
 		try {
-			const preview = await data.previewEmailDispatch(programId, evId, {
+			const preview = await data.previewEmailDispatch(eventId, {
 				templateId,
 				audience: audienceRequest,
 			});
 
 			if (preview.recipientCount === 0) {
 				showToast('No recipients in the selected audience.', 'error');
-				return;
+				return false;
 			}
 
 			const threshold = limits?.largeSendThreshold ?? CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD;
@@ -409,37 +472,38 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 					confirmLabel: 'Confirm schedule',
 				});
 				if (!confirmed) {
-					return;
+					return false;
 				}
 			}
 
 			const patchBody = buildPatchBody();
-			await data.createEmailDispatch(programId, evId, {
+			await data.createEmailDispatch(eventId, {
 				...patchBody,
 				idempotencyKey: crypto.randomUUID(),
 				...(preview.recipientCount >= threshold ? { largeSendConfirmed: true as const } : {}),
 			});
 
 			showToast('Dispatch scheduled.');
-			setDispatchName('');
 			void loadScheduledDispatches();
 			setActiveTab('scheduled');
+			return true;
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Schedule failed', 'error');
+			return false;
 		} finally {
 			setSending(false);
 		}
 	}
 
 	async function handleSaveEdit() {
-		if (!programId || !evId || !editingDispatch || !editDispatchName.trim() || !editTemplateId) {
+		if (!eventId || !editingDispatch || !editDispatchName.trim() || !editTemplateId) {
 			showToast('Enter a dispatch name and select a template.', 'error');
 			return;
 		}
 
 		setSavingEdit(true);
 		try {
-			const preview = await data.previewEmailDispatch(programId, evId, {
+			const preview = await data.previewEmailDispatch(eventId, {
 				templateId: editTemplateId,
 				audience: editingDispatch.audience ?? audienceRequest,
 			});
@@ -471,7 +535,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 				...(preview.recipientCount >= threshold ? { largeSendConfirmed: true as const } : {}),
 			};
 
-			await data.updateEmailDispatch(programId, evId, editingDispatch.dispatchId, body);
+			await data.updateEmailDispatch(eventId, editingDispatch.dispatchId, body);
 			showToast('Scheduled dispatch updated.');
 			closeEditModal();
 			void loadScheduledDispatches();
@@ -484,7 +548,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	}
 
 	async function handleCancelScheduled(dispatch: EmailDispatchListItem) {
-		if (!programId || !evId) {
+		if (!eventId) {
 			return;
 		}
 
@@ -499,7 +563,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 
 		setCancellingId(dispatch.dispatchId);
 		try {
-			await data.cancelEmailDispatch(programId, evId, dispatch.dispatchId);
+			await data.cancelEmailDispatch(eventId, dispatch.dispatchId);
 			showToast('Scheduled dispatch cancelled.');
 			void loadScheduledDispatches();
 		} catch (err: unknown) {
@@ -510,27 +574,27 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		}
 	}
 
-	async function handleSendNow() {
-		if (!programId || !evId || !templateId || !dispatchName.trim()) {
+	async function handleSendNow(): Promise<boolean> {
+		if (!eventId || !templateId || !dispatchName.trim()) {
 			showToast('Enter a dispatch name and select a template.', 'error');
-			return;
+			return false;
 		}
 
 		if (recipientCount === 0) {
 			showToast('No recipients in the selected audience.', 'error');
-			return;
+			return false;
 		}
 
 		setSending(true);
 		try {
-			const preview = await data.previewEmailDispatch(programId, evId, {
+			const preview = await data.previewEmailDispatch(eventId, {
 				templateId,
 				audience: audienceRequest,
 			});
 
 			if (preview.recipientCount === 0) {
 				showToast('No recipients in the selected audience.', 'error');
-				return;
+				return false;
 			}
 
 			const threshold = limits?.largeSendThreshold ?? CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD;
@@ -541,11 +605,11 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 					confirmLabel: 'Confirm send',
 				});
 				if (!confirmed) {
-					return;
+					return false;
 				}
 			}
 
-			await data.createEmailDispatch(programId, evId, {
+			await data.createEmailDispatch(eventId, {
 				dispatchName: dispatchName.trim(),
 				templateId,
 				audience: audienceRequest,
@@ -556,10 +620,11 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 			});
 
 			showToast('Dispatch accepted — processing in the background.');
-			setDispatchName('');
 			void loadLogDispatches();
+			return true;
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Send failed', 'error');
+			return false;
 		} finally {
 			setSending(false);
 		}
@@ -639,12 +704,15 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		previewLoading,
 		manualContactIds,
 		toggleManualContact,
-		// Manual attendee picker
+		selectAllRegistered,
+		selectCheckedInRegistered,
+		clearRegisteredSelection,
+		toggleRegisteredContact,
+		// Registered attendee picker
 		pickerAttendees,
+		pickerTotal,
 		pickerSearch,
 		setPickerSearch,
-		pickerFilter,
-		setPickerFilter,
 		pickerLoading,
 		// Dispatch detail
 		selectedDispatchId,

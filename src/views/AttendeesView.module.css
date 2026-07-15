@@ -3,10 +3,42 @@
 	flex-direction: column;
 	flex: 1;
 	min-height: 0;
+	gap: 20px;
 }
 
 .view :global(.top-bar) {
 	flex-shrink: 0;
+}
+
+/* design_handoff 2: 3 stat tiles above the filter card (Registered / Checked in / Not
+   checked in) — left-aligned, not the centered `.hub-stat` treatment used elsewhere. */
+.statsGrid {
+	flex-shrink: 0;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 14px;
+}
+
+.statTile {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-card);
+	background: var(--panel);
+	box-shadow: var(--shadow-card);
+	padding: 16px 18px;
+}
+
+.statValue {
+	margin: 0;
+	font-size: 22px;
+	font-weight: 800;
+	color: var(--text);
+}
+
+.statLabel {
+	margin: 2px 0 0;
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--muted);
 }
 
 .card {
@@ -17,8 +49,7 @@
 	margin-bottom: 0;
 }
 
-.card :global(.toolbar),
-.card :global(.search-input) {
+.card :global(.toolbar) {
 	flex-shrink: 0;
 }
 
@@ -49,8 +80,78 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(255, 255, 255, 0.55);
+	background: color-mix(in srgb, var(--panel) 55%, transparent);
 	z-index: 1;
+}
+
+/* design_handoff 2: icon + tinted field, matching EventsView's `.searchField`. */
+.searchField {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	border: 1px solid var(--border);
+	background: var(--ice);
+	border-radius: 9px;
+	padding: 6px 11px;
+	margin-bottom: 14px;
+	max-width: 22rem;
+}
+
+.searchField .material-symbols-outlined {
+	color: var(--muted);
+	font-size: 1.1rem;
+}
+
+.searchField input {
+	border: none;
+	background: transparent;
+	outline: none;
+	font: inherit;
+	font-size: 0.8rem;
+	color: var(--text);
+	width: 100%;
+}
+
+.filterGroup {
+	margin-bottom: 12px;
+}
+
+.filterLabel {
+	margin: 0 0 6px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.filterRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+/* design_handoff 2 `pillStyle()`: flush/transparent inactive, soft-accent-fill active only —
+   same language as EventsView's `.tab`/`.statusPill`. */
+.pill,
+.pillActive {
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--muted);
+	border-radius: 9px;
+	padding: 8px 12px;
+	font: inherit;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+	min-height: 40px;
+}
+
+.pillActive {
+	background: var(--accent-soft);
+	color: var(--accent);
+	border-color: var(--accent);
 }
 
 .dispatchFilterRow {
@@ -85,30 +186,29 @@
 
 .pageSummary {
 	font-size: 0.9rem;
-	color: var(--color-muted);
+	color: var(--muted);
 }
 
 .refreshHint {
 	font-size: 0.875rem;
-	color: var(--color-muted);
+	color: var(--muted);
 }
 
-.colEmail,
 .colAccountManager,
-.colTrack,
-.colCompany {
+.colType,
+.colCompany,
+.colAction {
 	/* visible by default */
 }
 
 @media (max-width: 900px) {
-	.colEmail,
 	.colAccountManager {
 		display: none;
 	}
 }
 
 @media (max-width: 600px) {
-	.colTrack {
+	.colType {
 		display: none;
 	}
 }
@@ -117,4 +217,48 @@
 	.colCompany {
 		display: none;
 	}
+}
+
+.nameCell {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.avatar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.nameInfo {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.nameEmail {
+	font-size: 0.75rem;
+	color: var(--muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.typeBadge {
+	background: var(--info-bg);
+	color: var(--info);
+}
+
+.removeButton {
+	min-height: 40px;
+	padding: 0 12px;
 }

@@ -1,0 +1,123 @@
+/* design_handoff 2: the sidebar's one divider sits here — between the top-level nav
+   (Overview / Programs & Events) and "Working event" — not between the picker and its
+   module list below. */
+.field {
+	margin-top: 12px;
+	padding: 12px 6px 10px;
+	border-top: 1px solid var(--border);
+}
+
+.label {
+	margin: 0 0 6px 6px;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+}
+
+.wrap {
+	position: relative;
+}
+
+.trigger {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	min-height: 44px;
+	padding: 8px 10px;
+	border-radius: 9px;
+	border: 1px dashed var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-family: inherit;
+	cursor: pointer;
+	text-align: left;
+}
+
+.trigger:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+}
+
+.triggerLabel {
+	font-size: 0.78rem;
+	font-weight: 700;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.chevron {
+	color: var(--muted);
+	font-size: 0.65rem;
+	flex-shrink: 0;
+}
+
+.menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	z-index: 20;
+	border: 1px solid var(--border);
+	background: var(--panel);
+	border-radius: 10px;
+	box-shadow: var(--shadow-card);
+	overflow: hidden;
+}
+
+.search {
+	width: 100%;
+	box-sizing: border-box;
+	border: none;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	padding: 9px 10px;
+	font-size: 0.8rem;
+	font-family: inherit;
+	outline: none;
+	min-height: 44px;
+}
+
+.matches {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 200px;
+	overflow-y: auto;
+}
+
+.match {
+	display: block;
+	width: 100%;
+	text-align: left;
+	border: none;
+	background: none;
+	color: var(--text);
+	padding: 9px 10px;
+	min-height: 44px;
+	font-size: 0.8rem;
+	font-family: inherit;
+	cursor: pointer;
+	border-bottom: 1px solid var(--border);
+}
+
+.matches li:last-child .match {
+	border-bottom: none;
+}
+
+.match:hover,
+.match:focus-visible {
+	background: var(--ice);
+	outline: none;
+}
+
+.empty {
+	padding: 12px 10px;
+	font-size: 0.8rem;
+	color: var(--muted);
+}

@@ -1,14 +1,18 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type {
 	CatalogEvent,
+	CatalogEventPublishState,
+	CatalogEventStatus,
 	CatalogProgram,
 	CreateCatalogEventBody,
 	PatchCatalogEventBody,
 } from '../types';
-import { ATTENDANCE_PROPERTY_PRESETS, suggestAttendanceProperty } from '../constants/hubspot';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalNumberForPatch, optionalTextForPatch } from '../utils/catalogMetadata';
 import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
+import { CalendarPicker } from './pickers/CalendarPicker';
+import { SelectPicker } from './pickers/SelectPicker';
+import { TimePicker } from './pickers/TimePicker';
 import styles from './CatalogEventModal.module.css';
 
 export interface CatalogEventModalProps {
@@ -16,22 +20,63 @@ export interface CatalogEventModalProps {
 	open: boolean;
 	programs: CatalogProgram[];
 	event?: CatalogEvent;
-	parentProgram?: CatalogProgram;
+	parentProgram?: CatalogProgram | null;
 	onCancel: () => void;
 	onSave: (body: CreateCatalogEventBody | PatchCatalogEventBody) => Promise<void>;
+	/** Edit mode only — archive / unarchive from Event Details Edit event (lock 8 / T081). */
+	onArchive?: () => Promise<void>;
 }
 
 interface EventFormState {
 	programId: string;
 	name: string;
-	partsAttendedOption: string;
-	attendanceProperty: string;
+	startDate: string;
+	startTime: string;
+	endDate: string;
+	endTime: string;
 	owner: string;
-	description: string;
-	date: string;
 	location: string;
 	capacity: string;
 	walkInFormUrl: string;
+	status: CatalogEventStatus;
+	publishState: CatalogEventPublishState;
+}
+
+const NO_PROGRAM_VALUE = '';
+
+/** HubSpot start/end are full datetimes; a date with no time picked defaults to this. */
+const DEFAULT_TIME = '09:00';
+
+const STATUS_OPTIONS: Array<{ value: CatalogEventStatus; label: string }> = [
+	{ value: 'active', label: 'Active' },
+	{ value: 'cancelled', label: 'Cancelled' },
+];
+
+const PUBLISH_STATE_OPTIONS: Array<{ value: CatalogEventPublishState; label: string }> = [
+	{ value: 'draft', label: 'Draft' },
+	{ value: 'published', label: 'Published' },
+];
+
+/** CalendarPicker/TimePicker yield `YYYY-MM-DD` / 24h `HH:MM`; HubSpot expects one ISO datetime. */
+function combineDateAndTime(date: string, time: string): string {
+	const trimmedDate = date.trim();
+	if (!trimmedDate) {
+		return '';
+	}
+	const trimmedTime = time.trim() || DEFAULT_TIME;
+	return `${trimmedDate}T${trimmedTime}:00.000Z`;
+}
+
+function dateInputFromIso(iso: string | undefined): string {
+	if (!iso) {
+		return '';
+	}
+	return iso.split('T')[0] ?? iso;
+}
+
+function timeInputFromIso(iso: string | undefined): string {
+	const match = iso ? /T(\d{2}:\d{2})/.exec(iso) : null;
+	return match?.[1] ?? '';
 }
 
 function walkInFormUrlFieldError(url: string): string | null {
@@ -55,51 +100,54 @@ function walkInFormUrlFieldError(url: string): string | null {
 	return 'Walk-in form URL must be a HubSpot form URL';
 }
 
-function emptyForm(defaultProgramId = ''): EventFormState {
+function emptyForm(defaultProgramId = NO_PROGRAM_VALUE): EventFormState {
 	return {
 		programId: defaultProgramId,
 		name: '',
-		partsAttendedOption: '',
-		attendanceProperty: ATTENDANCE_PROPERTY_PRESETS[0],
+		startDate: '',
+		startTime: '',
+		endDate: '',
+		endTime: '',
 		owner: '',
-		description: '',
-		date: '',
 		location: '',
 		capacity: '',
 		walkInFormUrl: '',
+		status: 'active',
+		publishState: 'draft',
 	};
 }
 
-function formFromEvent(event: CatalogEvent, programId: string): EventFormState {
+function formFromEvent(event: CatalogEvent): EventFormState {
 	return {
-		programId,
+		programId: event.programId ?? NO_PROGRAM_VALUE,
 		name: event.name,
-		partsAttendedOption: event.partsAttendedOption,
-		attendanceProperty: event.attendanceProperty ?? ATTENDANCE_PROPERTY_PRESETS[0],
+		startDate: dateInputFromIso(event.start),
+		startTime: timeInputFromIso(event.start),
+		endDate: dateInputFromIso(event.end),
+		endTime: timeInputFromIso(event.end),
 		owner: event.owner ?? '',
-		description: event.description ?? '',
-		date: event.date ?? '',
 		location: event.location ?? '',
 		capacity: event.capacity !== undefined ? String(event.capacity) : '',
 		walkInFormUrl: event.walkInFormUrl ?? '',
+		status: event.status,
+		publishState: event.publishState,
 	};
 }
 
 function buildCreateBody(form: EventFormState): CreateCatalogEventBody {
 	const body: CreateCatalogEventBody = {
-		programId: form.programId,
 		name: form.name.trim(),
-		partsAttendedOption: form.partsAttendedOption.trim(),
-		attendanceProperty: form.attendanceProperty.trim(),
+		start: combineDateAndTime(form.startDate, form.startTime),
+		publishState: form.publishState,
 	};
+	if (form.programId.trim()) {
+		body.programId = form.programId.trim();
+	}
+	if (form.endDate.trim()) {
+		body.end = combineDateAndTime(form.endDate, form.endTime);
+	}
 	if (form.owner.trim()) {
 		body.owner = form.owner.trim();
-	}
-	if (form.description.trim()) {
-		body.description = form.description.trim();
-	}
-	if (form.date.trim()) {
-		body.date = form.date.trim();
 	}
 	if (form.location.trim()) {
 		body.location = form.location.trim();
@@ -120,21 +168,18 @@ function buildCreateBody(form: EventFormState): CreateCatalogEventBody {
 function buildPatchBody(event: CatalogEvent, form: EventFormState): PatchCatalogEventBody {
 	const body: PatchCatalogEventBody = {
 		name: form.name.trim(),
-		partsAttendedOption: form.partsAttendedOption.trim(),
-		attendanceProperty: form.attendanceProperty.trim(),
+		start: combineDateAndTime(form.startDate, form.startTime),
+		status: form.status,
+		publishState: form.publishState,
 	};
 
+	const end = optionalTextForPatch(event.end, form.endDate ? combineDateAndTime(form.endDate, form.endTime) : '');
+	if (end !== undefined) {
+		body.end = end;
+	}
 	const owner = optionalTextForPatch(event.owner, form.owner);
 	if (owner !== undefined) {
 		body.owner = owner;
-	}
-	const description = optionalTextForPatch(event.description, form.description);
-	if (description !== undefined) {
-		body.description = description;
-	}
-	const date = optionalTextForPatch(event.date, form.date);
-	if (date !== undefined) {
-		body.date = date;
 	}
 	const location = optionalTextForPatch(event.location, form.location);
 	if (location !== undefined) {
@@ -160,26 +205,28 @@ export function CatalogEventModal({
 	parentProgram,
 	onCancel,
 	onSave,
+	onArchive,
 }: CatalogEventModalProps) {
 	const titleId = useId();
+	const subtitleId = useId();
 	const dialogRef = useRef<HTMLDivElement>(null);
-	const programLabelId = useId();
-	const programListboxId = useId();
-	const programTriggerRef = useRef<HTMLButtonElement>(null);
+	const programFieldId = useId();
+	const startDateFieldId = useId();
+	const startTimeFieldId = useId();
+	const endDateFieldId = useId();
+	const endTimeFieldId = useId();
+	const statusFieldId = useId();
+	const publishStateFieldId = useId();
 	const nameInputRef = useRef<HTMLInputElement>(null);
-	const programFieldRef = useRef<HTMLDivElement>(null);
 	const [form, setForm] = useState<EventFormState>(emptyForm());
 	const [saving, setSaving] = useState(false);
-	const [programMenuOpen, setProgramMenuOpen] = useState(false);
+	const [archiving, setArchiving] = useState(false);
+	const [startError, setStartError] = useState<string | null>(null);
 	const [walkInFormUrlError, setWalkInFormUrlError] = useState<string | null>(null);
 
 	const handleEscape = useCallback(() => {
-		if (programMenuOpen) {
-			setProgramMenuOpen(false);
-			return;
-		}
 		onCancel();
-	}, [onCancel, programMenuOpen]);
+	}, [onCancel]);
 
 	useModalFocusTrap({ open, containerRef: dialogRef, onEscape: handleEscape });
 
@@ -187,40 +234,15 @@ export function CatalogEventModal({
 		if (!open) {
 			return;
 		}
-		if (mode === 'edit' && event && parentProgram) {
-			setForm(formFromEvent(event, parentProgram.id));
+		if (mode === 'edit' && event) {
+			setForm(formFromEvent(event));
 		} else {
-			setForm(emptyForm(programs[0]?.id ?? ''));
+			setForm(emptyForm(NO_PROGRAM_VALUE));
 		}
-		setProgramMenuOpen(false);
+		setStartError(null);
 		setWalkInFormUrlError(null);
-		if (mode === 'edit') {
-			nameInputRef.current?.focus();
-		} else {
-			programTriggerRef.current?.focus();
-		}
-	}, [event, mode, open, parentProgram, programs]);
-
-	useEffect(() => {
-		if (!programMenuOpen) {
-			return;
-		}
-
-		function handlePointerDown(pointerEvent: MouseEvent | TouchEvent) {
-			const target = pointerEvent.target;
-			if (!(target instanceof Node) || !programFieldRef.current?.contains(target)) {
-				setProgramMenuOpen(false);
-			}
-		}
-
-		document.addEventListener('mousedown', handlePointerDown);
-		document.addEventListener('touchstart', handlePointerDown);
-
-		return () => {
-			document.removeEventListener('mousedown', handlePointerDown);
-			document.removeEventListener('touchstart', handlePointerDown);
-		};
-	}, [programMenuOpen]);
+		nameInputRef.current?.focus();
+	}, [event, mode, open]);
 
 	if (!open) {
 		return null;
@@ -228,6 +250,11 @@ export function CatalogEventModal({
 
 	async function handleSubmit(submitEvent: FormEvent) {
 		submitEvent.preventDefault();
+		if (!form.startDate.trim()) {
+			setStartError('Start date is required');
+			return;
+		}
+		setStartError(null);
 		const walkInUrlError = walkInFormUrlFieldError(form.walkInFormUrl);
 		if (walkInUrlError) {
 			setWalkInFormUrlError(walkInUrlError);
@@ -246,10 +273,28 @@ export function CatalogEventModal({
 		}
 	}
 
+	async function handleArchive() {
+		if (!onArchive) {
+			return;
+		}
+		setArchiving(true);
+		try {
+			await onArchive();
+		} finally {
+			setArchiving(false);
+		}
+	}
+
 	const title = mode === 'create' ? 'Create Event' : 'Edit Event';
+	const subtitle =
+		mode === 'edit' ? 'Update details for this event' : 'Add a standalone event or attach it to a program';
+	const busy = saving || archiving;
 	const activePrograms = programs.filter((program) => !program.archived);
-	const selectedProgramName =
-		activePrograms.find((program) => program.id === form.programId)?.name ?? 'Select Program';
+	const programOptions = [
+		{ value: NO_PROGRAM_VALUE, label: 'No program' },
+		...activePrograms.map((program) => ({ value: program.id, label: program.name })),
+	];
+	const programDisplayName = parentProgram?.name ?? (event?.programId ? 'Unknown' : 'No program');
 
 	return (
 		<div
@@ -257,6 +302,7 @@ export function CatalogEventModal({
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={titleId}
+			aria-describedby={subtitleId}
 			onClick={(clickEvent) => {
 				if (clickEvent.target === clickEvent.currentTarget) {
 					onCancel();
@@ -264,128 +310,113 @@ export function CatalogEventModal({
 			}}
 		>
 			<div ref={dialogRef} className={`modal ${styles.modal}`}>
-				<h3 id={titleId}>{title}</h3>
+				<div className={styles.header}>
+					<div>
+						<h3 id={titleId}>{title}</h3>
+						<p id={subtitleId} className={styles.subtitle}>
+							{subtitle}
+						</p>
+					</div>
+					<button type="button" className={styles.closeButton} onClick={onCancel} aria-label="Close">
+						×
+					</button>
+				</div>
 				<form
 					className={styles.form}
 					noValidate
 					onSubmit={(submitEvent) => void handleSubmit(submitEvent)}
 				>
 					{mode === 'create' ? (
-						<div className={styles.programField} ref={programFieldRef}>
-							<span id={programLabelId} className={styles.programFieldLabel}>
-								Program
-							</span>
-							<div className={styles.selectWrap}>
-								<button
-									type="button"
-									ref={programTriggerRef}
-									className={styles.programTrigger}
-									aria-haspopup="listbox"
-									aria-expanded={programMenuOpen}
-									aria-labelledby={programLabelId}
-									onClick={() => setProgramMenuOpen((current) => !current)}
-								>
-									{selectedProgramName}
-								</button>
-								{programMenuOpen ? (
-									<ul
-										id={programListboxId}
-										className={styles.programMenu}
-										role="listbox"
-										aria-labelledby={programLabelId}
-									>
-										{activePrograms.map((program) => (
-											<li key={program.id} role="none">
-												<button
-													type="button"
-													role="option"
-													aria-selected={form.programId === program.id}
-													className={styles.programOption}
-													onClick={() => {
-														setForm((current) => ({ ...current, programId: program.id }));
-														setProgramMenuOpen(false);
-													}}
-												>
-													{program.name}
-												</button>
-											</li>
-										))}
-									</ul>
-								) : null}
-							</div>
-						</div>
+						<SelectPicker
+							id={programFieldId}
+							label="Program"
+							placeholder="No program"
+							value={form.programId}
+							options={programOptions}
+							onChange={(programId) => setForm((current) => ({ ...current, programId }))}
+						/>
 					) : (
 						<p className={styles.readOnlyProgram}>
-							Program: <strong>{parentProgram?.name ?? 'Unknown'}</strong>
+							Program: <strong>{programDisplayName}</strong>
 						</p>
 					)}
 					<label>
 						Event name
 						<input
-							ref={mode === 'edit' ? nameInputRef : undefined}
+							ref={nameInputRef}
 							value={form.name}
-							onChange={(changeEvent) => {
-								const name = changeEvent.target.value;
-								setForm((current) => ({
-									...current,
-									name,
-									attendanceProperty: name.trim()
-										? suggestAttendanceProperty(name)
-										: current.attendanceProperty,
-								}));
+							onChange={(changeEvent) =>
+								setForm((current) => ({ ...current, name: changeEvent.target.value }))
+							}
+							required
+						/>
+					</label>
+					<div className={styles.fieldRow}>
+						<CalendarPicker
+							id={startDateFieldId}
+							label="Start Date"
+							value={form.startDate}
+							onChange={(startDate) => {
+								setStartError(null);
+								setForm((current) => ({ ...current, startDate }));
 							}}
-							required
 						/>
-					</label>
-					<label>
-						Parts Attended option
-						<input
-							value={form.partsAttendedOption}
-							onChange={(changeEvent) =>
-								setForm((current) => ({ ...current, partsAttendedOption: changeEvent.target.value }))
+						<TimePicker
+							id={startTimeFieldId}
+							label="Start Time"
+							value={form.startTime}
+							onChange={(startTime) => setForm((current) => ({ ...current, startTime }))}
+						/>
+					</div>
+					{startError ? (
+						<span className={styles.fieldError} role="alert">
+							{startError}
+						</span>
+					) : null}
+					<div className={styles.fieldRow}>
+						<CalendarPicker
+							id={endDateFieldId}
+							label="End Date"
+							value={form.endDate}
+							onChange={(endDate) => setForm((current) => ({ ...current, endDate }))}
+						/>
+						<TimePicker
+							id={endTimeFieldId}
+							label="End Time"
+							value={form.endTime}
+							onChange={(endTime) => setForm((current) => ({ ...current, endTime }))}
+						/>
+					</div>
+					{mode === 'edit' ? (
+						<SelectPicker
+							id={statusFieldId}
+							label="Status"
+							placeholder="Select status"
+							value={form.status}
+							options={STATUS_OPTIONS}
+							onChange={(status) =>
+								setForm((current) => ({ ...current, status: status as CatalogEventStatus }))
 							}
-							required
 						/>
-					</label>
-					<label>
-						Attendance property (HubSpot internal name)
-						<input
-							list="catalog-event-attendance-presets"
-							value={form.attendanceProperty}
-							onChange={(changeEvent) =>
-								setForm((current) => ({ ...current, attendanceProperty: changeEvent.target.value }))
-							}
-							required
-						/>
-						<datalist id="catalog-event-attendance-presets">
-							{ATTENDANCE_PROPERTY_PRESETS.map((preset) => (
-								<option key={preset} value={preset} />
-							))}
-						</datalist>
-					</label>
+					) : null}
+					<SelectPicker
+						id={publishStateFieldId}
+						label="Publish state"
+						placeholder="Select publish state"
+						value={form.publishState}
+						options={PUBLISH_STATE_OPTIONS}
+						onChange={(publishState) =>
+							setForm((current) => ({
+								...current,
+								publishState: publishState as CatalogEventPublishState,
+							}))
+						}
+					/>
 					<label>
 						Owner
 						<input
 							value={form.owner}
 							onChange={(changeEvent) => setForm((current) => ({ ...current, owner: changeEvent.target.value }))}
-						/>
-					</label>
-					<label>
-						Description
-						<textarea
-							value={form.description}
-							onChange={(changeEvent) =>
-								setForm((current) => ({ ...current, description: changeEvent.target.value }))
-							}
-							rows={3}
-						/>
-					</label>
-					<label>
-						Date
-						<input
-							type="date"
-							value={form.date}
-							onChange={(changeEvent) => setForm((current) => ({ ...current, date: changeEvent.target.value }))}
 						/>
 					</label>
 					<label>
@@ -426,10 +457,20 @@ export function CatalogEventModal({
 						) : null}
 					</label>
 					<div className="modal__actions">
-						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={saving}>
+						{mode === 'edit' && onArchive && event ? (
+							<button
+								type="button"
+								className={`btn btn-outline ${styles.archiveButton}`}
+								onClick={() => void handleArchive()}
+								disabled={busy}
+							>
+								{archiving ? 'Updating…' : event.archived ? 'Unarchive Event' : 'Archive Event'}
+							</button>
+						) : null}
+						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>
 							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary" disabled={saving}>
+						<button type="submit" className="btn btn-primary" disabled={busy}>
 							{saving ? 'Saving…' : 'Save Event'}
 						</button>
 					</div>

@@ -1,8 +1,8 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { CatalogProgram, CreateCatalogProgramBody, PatchCatalogProgramBody } from '../types';
-import { parseFormIdsInput, formatFormIdsInput } from '../constants/hubspot';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalTextForPatch } from '../utils/catalogMetadata';
+import { CalendarPicker } from './pickers/CalendarPicker';
 import styles from './CatalogProgramModal.module.css';
 
 export interface CatalogProgramModalProps {
@@ -11,51 +11,39 @@ export interface CatalogProgramModalProps {
 	program?: CatalogProgram;
 	onCancel: () => void;
 	onSave: (body: CreateCatalogProgramBody | PatchCatalogProgramBody) => Promise<void>;
+	/** Edit mode only — archive / unarchive from the Program modal (Programs & Events). */
+	onArchive?: () => Promise<void>;
 }
 
 interface ProgramFormState {
 	name: string;
-	hubspotFormIds: string;
 	description: string;
 	startDate: string;
 	endDate: string;
-	location: string;
-	timezone: string;
 }
 
 function emptyForm(): ProgramFormState {
 	return {
 		name: '',
-		hubspotFormIds: '',
 		description: '',
 		startDate: '',
 		endDate: '',
-		location: '',
-		timezone: '',
 	};
 }
 
 function formFromProgram(program: CatalogProgram): ProgramFormState {
 	return {
 		name: program.name,
-		hubspotFormIds: formatFormIdsInput(program.hubspotFormIds ?? []),
 		description: program.description ?? '',
 		startDate: program.startDate ?? '',
 		endDate: program.endDate ?? '',
-		location: program.location ?? '',
-		timezone: program.timezone ?? '',
 	};
 }
 
 function buildCreateBody(form: ProgramFormState): CreateCatalogProgramBody {
-	const formIds = parseFormIdsInput(form.hubspotFormIds);
 	const body: CreateCatalogProgramBody = {
 		name: form.name.trim(),
-		hubspotFormIds: formIds,
 	};
-	if (formIds[0]) {
-		body.hubspotFormId = formIds[0];
-	}
 	if (form.description.trim()) {
 		body.description = form.description.trim();
 	}
@@ -65,24 +53,13 @@ function buildCreateBody(form: ProgramFormState): CreateCatalogProgramBody {
 	if (form.endDate.trim()) {
 		body.endDate = form.endDate.trim();
 	}
-	if (form.location.trim()) {
-		body.location = form.location.trim();
-	}
-	if (form.timezone.trim()) {
-		body.timezone = form.timezone.trim();
-	}
 	return body;
 }
 
 function buildPatchBody(program: CatalogProgram, form: ProgramFormState): PatchCatalogProgramBody {
-	const formIds = parseFormIdsInput(form.hubspotFormIds);
 	const body: PatchCatalogProgramBody = {
 		name: form.name.trim(),
-		hubspotFormIds: formIds,
 	};
-	if (formIds[0]) {
-		body.hubspotFormId = formIds[0];
-	}
 
 	const description = optionalTextForPatch(program.description, form.description);
 	if (description !== undefined) {
@@ -96,24 +73,26 @@ function buildPatchBody(program: CatalogProgram, form: ProgramFormState): PatchC
 	if (endDate !== undefined) {
 		body.endDate = endDate;
 	}
-	const location = optionalTextForPatch(program.location, form.location);
-	if (location !== undefined) {
-		body.location = location;
-	}
-	const timezone = optionalTextForPatch(program.timezone, form.timezone);
-	if (timezone !== undefined) {
-		body.timezone = timezone;
-	}
 
 	return body;
 }
 
-export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: CatalogProgramModalProps) {
+export function CatalogProgramModal({
+	mode,
+	open,
+	program,
+	onCancel,
+	onSave,
+	onArchive,
+}: CatalogProgramModalProps) {
 	const titleId = useId();
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const firstFieldRef = useRef<HTMLInputElement>(null);
+	const startDateId = useId();
+	const endDateId = useId();
 	const [form, setForm] = useState<ProgramFormState>(emptyForm);
 	const [saving, setSaving] = useState(false);
+	const [archiving, setArchiving] = useState(false);
 
 	const handleEscape = useCallback(() => {
 		onCancel();
@@ -147,7 +126,20 @@ export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: C
 		}
 	}
 
+	async function handleArchive() {
+		if (!onArchive) {
+			return;
+		}
+		setArchiving(true);
+		try {
+			await onArchive();
+		} finally {
+			setArchiving(false);
+		}
+	}
+
 	const title = mode === 'create' ? 'Create Program' : 'Edit Program';
+	const busy = saving || archiving;
 
 	return (
 		<div
@@ -179,20 +171,6 @@ export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: C
 						/>
 					</label>
 					<label>
-						HubSpot form IDs (one per line or comma-separated)
-						<span className={styles.requiredMark} aria-hidden="true">
-							{' '}
-							*
-						</span>
-						<textarea
-							value={form.hubspotFormIds}
-							onChange={(event) => setForm((current) => ({ ...current, hubspotFormIds: event.target.value }))}
-							required
-							aria-required="true"
-							rows={3}
-						/>
-					</label>
-					<label>
 						Description
 						<textarea
 							value={form.description}
@@ -200,41 +178,33 @@ export function CatalogProgramModal({ mode, open, program, onCancel, onSave }: C
 							rows={3}
 						/>
 					</label>
-					<label>
-						Start date
-						<input
-							type="date"
-							value={form.startDate}
-							onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
-						/>
-					</label>
-					<label>
-						End date
-						<input
-							type="date"
-							value={form.endDate}
-							onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
-						/>
-					</label>
-					<label>
-						Location
-						<input
-							value={form.location}
-							onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
-						/>
-					</label>
-					<label>
-						Timezone
-						<input
-							value={form.timezone}
-							onChange={(event) => setForm((current) => ({ ...current, timezone: event.target.value }))}
-						/>
-					</label>
+					<CalendarPicker
+						id={startDateId}
+						label="Start date"
+						value={form.startDate}
+						onChange={(startDate) => setForm((current) => ({ ...current, startDate }))}
+					/>
+					<CalendarPicker
+						id={endDateId}
+						label="End date"
+						value={form.endDate}
+						onChange={(endDate) => setForm((current) => ({ ...current, endDate }))}
+					/>
 					<div className="modal__actions">
-						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={saving}>
+						{mode === 'edit' && onArchive && program ? (
+							<button
+								type="button"
+								className={`btn btn-outline ${styles.archiveButton}`}
+								onClick={() => void handleArchive()}
+								disabled={busy}
+							>
+								{archiving ? 'Updating…' : program.archived ? 'Unarchive Program' : 'Archive Program'}
+							</button>
+						) : null}
+						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>
 							Cancel
 						</button>
-						<button type="submit" className="btn btn-primary" disabled={saving}>
+						<button type="submit" className="btn btn-primary" disabled={busy}>
 							{saving ? 'Saving…' : 'Save Program'}
 						</button>
 					</div>

@@ -10,7 +10,7 @@ interface TopBarProps {
 export function TopBar({ title, meta, trailing }: TopBarProps) {
 	return (
 		<div className={`top-bar ${styles.topBar}`}>
-			<div>
+			<div className={styles.titleGroup}>
 				<h1>{title}</h1>
 				{meta ? <p className={styles.meta}>{meta}</p> : null}
 			</div>

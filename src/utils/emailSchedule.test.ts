@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultScheduleSlot } from './emailSchedule';
+import { defaultScheduleSlot, formatScheduleSlotLabel } from './emailSchedule';
 
 /**
  * `now` is built with the local-time Date constructor and `defaultScheduleSlot` reads
@@ -70,5 +70,18 @@ describe('defaultScheduleSlot', () => {
 			const slot = defaultScheduleSlot(new Date(2026, 6, 11, 9, minute, 0));
 			expect([0, 15, 30, 45]).toContain(slot.minute);
 		}
+	});
+});
+
+describe('formatScheduleSlotLabel', () => {
+	it('formats a date + 15-minute slot as “Mon D, YYYY at h:mm AM/PM”', () => {
+		expect(formatScheduleSlotLabel('2026-03-12', 9, 0)).toBe('Mar 12, 2026 at 9:00 AM');
+		expect(formatScheduleSlotLabel('2026-03-12', 0, 15)).toBe('Mar 12, 2026 at 12:15 AM');
+		expect(formatScheduleSlotLabel('2026-03-12', 12, 30)).toBe('Mar 12, 2026 at 12:30 PM');
+		expect(formatScheduleSlotLabel('2026-03-12', 21, 45)).toBe('Mar 12, 2026 at 9:45 PM');
+	});
+
+	it('returns an empty string for an invalid date', () => {
+		expect(formatScheduleSlotLabel('not-a-date', 9, 0)).toBe('');
 	});
 });

@@ -2,23 +2,40 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CatalogEventModal } from './CatalogEventModal';
+import type { CatalogEvent, CatalogProgram } from '../types';
 
-const programs = [
+const programs: CatalogProgram[] = [
 	{
 		id: 'prog-1',
 		name: 'Atlassian Event 2026',
-		hubspotFormIds: ['form-1'],
 		archived: false,
-		events: [],
 	},
 	{
 		id: 'prog-2',
 		name: 'QA Program 2026',
-		hubspotFormIds: ['form-2'],
 		archived: false,
-		events: [],
 	},
 ];
+
+const baseEvent: CatalogEvent = {
+	id: 'ev-1',
+	programId: 'prog-1',
+	name: 'Keynote',
+	start: '2026-09-02T09:00:00.000Z',
+	status: 'active',
+	publishState: 'draft',
+	archived: false,
+};
+
+function todayIsoDate(): string {
+	const now = new Date();
+	return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+async function pickRequiredStart(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(screen.getByRole('button', { name: /Start Date:/i }));
+	await user.keyboard('{Enter}');
+}
 
 describe('CatalogEventModal', () => {
 	const onCancel = vi.fn();
@@ -35,16 +52,47 @@ describe('CatalogEventModal', () => {
 
 		const dialog = screen.getByRole('dialog');
 		expect(dialog).toHaveAttribute('aria-modal', 'true');
-		expect(screen.getByLabelText('Program')).toBeInTheDocument();
-		expect(screen.getByLabelText('Program')).toHaveFocus();
+		expect(screen.getByLabelText(/^Program/)).toBeInTheDocument();
+		expect(screen.getByLabelText('Event name')).toHaveFocus();
 	});
 
-	it('submits create payload with optional metadata', async () => {
+	it('renders a title, subtitle, and close button, and closes on click (design_handoff 2)', () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+
+		expect(screen.getByRole('heading', { name: 'Create Event' })).toBeInTheDocument();
+		expect(screen.getByText('Add a standalone event or attach it to a program')).toBeInTheDocument();
+
+		const closeButton = screen.getByRole('button', { name: 'Close' });
+		expect(closeButton).toBeInTheDocument();
+		closeButton.click();
+		expect(onCancel).toHaveBeenCalled();
+	});
+
+	it('shows the edit subtitle in edit mode', () => {
+		render(
+			<CatalogEventModal
+				mode="edit"
+				open
+				programs={programs}
+				parentProgram={programs[0]}
+				event={baseEvent}
+				onCancel={onCancel}
+				onSave={onSave}
+			/>,
+		);
+
+		expect(screen.getByRole('heading', { name: 'Edit Event' })).toBeInTheDocument();
+		expect(screen.getByText('Update details for this event')).toBeInTheDocument();
+	});
+
+	it('submits create payload with optional metadata and ISO start', async () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
+		await user.click(screen.getByRole('button', { name: /^Program/ }));
+		await user.click(screen.getByRole('option', { name: 'Atlassian Event 2026' }));
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Owner'), 'Jane Doe');
 		await user.type(screen.getByLabelText('Capacity'), '500');
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
@@ -52,11 +100,84 @@ describe('CatalogEventModal', () => {
 		expect(onSave).toHaveBeenCalledWith({
 			programId: 'prog-1',
 			name: 'Keynote',
-			partsAttendedOption: 'Keynote',
-			attendanceProperty: 'atlassian_event__customer_event_attendance',
+			start: `${todayIsoDate()}T09:00:00.000Z`,
+			publishState: 'draft',
 			owner: 'Jane Doe',
 			capacity: 500,
 		});
+	});
+
+	it('combines a picked Start Time with Start Date into the datetime, instead of the hardcoded default', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await pickRequiredStart(user);
+		await user.click(screen.getByRole('button', { name: /Start Time:/i }));
+		await user.click(screen.getByRole('option', { name: '2:30 PM' }));
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(
+			expect.objectContaining({
+				start: `${todayIsoDate()}T14:30:00.000Z`,
+			}),
+		);
+	});
+
+	it('combines End Date + End Time into the end datetime', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await pickRequiredStart(user);
+		await user.click(screen.getByRole('button', { name: /End Date:/i }));
+		await user.keyboard('{Enter}');
+		await user.click(screen.getByRole('button', { name: /End Time:/i }));
+		await user.click(screen.getByRole('option', { name: '5:00 PM' }));
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(
+			expect.objectContaining({
+				end: `${todayIsoDate()}T17:00:00.000Z`,
+			}),
+		);
+	});
+
+	it('round-trips an existing event\'s start time into the Start Time field on edit', () => {
+		render(
+			<CatalogEventModal
+				mode="edit"
+				open
+				programs={programs}
+				parentProgram={programs[0]}
+				event={{ ...baseEvent, start: '2026-09-02T14:30:00.000Z' }}
+				onCancel={onCancel}
+				onSave={onSave}
+			/>,
+		);
+
+		expect(screen.getByRole('button', { name: /Start Time: 2:30 PM/i })).toBeInTheDocument();
+	});
+
+	it('allows create with No program (standalone event)', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Standalone');
+		await pickRequiredStart(user);
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).toHaveBeenCalledWith(
+			expect.not.objectContaining({
+				programId: expect.anything(),
+			}),
+		);
+		expect(onSave).toHaveBeenCalledWith(
+			expect.objectContaining({
+				name: 'Standalone',
+				start: `${todayIsoDate()}T09:00:00.000Z`,
+			}),
+		);
 	});
 
 	it('shows read-only Program in edit mode and clears capacity with null', async () => {
@@ -66,14 +187,7 @@ describe('CatalogEventModal', () => {
 				open
 				programs={programs}
 				parentProgram={programs[0]}
-				event={{
-					id: 'ev-1',
-					name: 'Keynote',
-					partsAttendedOption: 'Keynote',
-					attendanceProperty: 'atlassian_event__customer_event_attendance',
-					archived: false,
-					capacity: 100,
-				}}
+				event={{ ...baseEvent, capacity: 100 }}
 				onCancel={onCancel}
 				onSave={onSave}
 			/>,
@@ -81,11 +195,45 @@ describe('CatalogEventModal', () => {
 		const user = userEvent.setup();
 
 		expect(screen.getByText('Program:')).toBeInTheDocument();
+		expect(screen.getByText('Atlassian Event 2026')).toBeInTheDocument();
 		expect(screen.queryByLabelText('Program')).toBeNull();
 		await user.clear(screen.getByLabelText('Capacity'));
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
 		expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ capacity: null }));
+	});
+
+	it('shows Archive Event in edit mode and calls onArchive', async () => {
+		const onArchive = vi.fn().mockResolvedValue(undefined);
+		render(
+			<CatalogEventModal
+				mode="edit"
+				open
+				programs={programs}
+				event={{ ...baseEvent, archived: false }}
+				onCancel={onCancel}
+				onSave={onSave}
+				onArchive={onArchive}
+			/>,
+		);
+		await userEvent.setup().click(screen.getByRole('button', { name: 'Archive Event' }));
+		expect(onArchive).toHaveBeenCalled();
+	});
+
+	it('allows edit of a standalone event with No program label', () => {
+		render(
+			<CatalogEventModal
+				mode="edit"
+				open
+				programs={programs}
+				parentProgram={null}
+				event={{ ...baseEvent, id: 'ev-solo', programId: null, name: 'Solo' }}
+				onCancel={onCancel}
+				onSave={onSave}
+			/>,
+		);
+
+		expect(screen.getByText('No program')).toBeInTheDocument();
 	});
 
 	it('renders hostile owner text safely in the input value', () => {
@@ -96,11 +244,9 @@ describe('CatalogEventModal', () => {
 				programs={programs}
 				parentProgram={programs[0]}
 				event={{
+					...baseEvent,
 					id: 'ev-xss',
 					name: 'VIP',
-					partsAttendedOption: 'VIP',
-					attendanceProperty: 'atlassian_event__vip_event_attendance',
-					archived: false,
 					owner: '"><script>alert(1)</script>',
 				}}
 				onCancel={onCancel}
@@ -117,7 +263,7 @@ describe('CatalogEventModal', () => {
 		expect(document.querySelector('select')).toBeNull();
 
 		const user = userEvent.setup();
-		await user.click(screen.getByRole('button', { name: 'Program' }));
+		await user.click(screen.getByRole('button', { name: /^Program/ }));
 
 		const listbox = screen.getByRole('listbox');
 		expect(listbox).toBeInTheDocument();
@@ -128,14 +274,14 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.click(screen.getByRole('button', { name: 'Program' }));
+		await user.click(screen.getByRole('button', { name: /^Program/ }));
 		await user.click(screen.getByRole('option', { name: 'QA Program 2026' }));
 
-		expect(screen.getByRole('button', { name: 'Program' })).toHaveTextContent('QA Program 2026');
+		expect(screen.getByRole('button', { name: /^Program/ })).toHaveTextContent('QA Program 2026');
 		expect(screen.queryByRole('listbox')).toBeNull();
 
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
 		expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ programId: 'prog-2' }));
@@ -145,13 +291,13 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.click(screen.getByRole('button', { name: 'Program' }));
+		await user.click(screen.getByRole('button', { name: /^Program/ }));
 		expect(screen.getByRole('listbox')).toBeInTheDocument();
 		await user.keyboard('{Escape}');
 		expect(screen.queryByRole('listbox')).toBeNull();
 		expect(onCancel).not.toHaveBeenCalled();
 
-		await user.click(screen.getByRole('button', { name: 'Program' }));
+		await user.click(screen.getByRole('button', { name: /^Program/ }));
 		expect(screen.getByRole('listbox')).toBeInTheDocument();
 		await user.click(document.body);
 		expect(screen.queryByRole('listbox')).toBeNull();
@@ -176,7 +322,7 @@ describe('CatalogEventModal', () => {
 		const walkInUrl = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
 
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), walkInUrl);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
@@ -192,7 +338,7 @@ describe('CatalogEventModal', () => {
 		const user = userEvent.setup();
 
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
 		expect(onSave).toHaveBeenCalledWith(
@@ -207,7 +353,7 @@ describe('CatalogEventModal', () => {
 		const user = userEvent.setup();
 
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), 'https://evil.example.com/form');
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
@@ -220,7 +366,7 @@ describe('CatalogEventModal', () => {
 		const user = userEvent.setup();
 
 		await user.type(screen.getByLabelText('Event name'), 'Keynote');
-		await user.type(screen.getByLabelText('Parts Attended option'), 'Keynote');
+		await pickRequiredStart(user);
 		await user.type(
 			screen.getByLabelText('Walk-in form URL (HubSpot)'),
 			'http://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890',
@@ -239,14 +385,7 @@ describe('CatalogEventModal', () => {
 				open
 				programs={programs}
 				parentProgram={programs[0]}
-				event={{
-					id: 'ev-1',
-					name: 'Keynote',
-					partsAttendedOption: 'Keynote',
-					attendanceProperty: 'atlassian_event__customer_event_attendance',
-					archived: false,
-					walkInFormUrl: walkInUrl,
-				}}
+				event={{ ...baseEvent, walkInFormUrl: walkInUrl }}
 				onCancel={onCancel}
 				onSave={onSave}
 			/>,
@@ -258,5 +397,16 @@ describe('CatalogEventModal', () => {
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
 		expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ walkInFormUrl: null }));
+	});
+
+	it('blocks create save when start is missing', async () => {
+		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
+		const user = userEvent.setup();
+
+		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.click(screen.getByRole('button', { name: 'Save Event' }));
+
+		expect(onSave).not.toHaveBeenCalled();
+		expect(screen.getByRole('alert')).toHaveTextContent('Start date is required');
 	});
 });

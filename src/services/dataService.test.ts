@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../config';
-import { MOCK_EVENTS, resetMockCheckInState, resetMockThemePreference } from '../data/mockData';
+import { getMockCatalog, resetMockCheckInState, resetMockThemePreference } from '../data/mockData';
 import { resetMockEmailDispatchState } from '../data/mockData';
 import {
 	adjustCapacity,
@@ -8,12 +8,14 @@ import {
 	confirmCheckIn,
 	createDataService,
 	createEmailDispatch,
-	fetchCapacityStatus,
+	fetchEventCapacityStatus,
+	fetchCatalog,
 	fetchEmailDispatchDetail,
 	fetchEmailLimits,
-	fetchEvents,
-	fetchSliceAttendees,
+	fetchEventAttendees,
 	fetchThemePreference,
+	removeAttendee,
+	undoCheckIn,
 	updateThemePreference,
 } from './dataService';
 
@@ -46,42 +48,52 @@ describe('dataService mock/live switch', () => {
 		CONFIG.MOCK_API_DELAY_MS = originalDelay;
 	});
 
-	it('returns mock events when USE_MOCK_API is true', async () => {
-		const result = await fetchEvents();
-		expect(result.events).toEqual(MOCK_EVENTS);
+	it('returns mock catalog when USE_MOCK_API is true', async () => {
+		const result = await fetchCatalog();
+		expect(result).toEqual(getMockCatalog());
 		expect(mockedApiRequest).not.toHaveBeenCalled();
 	});
 
 	it('calls apiRequest with bearer token when USE_MOCK_API is false', async () => {
 		CONFIG.USE_MOCK_API = false;
 		mockedApiRequest.mockResolvedValue({
-			events: [{ id: 'evt-live', name: 'Live Event', startDate: '2026-10-15T09:00:00.000Z', status: 'active' }],
+			events: [
+				{
+					id: 'evt-live',
+					programId: null,
+					name: 'Live Event',
+					start: '2026-10-15T09:00:00.000Z',
+					status: 'active',
+					publishState: 'published',
+					archived: false,
+				},
+			],
+			programs: [],
 		});
 
-		const result = await fetchEvents({ token: 'session-token-abc' });
+		const result = await fetchCatalog({ token: 'session-token-abc' });
 
-		expect(mockedApiRequest).toHaveBeenCalledWith('/events', {}, { token: 'session-token-abc' });
+		expect(mockedApiRequest).toHaveBeenCalledWith('/catalog', {}, { token: 'session-token-abc' });
 		expect(result.events[0]?.id).toBe('evt-live');
-		expect(result.events[0]?.dateIso).toBe('2026-10-15');
+		expect(result.events[0]?.start).toBe('2026-10-15T09:00:00.000Z');
 	});
 });
 
 describe('createDataService', () => {
 	it('binds the session token to fetch methods', async () => {
 		CONFIG.USE_MOCK_API = false;
-		mockedApiRequest.mockResolvedValue({ events: [] });
+		mockedApiRequest.mockResolvedValue({ events: [], programs: [] });
 
 		const service = createDataService('bound-token');
-		await service.fetchEvents();
+		await service.fetchCatalog();
 
-		expect(mockedApiRequest).toHaveBeenCalledWith('/events', {}, { token: 'bound-token' });
+		expect(mockedApiRequest).toHaveBeenCalledWith('/catalog', {}, { token: 'bound-token' });
 	});
 });
 
-describe('fetchSliceAttendees mock path', () => {
+describe('fetchEventAttendees mock path', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -97,7 +109,7 @@ describe('fetchSliceAttendees mock path', () => {
 	});
 
 	it('filters attendees by search query in mock mode', async () => {
-		const result = await fetchSliceAttendees(programId, eventId, { q: 'Jane' });
+		const result = await fetchEventAttendees(eventId, { q: 'Jane' });
 
 		expect(result.attendees).toHaveLength(1);
 		expect(result.attendees[0]?.firstName).toBe('Jane');
@@ -105,17 +117,68 @@ describe('fetchSliceAttendees mock path', () => {
 	});
 
 	it('filters attendees by checked-in status in mock mode', async () => {
-		const result = await fetchSliceAttendees(programId, eventId, { checkedIn: false });
+		const result = await fetchEventAttendees(eventId, { checkedIn: false });
 
 		expect(result.attendees).toHaveLength(1);
 		expect(result.attendees[0]?.contactId).toBe('mock-101');
 	});
 });
 
+describe('removeAttendee mock path', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+	const eventId = 'ev-mr-2026';
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockCheckInState();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('removes a non-checked-in attendee and drops them from the list', async () => {
+		const before = await fetchEventAttendees(eventId);
+		expect(before.attendees.some((person) => person.contactId === 'mock-101')).toBe(true);
+
+		const result = await removeAttendee(eventId, 'mock-101');
+		expect(result).toEqual({ contactId: 'mock-101', removed: true });
+
+		const after = await fetchEventAttendees(eventId);
+		expect(after.attendees.some((person) => person.contactId === 'mock-101')).toBe(false);
+		expect(mockedApiRequest).not.toHaveBeenCalled();
+	});
+
+	it('rejects while the attendee is checked in', async () => {
+		await expect(removeAttendee(eventId, 'mock-202')).rejects.toThrow('attendee_checked_in');
+	});
+
+	it('rejects when the contact is not registered', async () => {
+		await expect(removeAttendee(eventId, 'missing-contact')).rejects.toThrow('contact_not_registered');
+	});
+
+	it('calls DELETE on the live path when USE_MOCK_API is false', async () => {
+		CONFIG.USE_MOCK_API = false;
+		mockedApiRequest.mockResolvedValue({ contactId: 'c-live', removed: true });
+
+		const result = await removeAttendee(eventId, 'c-live', { token: 'session-token' });
+
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`events/${eventId}/attendees/c-live`,
+			{ method: 'DELETE' },
+			{ token: 'session-token' },
+		);
+		expect(result).toEqual({ contactId: 'c-live', removed: true });
+	});
+});
+
 describe('checkInScan mock path', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -132,10 +195,10 @@ describe('checkInScan mock path', () => {
 
 	it('returns contact summary from mock scan without calling apiRequest', async () => {
 		const jwt = buildMockCheckInJwt('mock-101', eventId);
-		const result = await checkInScan(programId, eventId, jwt);
+		const result = await checkInScan(eventId, jwt);
 
 		expect(result).toMatchObject({
-			programId,
+			programId: '_standalone',
 			eventId,
 			contact: {
 				contactId: 'mock-101',
@@ -149,10 +212,71 @@ describe('checkInScan mock path', () => {
 	});
 });
 
+describe('undoCheckIn mock path', () => {
+	const originalUseMockApi = CONFIG.USE_MOCK_API;
+	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
+	const eventId = 'ev-mr-2026';
+
+	beforeEach(() => {
+		CONFIG.USE_MOCK_API = true;
+		CONFIG.MOCK_API_DELAY_MS = 0;
+		resetMockCheckInState();
+		mockedApiRequest.mockReset();
+	});
+
+	afterEach(() => {
+		CONFIG.USE_MOCK_API = originalUseMockApi;
+		CONFIG.MOCK_API_DELAY_MS = originalDelay;
+	});
+
+	it('undoes a checked-in attendee back to registered', async () => {
+		const before = await fetchEventAttendees(eventId);
+		expect(before.attendees.find((person) => person.contactId === 'mock-202')?.checkedIn).toBe(true);
+
+		const result = await undoCheckIn(eventId, 'mock-202');
+		expect(result).toMatchObject({
+			contactId: 'mock-202',
+			checkedIn: false,
+			alreadyCheckedIn: true,
+		});
+
+		const after = await fetchEventAttendees(eventId);
+		expect(after.attendees.find((person) => person.contactId === 'mock-202')?.checkedIn).toBe(false);
+		expect(mockedApiRequest).not.toHaveBeenCalled();
+	});
+
+	it('is a no-op when the attendee is only registered', async () => {
+		const result = await undoCheckIn(eventId, 'mock-101');
+		expect(result).toMatchObject({
+			contactId: 'mock-101',
+			checkedIn: false,
+			alreadyCheckedIn: false,
+		});
+	});
+
+	it('calls POST checkin/undo on the live path when USE_MOCK_API is false', async () => {
+		CONFIG.USE_MOCK_API = false;
+		mockedApiRequest.mockResolvedValue({
+			contactId: 'c-live',
+			checkedIn: false,
+			alreadyCheckedIn: true,
+			attendeeType: 'customer',
+		});
+
+		const result = await undoCheckIn(eventId, 'c-live', { token: 'session-token' });
+
+		expect(mockedApiRequest).toHaveBeenCalledWith(
+			`events/${eventId}/checkin/undo`,
+			{ method: 'POST', body: JSON.stringify({ contactId: 'c-live' }) },
+			{ token: 'session-token' },
+		);
+		expect(result).toMatchObject({ contactId: 'c-live', checkedIn: false, alreadyCheckedIn: true });
+	});
+});
+
 describe('confirmCheckIn mock path', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -168,7 +292,7 @@ describe('confirmCheckIn mock path', () => {
 	});
 
 	it('checks in a contact and is idempotent on repeat', async () => {
-		const first = await confirmCheckIn(programId, eventId, 'mock-101');
+		const first = await confirmCheckIn(eventId, 'mock-101');
 		expect(first).toEqual({
 			contactId: 'mock-101',
 			checkedIn: true,
@@ -176,7 +300,7 @@ describe('confirmCheckIn mock path', () => {
 			attendeeType: 'customer',
 		});
 
-		const second = await confirmCheckIn(programId, eventId, 'mock-101');
+		const second = await confirmCheckIn(eventId, 'mock-101');
 		expect(second).toEqual({
 			contactId: 'mock-101',
 			checkedIn: true,
@@ -187,7 +311,7 @@ describe('confirmCheckIn mock path', () => {
 	});
 
 	it('returns alreadyCheckedIn for contacts checked in in mock seed data', async () => {
-		const result = await confirmCheckIn(programId, eventId, 'mock-202');
+		const result = await confirmCheckIn(eventId, 'mock-202');
 
 		expect(result).toEqual({
 			contactId: 'mock-202',
@@ -198,10 +322,9 @@ describe('confirmCheckIn mock path', () => {
 	});
 });
 
-describe('fetchCapacityStatus mock path', () => {
+describe('fetchEventCapacityStatus mock path', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -217,9 +340,9 @@ describe('fetchCapacityStatus mock path', () => {
 	});
 
 	it('returns live attendance snapshot from mock seed', async () => {
-		const result = await fetchCapacityStatus(programId, eventId);
+		const result = await fetchEventCapacityStatus(eventId);
 		expect(result).toMatchObject({
-			programId,
+			programId: '_standalone',
 			eventId,
 			capacity: 100,
 			checkedInCount: 1,
@@ -233,7 +356,6 @@ describe('fetchCapacityStatus mock path', () => {
 describe('adjustCapacity mock path', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -249,18 +371,18 @@ describe('adjustCapacity mock path', () => {
 	});
 
 	it('adjusts down and up within bounds', async () => {
-		const down = await adjustCapacity(programId, eventId, 'down');
+		const down = await adjustCapacity(eventId, 'down');
 		expect(down.liveAttendance).toBe(0);
 		expect(down.departureCount).toBe(1);
 
-		const up = await adjustCapacity(programId, eventId, 'up');
+		const up = await adjustCapacity(eventId, 'up');
 		expect(up.liveAttendance).toBe(1);
 		expect(up.departureCount).toBe(0);
 	});
 
 	it('rejects adjust down at floor', async () => {
-		await adjustCapacity(programId, eventId, 'down');
-		await expect(adjustCapacity(programId, eventId, 'down')).rejects.toThrow('capacity_at_floor');
+		await adjustCapacity(eventId, 'down');
+		await expect(adjustCapacity(eventId, 'down')).rejects.toThrow('capacity_at_floor');
 	});
 });
 
@@ -282,7 +404,11 @@ describe('theme preference mock path (T013)', () => {
 
 	it('defaults to aurora with celebration not allowed for a non-allowlisted email', async () => {
 		const result = await fetchThemePreference('staff@adaptavist.com');
-		expect(result).toEqual({ theme: 'aurora', celebrationAllowed: false });
+		expect(result).toEqual({
+			theme: 'aurora',
+			celebrationAllowed: false,
+			celebrationToastMessage: null,
+		});
 	});
 
 	it('rejects setting celebration for a non-allowlisted email, stored value unchanged', async () => {
@@ -295,13 +421,59 @@ describe('theme preference mock path (T013)', () => {
 	});
 
 	it('a previously-stored celebration preference resolves to aurora once no longer allowlisted', async () => {
-		await updateThemePreference('celebration', CONFIG.CELEBRATION_THEME_EMAIL);
+		const allowlistedEmail = CONFIG.CELEBRATION_THEME_EMAIL[0];
+		await updateThemePreference('celebration', allowlistedEmail);
 
-		const asAllowlisted = await fetchThemePreference(CONFIG.CELEBRATION_THEME_EMAIL);
-		expect(asAllowlisted).toEqual({ theme: 'celebration', celebrationAllowed: true });
+		const asAllowlisted = await fetchThemePreference(allowlistedEmail);
+		expect(asAllowlisted).toEqual({
+			theme: 'celebration',
+			celebrationAllowed: true,
+			celebrationToastMessage: 'Just for you',
+		});
 
 		const asOtherUser = await fetchThemePreference('staff@adaptavist.com');
-		expect(asOtherUser).toEqual({ theme: 'aurora', celebrationAllowed: false });
+		expect(asOtherUser).toEqual({
+			theme: 'aurora',
+			celebrationAllowed: false,
+			celebrationToastMessage: null,
+		});
+	});
+
+	it('allows celebration for a second email added to the allowlist, not just the first', async () => {
+		const originalList = [...CONFIG.CELEBRATION_THEME_EMAIL];
+		CONFIG.CELEBRATION_THEME_EMAIL = [...originalList, 'second@adaptavist.com'];
+
+		try {
+			const result = await updateThemePreference('celebration', 'second@adaptavist.com');
+			expect(result).toMatchObject({
+				theme: 'celebration',
+				celebrationAllowed: true,
+				celebrationToastMessage: null,
+			});
+		} finally {
+			CONFIG.CELEBRATION_THEME_EMAIL = originalList;
+		}
+	});
+
+	it('returns a toast message for toast-list emails who are not on the theme list', async () => {
+		const originalTheme = [...CONFIG.CELEBRATION_THEME_EMAIL];
+		const originalToast = [...CONFIG.CELEBRATION_TOAST_EMAIL];
+		CONFIG.CELEBRATION_THEME_EMAIL = ['theme@adaptavist.com'];
+		CONFIG.CELEBRATION_TOAST_EMAIL = ['toast@adaptavist.com'];
+		CONFIG.CELEBRATION_TOAST_MESSAGE = 'Hello toast';
+
+		try {
+			const result = await fetchThemePreference('toast@adaptavist.com');
+			expect(result).toEqual({
+				theme: 'aurora',
+				celebrationAllowed: false,
+				celebrationToastMessage: 'Hello toast',
+			});
+		} finally {
+			CONFIG.CELEBRATION_THEME_EMAIL = originalTheme;
+			CONFIG.CELEBRATION_TOAST_EMAIL = originalToast;
+			CONFIG.CELEBRATION_TOAST_MESSAGE = 'Just for you';
+		}
 	});
 
 	it('persists a non-gated theme choice', async () => {
@@ -326,16 +498,29 @@ describe('theme preference live path (T013)', () => {
 	});
 
 	it('maps getThemePreference to GET user/prefs', async () => {
-		mockedApiRequest.mockResolvedValue({ theme: 'darkAurora', celebrationAllowed: false });
+		mockedApiRequest.mockResolvedValue({
+			theme: 'darkAurora',
+			celebrationAllowed: false,
+			celebrationToastMessage: null,
+		});
 
 		const result = await fetchThemePreference(undefined, { token: 'session-token' });
 
 		expect(mockedApiRequest).toHaveBeenCalledWith('user/prefs', {}, { token: 'session-token' });
-		expect(result).toEqual({ theme: 'darkAurora', celebrationAllowed: false });
+		expect(result).toEqual({
+			theme: 'darkAurora',
+			celebrationAllowed: false,
+			celebrationToastMessage: null,
+		});
 	});
 
 	it('maps setThemePreference to PUT user/prefs/theme', async () => {
-		mockedApiRequest.mockResolvedValue({ theme: 'aurora', celebrationAllowed: false, updatedAt: '2026-07-13T10:00:00.000Z' });
+		mockedApiRequest.mockResolvedValue({
+			theme: 'aurora',
+			celebrationAllowed: false,
+			celebrationToastMessage: null,
+			updatedAt: '2026-07-13T10:00:00.000Z',
+		});
 
 		const result = await updateThemePreference('aurora', undefined, { token: 'session-token' });
 
@@ -356,10 +541,9 @@ describe('theme preference live path (T013)', () => {
 	});
 });
 
-describe('email dataService catalog-scoped paths', () => {
+describe('email dataService event-scoped paths', () => {
 	const originalUseMockApi = CONFIG.USE_MOCK_API;
 	const originalDelay = CONFIG.MOCK_API_DELAY_MS;
-	const programId = 'prog-atlassian-2026';
 	const eventId = 'ev-mr-2026';
 
 	beforeEach(() => {
@@ -375,7 +559,7 @@ describe('email dataService catalog-scoped paths', () => {
 	});
 
 	it('returns mock email limits without calling apiRequest', async () => {
-		const result = await fetchEmailLimits(programId, eventId);
+		const result = await fetchEmailLimits(eventId);
 		expect(result).toMatchObject({
 			dispatchLimitPerHour: 10,
 			largeSendThreshold: CONFIG.EMAIL_SEND_CONFIRM_THRESHOLD,
@@ -411,13 +595,13 @@ describe('email dataService catalog-scoped paths', () => {
 		});
 
 		const service = createDataService('email-token');
-		await service.fetchEmailLimits(programId, eventId);
-		await service.fetchEmailTemplates(programId, eventId);
-		await service.previewEmailDispatch(programId, eventId, {
+		await service.fetchEmailLimits(eventId);
+		await service.fetchEmailTemplates(eventId);
+		await service.previewEmailDispatch(eventId, {
 			templateId: '123456789',
 			audience: { type: 'registered_all' },
 		});
-		await service.createEmailDispatch(programId, eventId, {
+		await service.createEmailDispatch(eventId, {
 			dispatchName: 'Live send',
 			templateId: '123456789',
 			audience: { type: 'registered_all' },
@@ -425,30 +609,30 @@ describe('email dataService catalog-scoped paths', () => {
 			timezone: null,
 			idempotencyKey: '550e8400-e29b-41d4-a716-446655440000',
 		});
-		await service.fetchEmailDispatches(programId, eventId, { view: 'log' });
+		await service.fetchEmailDispatches(eventId, { view: 'log' });
 
 		expect(mockedApiRequest).toHaveBeenCalledWith(
-			`programs/${programId}/events/${eventId}/email/limits`,
+			`events/${eventId}/email/limits`,
 			{},
 			{ token: 'email-token' },
 		);
 		expect(mockedApiRequest).toHaveBeenCalledWith(
-			`programs/${programId}/events/${eventId}/email/templates`,
+			`events/${eventId}/email/templates`,
 			{},
 			{ token: 'email-token' },
 		);
 		expect(mockedApiRequest).toHaveBeenCalledWith(
-			`programs/${programId}/events/${eventId}/email/preview`,
+			`events/${eventId}/email/preview`,
 			expect.objectContaining({ method: 'POST' }),
 			{ token: 'email-token' },
 		);
 		expect(mockedApiRequest).toHaveBeenCalledWith(
-			`programs/${programId}/events/${eventId}/email/dispatches`,
+			`events/${eventId}/email/dispatches`,
 			expect.objectContaining({ method: 'POST' }),
 			{ token: 'email-token' },
 		);
 		expect(mockedApiRequest).toHaveBeenCalledWith(
-			`programs/${programId}/events/${eventId}/email/dispatches?view=log`,
+			`events/${eventId}/email/dispatches?view=log`,
 			{},
 			{ token: 'email-token' },
 		);
@@ -464,15 +648,15 @@ describe('email dataService catalog-scoped paths', () => {
 			idempotencyKey: '660e8400-e29b-41d4-a716-446655440001',
 		};
 
-		const first = await createEmailDispatch(programId, eventId, body);
-		const second = await createEmailDispatch(programId, eventId, body);
+		const first = await createEmailDispatch(eventId, body);
+		const second = await createEmailDispatch(eventId, body);
 
 		expect(second.dispatchId).toBe(first.dispatchId);
 		expect(mockedApiRequest).not.toHaveBeenCalled();
 	});
 
 	it('fetches dispatch detail from mock store with catalog context', async () => {
-		const created = await createEmailDispatch(programId, eventId, {
+		const created = await createEmailDispatch(eventId, {
 			dispatchName: 'Detail test',
 			templateId: '123456789',
 			audience: { type: 'registered_all' },
@@ -481,7 +665,7 @@ describe('email dataService catalog-scoped paths', () => {
 			idempotencyKey: '770e8400-e29b-41d4-a716-446655440002',
 		});
 
-		const detail = await fetchEmailDispatchDetail(programId, eventId, created.dispatchId);
+		const detail = await fetchEmailDispatchDetail(eventId, created.dispatchId);
 		expect(detail.dispatch.dispatchId).toBe(created.dispatchId);
 		expect(detail.recipients.length).toBeGreaterThan(0);
 		expect(detail.recipients.every((row) => row.outcome === 'sent')).toBe(true);

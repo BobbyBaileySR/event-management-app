@@ -8,8 +8,7 @@ import {
 	type EmailDispatchWorkflowDeps,
 } from './useEmailDispatchWorkflow';
 
-const programId = 'prog-1';
-const evId = 'ev-1';
+const eventId = 'ev-1';
 
 type WorkflowData = EmailDispatchWorkflowDeps['data'];
 
@@ -26,7 +25,7 @@ function makeData(recipientCount = 2, overrides: Partial<WorkflowData> = {}): Wo
 			.fn()
 			.mockResolvedValue({ segments: [{ id: 'seg-1', name: 'VIP', kind: 'active' as const }] }),
 		previewEmailDispatch: vi.fn().mockResolvedValue({ recipientCount }),
-		fetchSliceAttendees: vi.fn().mockResolvedValue({ attendees: [], page: 1, pageSize: 50, total: 0 }),
+		fetchEventAttendees: vi.fn().mockResolvedValue({ attendees: [], page: 1, pageSize: 50, total: 0 }),
 		fetchEmailDispatches: vi.fn().mockResolvedValue({ dispatches: [], page: 1, pageSize: 50, total: 0 }),
 		fetchEmailDispatchDetail: vi
 			.fn()
@@ -71,8 +70,7 @@ function renderWorkflow(deps: Partial<EmailDispatchWorkflowDeps> = {}) {
 			data,
 			confirm,
 			showToast,
-			programId: deps.programId ?? programId,
-			evId: deps.evId ?? evId,
+			eventId: deps.eventId ?? eventId,
 		}),
 	);
 	return { ...result, data, confirm, showToast };
@@ -137,20 +135,22 @@ describe('useEmailDispatchWorkflow', () => {
 
 			expect(confirm).not.toHaveBeenCalled();
 			expect(data.createEmailDispatch).toHaveBeenCalledWith(
-				programId,
-				evId,
+				eventId,
 				expect.objectContaining({ dispatchName: 'Small send', scheduledAtUtc: null }),
 			);
-			const body = (data.createEmailDispatch as ReturnType<typeof vi.fn>).mock.calls[0][2];
+			const body = (data.createEmailDispatch as ReturnType<typeof vi.fn>).mock.calls[0][1];
 			expect(body).not.toHaveProperty('largeSendConfirmed');
 			expect(showToast).toHaveBeenCalledWith('Dispatch accepted — processing in the background.');
-			expect(result.current.dispatchName).toBe('');
+			// The dispatch name is auto-derived from the template, so it is not cleared after send.
+			expect(result.current.dispatchName).toBe('Small send');
 			expect(result.current.phase).toBe('draft');
 		});
 
-		it('blocks send when name is missing and surfaces a validation toast', async () => {
+		it('blocks send when no template is selected and surfaces a validation toast', async () => {
 			const { result, data, showToast } = await renderSettled();
 
+			// Clearing the template also clears the auto-derived dispatch name.
+			act(() => result.current.setTemplateId(''));
 			await act(async () => {
 				await result.current.handleSendNow();
 			});
@@ -174,7 +174,7 @@ describe('useEmailDispatchWorkflow', () => {
 			expect(confirm).toHaveBeenCalledWith(
 				expect.objectContaining({ message: expect.stringContaining('60 recipients') }),
 			);
-			const body = (data.createEmailDispatch as ReturnType<typeof vi.fn>).mock.calls[0][2];
+			const body = (data.createEmailDispatch as ReturnType<typeof vi.fn>).mock.calls[0][1];
 			expect(body).toMatchObject({ largeSendConfirmed: true });
 		});
 
@@ -206,8 +206,7 @@ describe('useEmailDispatchWorkflow', () => {
 			});
 
 			expect(data.createEmailDispatch).toHaveBeenCalledWith(
-				programId,
-				evId,
+				eventId,
 				expect.objectContaining({
 					dispatchName: 'Scheduled blast',
 					scheduledAtUtc: expect.any(String),
@@ -258,7 +257,7 @@ describe('useEmailDispatchWorkflow', () => {
 			});
 
 			expect(confirm).toHaveBeenCalledTimes(1);
-			expect(data.cancelEmailDispatch).toHaveBeenCalledWith(programId, evId, 'dsp-cancel');
+			expect(data.cancelEmailDispatch).toHaveBeenCalledWith(eventId, 'dsp-cancel');
 		});
 
 		it('does not cancel when the confirmation is declined', async () => {

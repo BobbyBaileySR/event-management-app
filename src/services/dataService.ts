@@ -1,21 +1,16 @@
 import { CONFIG } from '../config';
 import { apiRequest } from '../api/client';
 import {
-	MOCK_EVENTS,
-	MOCK_ATTENDEES,
 	MOCK_TEMPLATES,
-	MOCK_ANALYTICS,
-	MOCK_CAMPAIGN_METRICS,
 	MOCK_SCHEDULED_EMAILS,
-	MOCK_AGENDA,
-	MOCK_ACTIVITY,
-	getEventById,
 	getAuditLogForEvent,
 	getMockSliceAuditLog,
 	getMockCatalog,
 	getMockSliceAttendees,
 	mockCheckInScan,
 	mockConfirmCheckIn,
+	mockUndoCheckIn,
+	mockRemoveAttendee,
 	mockAdjustCapacity,
 	getMockCapacityStatus,
 	mockCreateEvent,
@@ -35,7 +30,6 @@ import {
 	setMockThemePreference,
 } from '../data/mockData';
 import {
-	normalizeAttendeesResponse,
 	normalizeCatalogResponse,
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
@@ -49,23 +43,18 @@ import {
 	normalizeEmailDispatchListResponse,
 	normalizeEmailDispatchDetailResponse,
 	normalizeCancelEmailDispatchResponse,
-	normalizeEventResponse,
-	normalizeEventsResponse,
 	normalizeSliceAttendeesResponse,
+	normalizeRemoveAttendeeResponse,
 } from '../utils/normalizeApi';
 import type {
-	ActivityItem,
-	AgendaSession,
-	AnalyticsConversion,
-	AttendeesResponse,
 	AuditEntry,
 	AuditLogListResult,
-	CampaignMetrics,
 	CatalogEventRecord,
 	CatalogProgramRecord,
 	CatalogResponse,
 	CheckInScanResponse,
 	ConfirmCheckInResponse,
+	UndoCheckInResponse,
 	CapacityStatus,
 	AdjustCapacityDirection,
 	CancelEmailDispatchResponse,
@@ -87,10 +76,9 @@ import type {
 	EmailPreviewPayload,
 	EmailSendPayload,
 	EmailTemplate,
-	EventResponse,
-	EventsResponse,
 	ScheduledEmail,
 	SliceAttendeesResponse,
+	RemoveAttendeeResponse,
 	ThemePreference,
 } from '../types';
 import type { ThemeId } from '../theme/themeTokens';
@@ -118,36 +106,6 @@ function mockDelay<T>(result: T): Promise<T> {
 
 function requestOptions(token?: string | null): { token?: string | null } {
 	return token ? { token } : {};
-}
-
-export async function fetchEvents(options: DataServiceOptions = {}): Promise<EventsResponse> {
-	const { token } = options;
-	return withMockFallback(
-		() => mockDelay({ events: MOCK_EVENTS }),
-		async () => normalizeEventsResponse((await apiRequest('/events', {}, requestOptions(token))) ?? {}) as EventsResponse,
-	);
-}
-
-export async function fetchEvent(eventId: string, options: DataServiceOptions = {}): Promise<EventResponse> {
-	const { token } = options;
-	return withMockFallback(
-		() => mockDelay({ event: getEventById(eventId) ?? null }),
-		async () =>
-			normalizeEventResponse(
-				(await apiRequest(`/events/${encodeURIComponent(eventId)}`, {}, requestOptions(token))) ?? {},
-			),
-	);
-}
-
-export async function fetchAttendees(eventId: string, options: DataServiceOptions = {}): Promise<AttendeesResponse> {
-	const { token } = options;
-	return withMockFallback(
-		() => mockDelay({ attendees: MOCK_ATTENDEES[eventId] ?? [] }),
-		async () =>
-			normalizeAttendeesResponse(
-				(await apiRequest(`/events/${encodeURIComponent(eventId)}/attendees`, {}, requestOptions(token))) ?? {},
-			) as AttendeesResponse,
-	);
 }
 
 export async function fetchTemplates(
@@ -205,42 +163,6 @@ export async function fetchAuditLog(
 	);
 }
 
-export async function fetchAnalytics(
-	eventId: string,
-	options: DataServiceOptions = {},
-): Promise<{ conversion: AnalyticsConversion }> {
-	const { token } = options;
-	return withMockFallback(
-		() =>
-			mockDelay({
-				conversion: MOCK_ANALYTICS[eventId] ?? { checkedIn: 0, registered: 0, cancelled: 0 },
-			}),
-		async () =>
-			(await apiRequest(`/events/${encodeURIComponent(eventId)}/analytics`, {}, requestOptions(token))) as {
-				conversion: AnalyticsConversion;
-			},
-	);
-}
-
-export async function fetchCampaignMetrics(
-	eventId: string,
-	options: DataServiceOptions = {},
-): Promise<{ metrics: CampaignMetrics }> {
-	const { token } = options;
-	return withMockFallback(
-		() =>
-			mockDelay({
-				metrics: MOCK_CAMPAIGN_METRICS[eventId] ?? { sent: 0, opened: 0, clicked: 0, bounced: 0 },
-			}),
-		async () =>
-			(await apiRequest(
-				`/events/${encodeURIComponent(eventId)}/analytics/campaign`,
-				{},
-				requestOptions(token),
-			)) as { metrics: CampaignMetrics },
-	);
-}
-
 export async function fetchScheduledEmails(
 	eventId: string,
 	options: DataServiceOptions = {},
@@ -254,34 +176,6 @@ export async function fetchScheduledEmails(
 				{},
 				requestOptions(token),
 			)) as { scheduled: ScheduledEmail[] },
-	);
-}
-
-export async function fetchAgenda(
-	eventId: string,
-	options: DataServiceOptions = {},
-): Promise<{ sessions: AgendaSession[] }> {
-	const { token } = options;
-	return withMockFallback(
-		() => mockDelay({ sessions: MOCK_AGENDA[eventId] ?? [] }),
-		async () =>
-			(await apiRequest(`/events/${encodeURIComponent(eventId)}/agenda`, {}, requestOptions(token))) as {
-				sessions: AgendaSession[];
-			},
-	);
-}
-
-export async function fetchActivity(
-	eventId: string,
-	options: DataServiceOptions = {},
-): Promise<{ activity: ActivityItem[] }> {
-	const { token } = options;
-	return withMockFallback(
-		() => mockDelay({ activity: MOCK_ACTIVITY[eventId] ?? [] }),
-		async () =>
-			(await apiRequest(`/events/${encodeURIComponent(eventId)}/activity`, {}, requestOptions(token))) as {
-				activity: ActivityItem[];
-			},
 	);
 }
 
@@ -366,8 +260,93 @@ export async function fetchCatalog(options: FetchCatalogOptions = {}): Promise<C
 	);
 }
 
+/** @deprecated Prefer `fetchEventAttendees` — event-scoped path; programId ignored. */
 export async function fetchSliceAttendees(
-	programId: string,
+	_programId: string,
+	eventId: string,
+	query: {
+		checkedIn?: boolean;
+		q?: string;
+		page?: number;
+		pageSize?: number;
+		dispatchId?: string;
+		dispatchFilter?: 'received' | 'not_received';
+	} = {},
+	options: DataServiceOptions = {},
+): Promise<SliceAttendeesResponse> {
+	return fetchEventAttendees(eventId, query, options);
+}
+
+export async function checkInScan(
+	eventId: string,
+	jwt: string,
+	options: DataServiceOptions = {},
+): Promise<CheckInScanResponse> {
+	const { token } = options;
+	const route = `events/${encodeURIComponent(eventId)}/checkin/scan`;
+
+	return withMockFallback(
+		() => mockDelay(mockCheckInScan('_standalone', eventId, jwt)),
+		async () =>
+			normalizeCheckInScanResponse(
+				((await apiRequest(
+					route,
+					{ method: 'POST', body: JSON.stringify({ jwt }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+export async function confirmCheckIn(
+	eventId: string,
+	contactId: string,
+	options: DataServiceOptions = {},
+): Promise<ConfirmCheckInResponse> {
+	const { token } = options;
+	const route = `events/${encodeURIComponent(eventId)}/checkin`;
+
+	return withMockFallback(
+		() => mockDelay(mockConfirmCheckIn('_standalone', eventId, contactId)),
+		async () =>
+			normalizeConfirmCheckInResponse(
+				((await apiRequest(
+					route,
+					{ method: 'POST', body: JSON.stringify({ contactId }) },
+					requestOptions(token),
+				)) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+/** @deprecated Prefer `fetchEventCapacityStatus` — event-scoped path; programId ignored. */
+export async function fetchCapacityStatus(
+	_programId: string,
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<CapacityStatus> {
+	return fetchEventCapacityStatus(eventId, options);
+}
+
+/** Event-scoped capacity (T071 / R-007) — preferred when Program membership is optional/unknown. */
+export async function fetchEventCapacityStatus(
+	eventId: string,
+	options: DataServiceOptions = {},
+): Promise<CapacityStatus> {
+	const { token } = options;
+	const route = `events/${encodeURIComponent(eventId)}/capacity`;
+
+	return withMockFallback(
+		() => mockDelay(getMockCapacityStatus('_standalone', eventId)),
+		async () =>
+			normalizeCapacityStatusResponse(
+				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			),
+	);
+}
+
+/** Event-scoped attendee list (T071) — no Program required in the path. */
+export async function fetchEventAttendees(
 	eventId: string,
 	query: {
 		checkedIn?: boolean;
@@ -398,10 +377,10 @@ export async function fetchSliceAttendees(
 		search.set('dispatchFilter', query.dispatchFilter);
 	}
 	const suffix = search.toString() ? `?${search}` : '';
-	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/attendees${suffix}`;
+	const route = `events/${encodeURIComponent(eventId)}/attendees${suffix}`;
 
 	return withMockFallback(
-		() => mockDelay(getMockSliceAttendees(programId, eventId, query)),
+		() => mockDelay(getMockSliceAttendees('_standalone', eventId, query)),
 		async () =>
 			normalizeSliceAttendeesResponse(
 				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
@@ -409,39 +388,20 @@ export async function fetchSliceAttendees(
 	);
 }
 
-export async function checkInScan(
-	programId: string,
-	eventId: string,
-	jwt: string,
-	options: DataServiceOptions = {},
-): Promise<CheckInScanResponse> {
-	const { token } = options;
-	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/checkin/scan`;
-
-	return withMockFallback(
-		() => mockDelay(mockCheckInScan(programId, eventId, jwt)),
-		async () =>
-			normalizeCheckInScanResponse(
-				((await apiRequest(
-					route,
-					{ method: 'POST', body: JSON.stringify({ jwt }) },
-					requestOptions(token),
-				)) ?? {}) as Record<string, unknown>,
-			),
-	);
-}
-
-export async function confirmCheckIn(
-	programId: string,
+/**
+ * `POST events/{evId}/checkin/undo` (R-006) — flips association label checked-in → registered.
+ * No-op (still succeeds) when the contact is only registered.
+ */
+export async function undoCheckIn(
 	eventId: string,
 	contactId: string,
 	options: DataServiceOptions = {},
-): Promise<ConfirmCheckInResponse> {
+): Promise<UndoCheckInResponse> {
 	const { token } = options;
-	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/checkin`;
+	const route = `events/${encodeURIComponent(eventId)}/checkin/undo`;
 
 	return withMockFallback(
-		() => mockDelay(mockConfirmCheckIn(programId, eventId, contactId)),
+		() => mockDelay(mockUndoCheckIn('_standalone', eventId, contactId)),
 		async () =>
 			normalizeConfirmCheckInResponse(
 				((await apiRequest(
@@ -453,36 +413,42 @@ export async function confirmCheckIn(
 	);
 }
 
-export async function fetchCapacityStatus(
-	programId: string,
+/**
+ * `DELETE events/{evId}/attendees/{contactId}` (R-006) — removes a registered attendee
+ * entirely. Blocked while checked in (`attendee_checked_in`) — undo check-in first.
+ */
+export async function removeAttendee(
 	eventId: string,
+	contactId: string,
 	options: DataServiceOptions = {},
-): Promise<CapacityStatus> {
+): Promise<RemoveAttendeeResponse> {
 	const { token } = options;
-	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/capacity`;
+	const route = `events/${encodeURIComponent(eventId)}/attendees/${encodeURIComponent(contactId)}`;
 
 	return withMockFallback(
-		() => mockDelay(getMockCapacityStatus(programId, eventId)),
+		() => mockDelay(mockRemoveAttendee('_standalone', eventId, contactId)),
 		async () =>
-			normalizeCapacityStatusResponse(
-				((await apiRequest(route, {}, requestOptions(token))) ?? {}) as Record<string, unknown>,
+			normalizeRemoveAttendeeResponse(
+				((await apiRequest(route, { method: 'DELETE' }, requestOptions(token))) ?? {}) as Record<
+					string,
+					unknown
+				>,
 			),
 	);
 }
 
 export async function adjustCapacity(
-	programId: string,
 	eventId: string,
 	direction: AdjustCapacityDirection,
 	options: DataServiceOptions = {},
 ): Promise<CapacityStatus> {
 	const { token } = options;
-	const route = `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/capacity/adjust`;
+	const route = `events/${encodeURIComponent(eventId)}/capacity/adjust`;
 
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(mockAdjustCapacity(programId, eventId, direction));
+				return mockDelay(mockAdjustCapacity('_standalone', eventId, direction));
 			} catch (error) {
 				mapMockCapacityError(error);
 			}
@@ -617,8 +583,8 @@ export async function createEvent(
 				return mockDelay({
 					event: {
 						...event,
-						programId: body.programId,
-						archivedViaProgramId: null,
+						programId: body.programId ?? null,
+						archivedViaProgramId: event.archivedViaProgramId ?? null,
 					} as CatalogEventRecord,
 				});
 			} catch (error) {
@@ -644,14 +610,13 @@ export async function updateEvent(
 		() => {
 			try {
 				const event = mockUpdateEvent(id, body);
-				const program = getMockCatalog(true).programs.find((entry) =>
-					entry.events.some((candidate) => candidate.id === id),
-				);
+				const programId =
+					getMockCatalog(true).events.find((candidate) => candidate.id === id)?.programId ?? null;
 				return mockDelay({
 					event: {
 						...event,
-						programId: program?.id ?? '',
-						archivedViaProgramId: null,
+						programId,
+						archivedViaProgramId: event.archivedViaProgramId ?? null,
 					} as CatalogEventRecord,
 				});
 			} catch (error) {
@@ -667,8 +632,8 @@ export async function updateEvent(
 	);
 }
 
-function emailRoute(programId: string, eventId: string, suffix = ''): string {
-	return `programs/${encodeURIComponent(programId)}/events/${encodeURIComponent(eventId)}/email${suffix}`;
+function emailRoute(eventId: string, suffix = ''): string {
+	return `events/${encodeURIComponent(eventId)}/email${suffix}`;
 }
 
 function mapMockEmailError(error: unknown): never {
@@ -679,16 +644,15 @@ function mapMockEmailError(error: unknown): never {
 }
 
 export async function fetchEmailLimits(
-	programId: string,
 	eventId: string,
 	options: DataServiceOptions = {},
 ): Promise<EmailDispatchLimits> {
 	const { token } = options;
 	return withMockFallback(
-		() => mockDelay(getMockEmailLimits(programId, eventId)),
+		() => mockDelay(getMockEmailLimits('_standalone', eventId)),
 		async () =>
 			normalizeEmailLimitsResponse(
-				((await apiRequest(emailRoute(programId, eventId, '/limits'), {}, requestOptions(token))) ?? {}) as Record<
+				((await apiRequest(emailRoute(eventId, '/limits'), {}, requestOptions(token))) ?? {}) as Record<
 					string,
 					unknown
 				>,
@@ -697,16 +661,15 @@ export async function fetchEmailLimits(
 }
 
 export async function fetchEmailTemplates(
-	programId: string,
 	eventId: string,
 	options: DataServiceOptions = {},
 ): Promise<EmailTemplatesListResponse> {
 	const { token } = options;
 	return withMockFallback(
-		() => mockDelay(getMockEmailTemplates(programId, eventId)),
+		() => mockDelay(getMockEmailTemplates('_standalone', eventId)),
 		async () =>
 			normalizeEmailTemplatesResponse(
-				((await apiRequest(emailRoute(programId, eventId, '/templates'), {}, requestOptions(token))) ?? {}) as Record<
+				((await apiRequest(emailRoute(eventId, '/templates'), {}, requestOptions(token))) ?? {}) as Record<
 					string,
 					unknown
 				>,
@@ -715,16 +678,15 @@ export async function fetchEmailTemplates(
 }
 
 export async function fetchEmailSegments(
-	programId: string,
 	eventId: string,
 	options: DataServiceOptions = {},
 ): Promise<EmailSegmentsListResponse> {
 	const { token } = options;
 	return withMockFallback(
-		() => mockDelay(getMockEmailSegments(programId, eventId)),
+		() => mockDelay(getMockEmailSegments('_standalone', eventId)),
 		async () =>
 			normalizeEmailSegmentsResponse(
-				((await apiRequest(emailRoute(programId, eventId, '/segments'), {}, requestOptions(token))) ?? {}) as Record<
+				((await apiRequest(emailRoute(eventId, '/segments'), {}, requestOptions(token))) ?? {}) as Record<
 					string,
 					unknown
 				>,
@@ -733,7 +695,6 @@ export async function fetchEmailSegments(
 }
 
 export async function previewEmailDispatch(
-	programId: string,
 	eventId: string,
 	body: EmailPreviewRequestBody,
 	options: DataServiceOptions = {},
@@ -742,7 +703,7 @@ export async function previewEmailDispatch(
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(mockPreviewEmailDispatch(programId, eventId, body));
+				return mockDelay(mockPreviewEmailDispatch('_standalone', eventId, body));
 			} catch (error) {
 				mapMockEmailError(error);
 			}
@@ -750,7 +711,7 @@ export async function previewEmailDispatch(
 		async () =>
 			normalizeEmailPreviewResponse(
 				((await apiRequest(
-					emailRoute(programId, eventId, '/preview'),
+					emailRoute(eventId, '/preview'),
 					{ method: 'POST', body: JSON.stringify(body) },
 					requestOptions(token),
 				)) ?? {}) as Record<string, unknown>,
@@ -759,7 +720,6 @@ export async function previewEmailDispatch(
 }
 
 export async function createEmailDispatch(
-	programId: string,
 	eventId: string,
 	body: CreateEmailDispatchBody,
 	options: DataServiceOptions = {},
@@ -768,7 +728,7 @@ export async function createEmailDispatch(
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(mockCreateEmailDispatch(programId, eventId, body));
+				return mockDelay(mockCreateEmailDispatch('_standalone', eventId, body));
 			} catch (error) {
 				mapMockEmailError(error);
 			}
@@ -776,7 +736,7 @@ export async function createEmailDispatch(
 		async () =>
 			normalizeCreateEmailDispatchResponse(
 				((await apiRequest(
-					emailRoute(programId, eventId, '/dispatches'),
+					emailRoute(eventId, '/dispatches'),
 					{ method: 'POST', body: JSON.stringify(body) },
 					requestOptions(token),
 				)) ?? {}) as Record<string, unknown>,
@@ -791,7 +751,6 @@ export interface FetchEmailDispatchesQuery {
 }
 
 export async function fetchEmailDispatches(
-	programId: string,
 	eventId: string,
 	query: FetchEmailDispatchesQuery = {},
 	options: DataServiceOptions = {},
@@ -810,17 +769,16 @@ export async function fetchEmailDispatches(
 	const suffix = search.toString() ? `?${search}` : '';
 
 	return withMockFallback(
-		() => mockDelay(getMockEmailDispatches(programId, eventId, query)),
+		() => mockDelay(getMockEmailDispatches('_standalone', eventId, query)),
 		async () =>
 			normalizeEmailDispatchListResponse(
-				((await apiRequest(emailRoute(programId, eventId, `/dispatches${suffix}`), {}, requestOptions(token))) ??
+				((await apiRequest(emailRoute(eventId, `/dispatches${suffix}`), {}, requestOptions(token))) ??
 					{}) as Record<string, unknown>,
 			),
 	);
 }
 
 export async function fetchEmailDispatchDetail(
-	programId: string,
 	eventId: string,
 	dispatchId: string,
 	query: { page?: number; pageSize?: number } = {},
@@ -839,7 +797,7 @@ export async function fetchEmailDispatchDetail(
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(getMockEmailDispatchDetail(programId, eventId, dispatchId, query));
+				return mockDelay(getMockEmailDispatchDetail('_standalone', eventId, dispatchId, query));
 			} catch (error) {
 				mapMockEmailError(error);
 			}
@@ -847,7 +805,7 @@ export async function fetchEmailDispatchDetail(
 		async () =>
 			normalizeEmailDispatchDetailResponse(
 				((await apiRequest(
-					emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}${suffix}`),
+					emailRoute(eventId, `/dispatches/${encodeURIComponent(dispatchId)}${suffix}`),
 					{},
 					requestOptions(token),
 				)) ?? {}) as Record<string, unknown>,
@@ -856,7 +814,6 @@ export async function fetchEmailDispatchDetail(
 }
 
 export async function updateEmailDispatch(
-	programId: string,
 	eventId: string,
 	dispatchId: string,
 	body: PatchEmailDispatchBody,
@@ -866,14 +823,14 @@ export async function updateEmailDispatch(
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(mockUpdateEmailDispatch(programId, eventId, dispatchId, body));
+				return mockDelay(mockUpdateEmailDispatch('_standalone', eventId, dispatchId, body));
 			} catch (error) {
 				mapMockEmailError(error);
 			}
 		},
 		async () => {
 			const response = (await apiRequest(
-				emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
+				emailRoute(eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
 				{ method: 'PATCH', body: JSON.stringify(body) },
 				requestOptions(token),
 			)) as Record<string, unknown>;
@@ -884,7 +841,6 @@ export async function updateEmailDispatch(
 }
 
 export async function cancelEmailDispatch(
-	programId: string,
 	eventId: string,
 	dispatchId: string,
 	options: DataServiceOptions = {},
@@ -893,7 +849,7 @@ export async function cancelEmailDispatch(
 	return withMockFallback(
 		() => {
 			try {
-				return mockDelay(mockCancelEmailDispatch(programId, eventId, dispatchId));
+				return mockDelay(mockCancelEmailDispatch('_standalone', eventId, dispatchId));
 			} catch (error) {
 				mapMockEmailError(error);
 			}
@@ -901,7 +857,7 @@ export async function cancelEmailDispatch(
 		async () =>
 			normalizeCancelEmailDispatchResponse(
 				((await apiRequest(
-					emailRoute(programId, eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
+					emailRoute(eventId, `/dispatches/${encodeURIComponent(dispatchId)}`),
 					{ method: 'DELETE' },
 					requestOptions(token),
 				)) ?? {}) as Record<string, unknown>,
@@ -913,23 +869,16 @@ export async function cancelEmailDispatch(
 export function createDataService(token?: string | null) {
 	const options: DataServiceOptions = { token };
 	return {
-		fetchEvents: () => fetchEvents(options),
-		fetchEvent: (eventId: string) => fetchEvent(eventId, options),
-		fetchAttendees: (eventId: string) => fetchAttendees(eventId, options),
 		fetchTemplates: (eventId: string) => fetchTemplates(eventId, options),
 		fetchAuditLog: (eventId?: string, query?: { page?: number; pageSize?: number }) =>
 			fetchAuditLog(eventId, { ...options, ...query }),
-		fetchAnalytics: (eventId: string) => fetchAnalytics(eventId, options),
-		fetchCampaignMetrics: (eventId: string) => fetchCampaignMetrics(eventId, options),
 		fetchScheduledEmails: (eventId: string) => fetchScheduledEmails(eventId, options),
-		fetchAgenda: (eventId: string) => fetchAgenda(eventId, options),
-		fetchActivity: (eventId: string) => fetchActivity(eventId, options),
 		previewEmail: (payload: EmailPreviewPayload) => previewEmail(payload, options),
 		sendEmail: (payload: EmailSendPayload) => sendEmail(payload, options),
 		fetchCatalog: (catalogOptions?: Omit<FetchCatalogOptions, 'token'>) =>
 			fetchCatalog({ ...options, ...catalogOptions }),
-		fetchSliceAttendees: (
-			programId: string,
+		fetchEventCapacityStatus: (eventId: string) => fetchEventCapacityStatus(eventId, options),
+		fetchEventAttendees: (
 			eventId: string,
 			query?: {
 				checkedIn?: boolean;
@@ -939,38 +888,35 @@ export function createDataService(token?: string | null) {
 				dispatchId?: string;
 				dispatchFilter?: 'received' | 'not_received';
 			},
-		) => fetchSliceAttendees(programId, eventId, query, options),
-		checkInScan: (programId: string, eventId: string, jwt: string) =>
-			checkInScan(programId, eventId, jwt, options),
-		confirmCheckIn: (programId: string, eventId: string, contactId: string) =>
-			confirmCheckIn(programId, eventId, contactId, options),
-		fetchCapacityStatus: (programId: string, eventId: string) =>
-			fetchCapacityStatus(programId, eventId, options),
-		adjustCapacity: (programId: string, eventId: string, direction: AdjustCapacityDirection) =>
-			adjustCapacity(programId, eventId, direction, options),
+		) => fetchEventAttendees(eventId, query, options),
+		checkInScan: (eventId: string, jwt: string) => checkInScan(eventId, jwt, options),
+		confirmCheckIn: (eventId: string, contactId: string) => confirmCheckIn(eventId, contactId, options),
+		undoCheckIn: (eventId: string, contactId: string) => undoCheckIn(eventId, contactId, options),
+		removeAttendee: (eventId: string, contactId: string) => removeAttendee(eventId, contactId, options),
+		adjustCapacity: (eventId: string, direction: AdjustCapacityDirection) =>
+			adjustCapacity(eventId, direction, options),
 		createProgram: (body: CreateCatalogProgramBody) => createProgram(body, options),
 		updateProgram: (id: string, body: PatchCatalogProgramBody) => updateProgram(id, body, options),
 		createEvent: (body: CreateCatalogEventBody) => createEvent(body, options),
 		updateEvent: (id: string, body: PatchCatalogEventBody) => updateEvent(id, body, options),
-		fetchEmailLimits: (programId: string, eventId: string) => fetchEmailLimits(programId, eventId, options),
-		fetchEmailTemplates: (programId: string, eventId: string) => fetchEmailTemplates(programId, eventId, options),
-		fetchEmailSegments: (programId: string, eventId: string) => fetchEmailSegments(programId, eventId, options),
-		previewEmailDispatch: (programId: string, eventId: string, body: EmailPreviewRequestBody) =>
-			previewEmailDispatch(programId, eventId, body, options),
-		createEmailDispatch: (programId: string, eventId: string, body: CreateEmailDispatchBody) =>
-			createEmailDispatch(programId, eventId, body, options),
-		fetchEmailDispatches: (programId: string, eventId: string, query?: FetchEmailDispatchesQuery) =>
-			fetchEmailDispatches(programId, eventId, query, options),
+		fetchEmailLimits: (eventId: string) => fetchEmailLimits(eventId, options),
+		fetchEmailTemplates: (eventId: string) => fetchEmailTemplates(eventId, options),
+		fetchEmailSegments: (eventId: string) => fetchEmailSegments(eventId, options),
+		previewEmailDispatch: (eventId: string, body: EmailPreviewRequestBody) =>
+			previewEmailDispatch(eventId, body, options),
+		createEmailDispatch: (eventId: string, body: CreateEmailDispatchBody) =>
+			createEmailDispatch(eventId, body, options),
+		fetchEmailDispatches: (eventId: string, query?: FetchEmailDispatchesQuery) =>
+			fetchEmailDispatches(eventId, query, options),
 		fetchEmailDispatchDetail: (
-			programId: string,
 			eventId: string,
 			dispatchId: string,
 			query?: { page?: number; pageSize?: number },
-		) => fetchEmailDispatchDetail(programId, eventId, dispatchId, query, options),
-		updateEmailDispatch: (programId: string, eventId: string, dispatchId: string, body: PatchEmailDispatchBody) =>
-			updateEmailDispatch(programId, eventId, dispatchId, body, options),
-		cancelEmailDispatch: (programId: string, eventId: string, dispatchId: string) =>
-			cancelEmailDispatch(programId, eventId, dispatchId, options),
+		) => fetchEmailDispatchDetail(eventId, dispatchId, query, options),
+		updateEmailDispatch: (eventId: string, dispatchId: string, body: PatchEmailDispatchBody) =>
+			updateEmailDispatch(eventId, dispatchId, body, options),
+		cancelEmailDispatch: (eventId: string, dispatchId: string) =>
+			cancelEmailDispatch(eventId, dispatchId, options),
 		getThemePreference: (email?: string | null) => fetchThemePreference(email, options),
 		setThemePreference: (theme: ThemeId, email?: string | null) => updateThemePreference(theme, email, options),
 	};

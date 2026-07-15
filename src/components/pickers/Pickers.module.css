@@ -7,7 +7,7 @@
 .fieldLabel {
 	font-size: 0.85rem;
 	font-weight: 600;
-	color: var(--color-denim);
+	color: var(--text);
 }
 
 .wrap {
@@ -15,20 +15,46 @@
 	width: 100%;
 }
 
+/* design_handoff 2: trigger fields use the tinted `--input-bg` fill (like every other
+   form field), not the plain panel background — this is a form control, not a card. */
 .trigger {
+	position: relative;
 	width: 100%;
 	min-height: 44px;
 	padding: 8px 36px 8px 10px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: var(--panel);
+	background: var(--input-bg);
 	color: var(--text);
 	font: inherit;
 	text-align: left;
 	cursor: pointer;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%230B0573' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-	background-repeat: no-repeat;
-	background-position: right 12px center;
+}
+
+/* Chevron via the self-hosted Material Symbols font (research R-003) — a background-image
+   data URI can't reference CSS custom properties, so it can't track theme colors; this can. */
+.trigger::after {
+	content: 'expand_more';
+	font-family: 'Material Symbols Outlined';
+	font-size: 18px;
+	line-height: 1;
+	position: absolute;
+	right: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--muted);
+	pointer-events: none;
+}
+
+/* design_handoff 2: date fields get a calendar glyph, not the generic dropdown chevron
+   (reserved for true select-style choices). Only overrides `content` — inherits
+   `.trigger::after`'s font/position/color. */
+.triggerDate::after {
+	content: 'calendar_month';
+}
+
+.triggerTime::after {
+	content: 'schedule';
 }
 
 .trigger:disabled {
@@ -37,7 +63,10 @@
 }
 
 .trigger:focus-visible {
-	outline: 2px solid var(--color-link);
+	/* --color-link isn't remapped for Dark Aurora (stays the light-theme blue) and reads
+	   ~2:1 there — fails WCAG 1.4.11. --color-cobalt is theme-aware and clears 3:1 in all
+	   three themes; also matches the shared focus-ring token used elsewhere (components.css). */
+	outline: 2px solid var(--color-cobalt);
 	outline-offset: 2px;
 }
 
@@ -73,7 +102,7 @@
 
 .option[aria-selected='true'] {
 	background: var(--ice);
-	color: var(--color-denim);
+	color: var(--text);
 	font-weight: 600;
 }
 
@@ -82,6 +111,17 @@
 .optionActive {
 	background: var(--ice);
 	outline: none;
+}
+
+/* Options and calendar days use roving tabindex (aria-activedescendant) — the real DOM
+   focus stays on the listbox/grid container, so `:focus-visible` above never matches the
+   item itself. `.optionActive` (toggled by activeIndex/activeDate) is the only visual
+   indicator of the keyboard-active item, and `--ice` alone reads ~1.1-1.3:1 against
+   `--panel` in every theme — invisible, failing WCAG 1.4.11 (3:1 non-text contrast). Add a
+   real outline so keyboard users can see which option/day is active (ui-a11y-audit.md, T034). */
+.optionActive {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: -2px;
 }
 
 .calendarHeader {
@@ -100,7 +140,7 @@
 	border-radius: 6px;
 	cursor: pointer;
 	font-size: 1rem;
-	color: var(--color-denim);
+	color: var(--text);
 }
 
 .calendarNavBtn:hover,

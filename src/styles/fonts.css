@@ -1,6 +1,6 @@
 /**
  * Self-hosted font subsets (research R-003). Sourced via npm (@fontsource-variable/*,
- * OFL-1.1 / Apache-2.0 licensed) — same self-host-via-bundler precedent as chart.js
+ * OFL-1.1 / Apache-2.0 licensed) — self-hosted via the Vite bundler (same pattern as other npm assets)
  * (FE-SEC-005). Latin-only subsets; font-src 'self' only (T008 wires the CSP); no
  * Google Fonts / icon CDN. Each package's own CSS declares the @font-face rule and
  * resolves its woff2 file relative to itself — Vite bundles it via this @import.
@@ -14,3 +14,27 @@
    axis range, so this is the smaller "subset" for our fixed-appearance usage. See
    docs/ui-component-catalog.md for the glyph list actually in use. */
 @import '@fontsource/material-symbols-outlined/400.css';
+
+/*
+ * @fontsource's stylesheet only declares the @font-face — unlike Google's icon-font CDN
+ * CSS, it ships no `.material-symbols-outlined` utility class. Any element using that
+ * className with no font-family renders the glyph name as literal Manrope text (e.g.
+ * "search") instead of the icon glyph — this is the shared utility that fixes that.
+ * Apply `material-symbols-outlined` to a <span> whose text content is the glyph name;
+ * an ancestor-scoped rule (e.g. `.searchField .material-symbols-outlined`) can still
+ * override size/color on top of this. See docs/ui-component-catalog.md for glyphs in use.
+ */
+.material-symbols-outlined {
+	font-family: 'Material Symbols Outlined';
+	font-weight: normal;
+	font-style: normal;
+	font-size: 24px;
+	line-height: 1;
+	letter-spacing: normal;
+	text-transform: none;
+	white-space: nowrap;
+	word-wrap: normal;
+	direction: ltr;
+	font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+	-webkit-font-smoothing: antialiased;
+}

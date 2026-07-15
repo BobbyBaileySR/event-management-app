@@ -23,7 +23,6 @@ Staff may check events on-site from phones; treat responsive layout as a **shipp
 - **Shell** — sidebar collapses / stacks below `900px` (see `Sidebar.module.css`, `AppLayout.module.css`); new chrome should follow the same pattern.
 - **Tables** — on narrow viewports: horizontal scroll wrapper, card/stack alternative, or hide non-essential columns — never overflow the viewport silently.
 - **Forms & modals** — full-width fields on mobile; modals fit the viewport (`max-width: min(…, 100vw - …)`).
-- **Data viz** — charts (`ConversionChart`, etc.) must resize; use responsive container height/width, not fixed desktop-only dimensions.
 
 ## Before finishing UI work
 

@@ -21,10 +21,14 @@ import type {
 	EmailTemplatesListResponse,
 	Event,
 	CatalogEvent,
+	CatalogEventPublishState,
+	CatalogEventStatus,
+	CatalogEventSummary,
 	CatalogProgram,
 	CatalogResponse,
 	HubSpotSegmentOption,
 	MarketingTemplateOption,
+	RemoveAttendeeResponse,
 	SliceAttendeesResponse,
 	ThemePreference,
 } from '../types';
@@ -90,6 +94,8 @@ export function normalizeEvent(raw: Record<string, unknown> | null | undefined):
 		registrationClose: String(raw.registrationClose ?? ''),
 		hubspotId: String(raw.hubspotId ?? raw.id ?? ''),
 		description: String(raw.description ?? ''),
+		programId: raw.programId === null || raw.programId === undefined ? undefined : String(raw.programId),
+		programName: raw.programName === null || raw.programName === undefined ? undefined : String(raw.programName),
 	};
 }
 
@@ -157,46 +163,75 @@ function copyOptionalNumber(raw: Record<string, unknown>, key: string): number |
 	return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+function normalizeCatalogEventStatus(value: unknown): CatalogEventStatus {
+	return value === 'cancelled' ? 'cancelled' : 'active';
+}
+
+function normalizeCatalogPublishState(value: unknown): CatalogEventPublishState {
+	return value === 'published' ? 'published' : 'draft';
+}
+
 function normalizeCatalogEvent(raw: Record<string, unknown>): CatalogEvent {
-	return {
+	const programId = raw.programId;
+	const archivedVia = raw.archivedViaProgramId;
+	const event: CatalogEvent = {
 		id: String(raw.id ?? ''),
+		programId: typeof programId === 'string' ? programId : null,
 		name: String(raw.name ?? ''),
-		partsAttendedOption: String(raw.partsAttendedOption ?? ''),
-		attendanceProperty: String(
-			raw.attendanceProperty ?? 'atlassian_event__customer_event_attendance',
-		),
+		start: String(raw.start ?? ''),
+		status: normalizeCatalogEventStatus(raw.status),
+		publishState: normalizeCatalogPublishState(raw.publishState),
 		archived: Boolean(raw.archived),
-		owner: copyOptionalString(raw, 'owner'),
-		description: copyOptionalString(raw, 'description'),
-		date: copyOptionalString(raw, 'date'),
-		location: copyOptionalString(raw, 'location'),
-		capacity: copyOptionalNumber(raw, 'capacity'),
-		walkInFormUrl: copyOptionalString(raw, 'walkInFormUrl'),
 	};
+	const end = copyOptionalString(raw, 'end');
+	if (end) {
+		event.end = end;
+	}
+	const location = copyOptionalString(raw, 'location');
+	if (location) {
+		event.location = location;
+	}
+	const capacity = copyOptionalNumber(raw, 'capacity');
+	if (capacity !== undefined) {
+		event.capacity = capacity;
+	}
+	const walkInFormUrl = copyOptionalString(raw, 'walkInFormUrl');
+	if (walkInFormUrl) {
+		event.walkInFormUrl = walkInFormUrl;
+	}
+	const registrationFormUrl = copyOptionalString(raw, 'registrationFormUrl');
+	if (registrationFormUrl) {
+		event.registrationFormUrl = registrationFormUrl;
+	}
+	const registrationSlug = copyOptionalString(raw, 'registrationSlug');
+	if (registrationSlug) {
+		event.registrationSlug = registrationSlug;
+	}
+	const owner = copyOptionalString(raw, 'owner');
+	if (owner) {
+		event.owner = owner;
+	}
+	if (typeof archivedVia === 'string') {
+		event.archivedViaProgramId = archivedVia;
+	} else if (archivedVia === null) {
+		event.archivedViaProgramId = null;
+	}
+	return event;
 }
 
 function normalizeCatalogProgram(raw: Record<string, unknown>): CatalogProgram {
-	const events = Array.isArray(raw.events) ? raw.events : [];
-	const formIds = raw.hubspotFormIds;
-	const legacyFormId = raw.hubspotFormId;
-	const hubspotFormIds = Array.isArray(formIds)
-		? formIds.map(String)
-		: legacyFormId
-			? [String(legacyFormId)]
-			: [];
-
 	return {
 		id: String(raw.id ?? ''),
 		name: String(raw.name ?? ''),
-		hubspotFormIds,
 		archived: Boolean(raw.archived),
-		events: events.map((event) => normalizeCatalogEvent(event as Record<string, unknown>)),
 		description: copyOptionalString(raw, 'description'),
 		startDate: copyOptionalString(raw, 'startDate'),
 		endDate: copyOptionalString(raw, 'endDate'),
-		location: copyOptionalString(raw, 'location'),
-		timezone: copyOptionalString(raw, 'timezone'),
 	};
+}
+
+function normalizeCatalogEventSummary(raw: Record<string, unknown>): CatalogEventSummary {
+	return normalizeCatalogEvent(raw);
 }
 
 export function normalizeSliceAttendeesResponse(response: Record<string, unknown>): SliceAttendeesResponse {
@@ -224,7 +259,9 @@ export function normalizeSliceAttendeesResponse(response: Record<string, unknown
 
 export function normalizeCatalogResponse(response: Record<string, unknown>): CatalogResponse {
 	const programs = Array.isArray(response.programs) ? response.programs : [];
+	const events = Array.isArray(response.events) ? response.events : [];
 	return {
+		events: events.map((event) => normalizeCatalogEventSummary(event as Record<string, unknown>)),
 		programs: programs.map((program) => normalizeCatalogProgram(program as Record<string, unknown>)),
 	};
 }
@@ -289,9 +326,13 @@ export function normalizeCapacityStatusResponse(response: Record<string, unknown
 /** Never trust a raw `theme` value for gating (research R-002) — fall back to Aurora if unrecognized. */
 export function normalizeThemePreferenceResponse(response: Record<string, unknown>): ThemePreference {
 	const rawTheme = String(response.theme ?? '');
+	const rawToast = response.celebrationToastMessage;
+	const celebrationToastMessage =
+		typeof rawToast === 'string' && rawToast.trim().length > 0 ? rawToast.trim() : null;
 	return {
 		theme: isThemeId(rawTheme) ? rawTheme : DEFAULT_THEME_ID,
 		celebrationAllowed: Boolean(response.celebrationAllowed),
+		celebrationToastMessage,
 		updatedAt: typeof response.updatedAt === 'string' ? response.updatedAt : undefined,
 	};
 }
@@ -437,5 +478,12 @@ export function normalizeCancelEmailDispatchResponse(response: Record<string, un
 	return {
 		dispatchId: String(response.dispatchId ?? ''),
 		status: 'cancelled',
+	};
+}
+
+export function normalizeRemoveAttendeeResponse(response: Record<string, unknown>): RemoveAttendeeResponse {
+	return {
+		contactId: String(response.contactId ?? ''),
+		removed: Boolean(response.removed),
 	};
 }

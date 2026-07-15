@@ -15,6 +15,10 @@ export function eventPath(eventId: string, moduleId?: string | null): string {
 	return `/events/${eventId}/${moduleId}`;
 }
 
+export function overviewPath(): string {
+	return '/overview';
+}
+
 export function catalogPath(): string {
 	return '/catalog';
 }
@@ -23,12 +27,8 @@ export function auditPath(): string {
 	return '/audit';
 }
 
-/** Catalog-scoped slice views (Attendees, Check-in, Email) — not tied to legacy event hub URLs. */
-export function sliceModulePath(moduleId: 'attendees' | 'check-in' | 'email'): string {
-	return `/events/${moduleId}`;
-}
-
-const SLICE_MODULE_PATHS: Record<string, string> = {
+/** Legacy catalog-scoped slice URLs — kept so static segments are not captured as `:eventId`. */
+const LEGACY_SLICE_MODULE_PATHS: Record<string, string> = {
 	'/events/attendees': 'attendees',
 	'/events/check-in': 'check-in',
 	'/events/email': 'email',
@@ -41,6 +41,10 @@ export function useActiveRoute(): ActiveRoute {
 	const eventId = params.eventId ?? null;
 	const moduleId = params.module ?? null;
 
+	if (location.pathname === '/overview') {
+		return { name: 'overview', eventId: null };
+	}
+
 	if (location.pathname === '/catalog') {
 		return { name: 'catalog', eventId: null };
 	}
@@ -49,9 +53,9 @@ export function useActiveRoute(): ActiveRoute {
 		return { name: 'audit', eventId: null };
 	}
 
-	const sliceRoute = SLICE_MODULE_PATHS[location.pathname];
-	if (sliceRoute) {
-		return { name: sliceRoute, eventId: null };
+	const legacySlice = LEGACY_SLICE_MODULE_PATHS[location.pathname];
+	if (legacySlice) {
+		return { name: legacySlice, eventId: null };
 	}
 
 	if (!eventId) {
