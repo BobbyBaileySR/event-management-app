@@ -8,6 +8,15 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ## 2026-07-23
 
+### Security — v0.1 docs for BE-SEC-009 / 011 / 012 (also affects Backend)
+
+- Synced `docs/api-contract.md` + `docs/rbac.md` (+ slice contracts): attendee detail now audited as `attendee.detail.view`; webhook association proof; note content max 8192. Parked `FE-SEC-008` (walk-in iframe) for later.
+
+### Docs — park v0.1 full-tree security audit findings
+
+- Ran a **full on-disk** Frontend + Backend security audit for the v0.1 release gate (not `/review-security` git-diff scope). **0 Critical/High**; **1 Frontend Medium** parked as `FE-SEC-008` (walk-in iframe sandbox + tighter HubSpot URL allowlist). Backend Mediums parked in `../Backend/TODO.md` (`BE-SEC-009`–`012`, sticky-role note on `BE-SLICE15-008`).
+- Updated [DEVELOPMENT-GUIDE-FOR-BOBBY.md](DEVELOPMENT-GUIDE-FOR-BOBBY.md): stage before `/review-security`; note that release gates need a full-tree audit while incremental QA fixes use the skill.
+
 ### Feature: unlocked the Check-in "+" live-attendance correction (also affects Backend, `BE-CHECKIN-001`)
 
 - **Why**: event staff wanted full control to correct live attendance up as well as down "where and when they see fit" — the "+" button was capped at `checkedInCount`, so staff couldn't correct the live count above it (e.g. a walk-in checked in through a side channel that hasn't landed in `checkedInCount` yet, but is physically on site).

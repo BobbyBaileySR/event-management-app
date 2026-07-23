@@ -4,7 +4,7 @@ Draft contract — to be copied into [`Frontend/docs/api-contract.md`](../../../
 
 **Auth**: `Authorization: Bearer <session>`, **`admin`** role (same gate as `GET events/{evId}/attendees`).
 
-**Audit**: None — unaudited read, matching every other Slice 1 GET.
+**Audit**: **Yes** — `attendee.detail.view` (BE-SEC-009). Metadata: `eventId`, `contactId`, `answerCount` only — never email, name, or registration-answer text.
 
 ## Request
 
