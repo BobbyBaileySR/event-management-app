@@ -27,9 +27,10 @@ A **fire-and-forget** endpoint (Async HTTP Event Listener — no response body i
 
 1. Verify shared secret + source IP. Reject (no index write, no audit entry beyond a rejected-attempt record if this system's rate-limit/audit conventions call for one) if either check fails.
 2. Rate-limit by source IP via the existing `Utils/RateLimit.ts` mechanism (new `attendee-webhook` bucket) — same shape as `OnAuthExchange.ts`'s existing IP-keyed, no-session rate limit.
-3. Apply a registration write-through to the Attendee index: add `contactId` to the Event's manifest if not already present, write the roster/display fields with the incoming `rosterObservedAt` (field-scoped, guarded — data-model.md's write rule).
-3a. **(013)** If `answers` is present and parses as JSON, determine `source` (`registration` if this is the first entry ever recorded for this `{eventId, contactId}` pair, `amendment` otherwise) and append `{ answers, source, observedAt, slot }` to the registration-answer history store for this pair (never overwrite — see `013-registration-form-bridge/data-model.md`; `slot` defaults to `0` when the body omits it). Absent or unparseable `answers` does not affect step 3 above in any way.
-4. Record an audit entry (`attendee.registration.webhook` or equivalent — no attendee email/name in the audit metadata, matching this system's existing PII-in-audit-metadata convention). **(013)** When step 3a applied an entry, extend this same audit entry's metadata with `answersCaptured: true` and `answerCount: <number of keys>` — never the answer text itself. No second, separate audit action for this.
+3. **Verify live HubSpot registration** for `(eventId, contactId)` via `CustomObjectAdapter.getContactSummary` (BE-SEC-011). Reject with audit reason `contact_not_registered` and **no** index write if the Contact lacks a `registered`/`checked-in` association (or the Contact record is missing).
+4. Apply a registration write-through to the Attendee index: add `contactId` to the Event's manifest if not already present, write the roster/display fields with the incoming `rosterObservedAt` (field-scoped, guarded — data-model.md's write rule).
+4a. **(013)** If `answers` is present and parses as JSON, determine `source` (`registration` if this is the first entry ever recorded for this `{eventId, contactId}` pair, `amendment` otherwise) and append `{ answers, source, observedAt, slot }` to the registration-answer history store for this pair (never overwrite — see `013-registration-form-bridge/data-model.md`; `slot` defaults to `0` when the body omits it). Absent or unparseable `answers` does not affect step 4 above in any way.
+5. Record an audit entry (`attendee.registration.webhook` or equivalent — no attendee email/name in the audit metadata, matching this system's existing PII-in-audit-metadata convention). **(013)** When step 4a applied an entry, extend this same audit entry's metadata with `answersCaptured: true` and `answerCount: <number of keys>` — never the answer text itself. No second, separate audit action for this.
 
 ### Response
 
@@ -40,6 +41,8 @@ Since this is an Async listener, the response is not meaningfully consumed by Hu
 - Auth failure (bad secret / disallowed source IP): rejected before any index write.
 - Rate limited: rejected, same as any other `Utils/RateLimit.ts` consumer.
 - Missing `eventId`/`contactId`: rejected — cannot write-through without knowing what to write.
+- Event not found: rejected — no index write.
+- Contact not registered for the event (no live HubSpot `registered`/`checked-in` association — BE-SEC-011): rejected — no index write (audit reason `contact_not_registered`).
 
 ---
 

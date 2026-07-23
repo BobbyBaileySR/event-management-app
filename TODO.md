@@ -136,6 +136,7 @@ Cross-folder checklist — mirror in [../Backend/TODO.md](../Backend/TODO.md).
 | :--- | :--- | :---: | :--- | :--- | :--- |
 | FE-SEC-002 | **PR security review process** (manual fallback — Bugbot not approved) | done | Slice 1.5 | Backend | **Foundation step 2** · **Slice 1.5 Tier A step A6.** PR template + [docs/security-review-process.md](docs/security-review-process.md); author runs `/review-security` before PR; human approval + CI on `main`. **FE-SEC-002B** (optional): enable Cursor Bugbot on GitHub if approved later. |
 | FE-SEC-006 | **SRI on Google Identity Services script** | parked | N/A | — | **Known trade-off:** GIS loader does not support SRI cleanly; document-only unless Google documents a hash. |
+| FE-SEC-008 | **Walk-in iframe sandbox + tighter HubSpot URL allowlist** | parked | v0.1 | Backend | **2026-07-23 full-tree v0.1 security audit (Medium).** Deferred from v0.1 fix batch — reconsider later. `CheckInView.tsx` walk-in `<iframe>` has no `sandbox`; `hubspotFormUrl.ts` / CSP `frame-src` allow any `*.hubspot.com` / `*.hsforms.com` host. Risk: admin-influenced walk-in URL framing a HubSpot-hosted page that can top-navigate the desk. Fix: add iframe `sandbox` (scripts/forms/same-origin as needed; omit top-navigation unless proven required); tighten allowlist to form-share hosts/paths; keep backend `walkInFormUrl` validation in sync. |
 
 ---
 
