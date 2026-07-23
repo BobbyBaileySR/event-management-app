@@ -3,14 +3,69 @@
 	width: 100%;
 }
 
+/* design_handoff 2: header bleeds to the modal's own edges (the global `.modal` class has
+   one flat 28px inset with no section-level padding), so the header/footer here cancel it
+   and re-apply their own. Mirrors CatalogEventModal. */
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin: -28px -28px 16px;
+	padding: 20px 22px;
+	border-bottom: 1px solid var(--border);
+}
+
+.header h3 {
+	margin: 0;
+}
+
+/* `.modal` prefix (not just `.subtitle`) beats the global `.modal p { margin-bottom: 20px }`
+   rule (components.css) on specificity — otherwise that 20px wins and the header reads as
+   needlessly tall. */
+.modal .subtitle {
+	margin: 2px 0 0;
+	font-size: 0.75rem;
+	color: var(--muted);
+}
+
+.closeButton {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border);
+	border-radius: 9px;
+	background: none;
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+	color: var(--text);
+	outline: none;
+}
+
+.closeButton:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+}
+
 .form {
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
-	margin-top: 12px;
 }
 
-.form label {
+/* Direct-child selector — see the matching comment in CatalogEventModal.module.css. Same
+   latent leak here (this modal also nests CalendarPicker/SelectPicker), just not yet
+   triggered because none of its pickers use `required` today. */
+.form > label {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
@@ -24,6 +79,8 @@
 	padding: 8px 10px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
+	background: var(--input-bg);
+	color: var(--text);
 	font: inherit;
 }
 
@@ -32,9 +89,15 @@
 	min-height: 72px;
 }
 
-.requiredMark {
-	color: var(--danger);
-	font-weight: 700;
+/* design_handoff 2: actions sit in a tinted footer bar that bleeds to the modal edges
+   (mirrors the header), with a top divider and rounded bottom corners matching `.modal`. */
+.footer {
+	margin: 16px -28px -28px;
+	padding: 16px 22px;
+	border-top: 1px solid var(--border);
+	background: var(--surface);
+	border-bottom-left-radius: var(--radius-lg);
+	border-bottom-right-radius: var(--radius-lg);
 }
 
 .archiveButton {

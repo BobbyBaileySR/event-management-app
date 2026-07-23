@@ -7,11 +7,11 @@ alwaysApply: false
 # Frontend patterns
 
 - One view per file in `src/views/` — export a React component (no `mount()`/`unmount()`)
-- Data via `src/services/dataService.ts`; HTTP via `src/api/client.ts` (`X-EMS-Route` for logical paths)
+- Data via `src/services/dataService.ts`; HTTP via `src/api/client.ts` (`route` query parameter for logical paths; legacy header is backend fallback only)
 - Auth via `src/services/authService.ts` → `auth/exchange` when live
 - Routing: `react-router` hash routes in `src/App.tsx`; event context from URL params via `useActiveRoute()`
 - Session: `src/state/appState.tsx` + `useSession()`; data fetching: `useDataService()` hook
-- Keep `USE_MOCK_API` path until backend endpoint exists for that feature
+- All EMS data flows through the live ScriptRunner API — there is **no mock-data path** (`mockData.ts` + `USE_MOCK_API` removed 2026-07-15; testing is against HubSpot Staging). `USE_MOCK_AUTH` remains for local sign-in. New `dataService` methods call `apiRequest` directly and normalize via `normalizeApi.ts`.
 - Render dynamic/remote data with JSX `{value}` — never `dangerouslySetInnerHTML` (XSS). See `frontend-security.mdc`.
 
 ## When changing features

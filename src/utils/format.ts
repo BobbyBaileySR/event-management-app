@@ -19,6 +19,15 @@ export function formatDateTime(iso: string): string {
 	}).format(new Date(iso));
 }
 
+/** 24-hour HH:MM for the check-in list's "In · HH:MM" indicator. */
+export function formatCheckInTime(iso: string): string {
+	return new Intl.DateTimeFormat(undefined, {
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: false,
+	}).format(new Date(iso));
+}
+
 export function capitalizeStatus(status: string): string {
 	if (!status) {
 		return '';

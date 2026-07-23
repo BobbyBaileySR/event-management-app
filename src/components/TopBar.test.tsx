@@ -35,4 +35,25 @@ describe('TopBar', () => {
 		expect(screen.getAllByText(hostile).length).toBeGreaterThan(0);
 		expect(document.querySelector('img')).toBeNull();
 	});
+
+	it('renders the workingEvent pill when provided', () => {
+		render(<TopBar title="Check-in" workingEvent="Meeting Room" />);
+
+		expect(screen.getByText('Meeting Room')).toBeInTheDocument();
+		expect(screen.getByText(/Working on:/)).toBeInTheDocument();
+	});
+
+	it('omits the workingEvent pill when not provided or null', () => {
+		render(<TopBar title="Check-in" workingEvent={null} />);
+
+		expect(screen.queryByText(/Working on:/)).not.toBeInTheDocument();
+	});
+
+	it('renders a hostile workingEvent name as text, never as markup (XSS guard)', () => {
+		const hostile = '"><img src=x onerror=alert(1)>';
+		render(<TopBar title="Check-in" workingEvent={hostile} />);
+
+		expect(screen.getByText(hostile)).toBeInTheDocument();
+		expect(document.querySelector('img')).toBeNull();
+	});
 });

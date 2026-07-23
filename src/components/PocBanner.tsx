@@ -10,9 +10,6 @@ export function PocBanner() {
 	if (CONFIG.USE_MOCK_AUTH) {
 		modes.push('mock auth');
 	}
-	if (CONFIG.USE_MOCK_API) {
-		modes.push('sample data');
-	}
 	if (modes.length === 0) {
 		return null;
 	}
@@ -25,7 +22,7 @@ export function PocBanner() {
 				<>
 					<strong>{modes[0]}</strong>
 					{modes.length > 1 ? ` — ${modes.slice(1).join(', ')}` : ''}
-					{CONFIG.USE_MOCK_AUTH || CONFIG.USE_MOCK_API ? '' : '. UI preview on github.io — use local dev for staging API.'}
+					{CONFIG.USE_MOCK_AUTH ? '' : '. UI preview on github.io — use local dev for staging API.'}
 				</>
 			) : (
 				<>

@@ -56,6 +56,30 @@
 	flex-shrink: 0;
 }
 
+/* Purely visual busy indicator (aria-hidden) — never replaces the trigger's label text, so the
+   accessible name/"Select an event" placeholder stays stable while the catalog fetch is in flight. */
+.spinner {
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--border);
+	border-top-color: var(--accent);
+	border-radius: 50%;
+	flex-shrink: 0;
+	animation: workingEventSpin 0.8s linear infinite;
+}
+
+@keyframes workingEventSpin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.spinner {
+		animation: none;
+	}
+}
+
 .menu {
 	position: absolute;
 	top: calc(100% + 4px);

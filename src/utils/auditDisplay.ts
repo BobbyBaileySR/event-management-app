@@ -97,6 +97,17 @@ export function describeAuditAction(action: string): string {
 	return ACTION_PHRASES[action] ?? 'performed an action';
 }
 
+/** Static list of known audit actions, for the audit log's action filter dropdown (FE-SLICE007-001 — no reactive search). */
+export const KNOWN_AUDIT_ACTIONS: readonly string[] = Object.keys(ACTION_PHRASES).sort();
+
+/** Static list of known audit resourceTypes, for the audit log's resource-type filter dropdown. */
+export const KNOWN_AUDIT_RESOURCE_TYPES: readonly string[] = [
+	'catalog_program',
+	'catalog_event',
+	'email_dispatch',
+	'session',
+];
+
 /** Feed category badge label derived from the action's namespace prefix. */
 export function categorizeAuditAction(action: string): string {
 	const match = CATEGORY_PREFIXES.find(([prefix]) => action.startsWith(prefix));

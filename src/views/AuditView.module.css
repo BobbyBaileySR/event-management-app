@@ -17,6 +17,24 @@
 	margin-bottom: 0;
 }
 
+.filterBar {
+	align-items: flex-end;
+	margin-bottom: 16px;
+	flex-shrink: 0;
+}
+
+.filterField {
+	flex: 1 1 180px;
+	min-width: 160px;
+	margin-bottom: 0;
+}
+
+.filterActions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
 .tableWrap {
 	position: relative;
 	flex: 1;

@@ -57,7 +57,7 @@ Branch `slice-1.5-a1-a5-backend` reviewed with **`/review-security`** before mer
 
 **Format:** Pre-dates the standard §C template. Equivalent checks are listed below; **future slices** must use the full **[slice-operator-security-qa-template.md](../../docs/slice-operator-security-qa-template.md)** in `quickstart.md` §C (see `.cursor/rules/ems-slice-operator-security-qa.mdc`).
 
-**Run as:** **admin** on UAT or Live · `USE_MOCK_API: false` · separate browser/profile for viewer checks · test Program + Event selected.
+**Run as:** **admin** on UAT or Live through the intended ScriptRunner environment · separate browser/profile for viewer checks · test working Event selected. EMS has no mock-data mode.
 
 | Step ID | Check | Pass ☐ | Failure — stop Live deploy |
 | :---: | :--- | :---: | :--- |

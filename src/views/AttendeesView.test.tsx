@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ConfirmProvider } from '../components/ConfirmModal';
 import { ToastProvider } from '../components/Toast';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import { SessionProvider, useSession } from '../state/appState';
 import type { Session, SliceAttendee } from '../types';
 import { AttendeesView } from './AttendeesView';
@@ -79,12 +80,58 @@ const mockUndoCheckIn = vi.fn().mockResolvedValue({
 	attendeeType: 'partner',
 });
 
+const mockFetchAttendeeDetail = vi.fn().mockResolvedValue({
+	contactId: 'c-001',
+	firstName: 'Jane',
+	lastName: 'Doe',
+	email: 'jane@example.com',
+	company: 'Adaptavist',
+	accountManager: 'owner-1',
+	attendeeType: 'customer',
+	checkedIn: false,
+	checkedInAt: null,
+	phone: null,
+	jobTitle: null,
+	dietaryRequirement: null,
+	registrationSource: null,
+	journey: [],
+	registrationAnswerHistory: [],
+});
+
+const mockGenerateAttendeeLeadsBatch = vi.fn().mockResolvedValue({
+	results: [
+		{ contactId: 'c-001', outcome: 'created', leadId: 'lead-1' },
+		{ contactId: 'c-002', outcome: 'updated', leadId: 'lead-2' },
+	],
+});
+
+const mockFetchAttendeeNotes = vi.fn().mockResolvedValue({ notes: [] });
+
+const mockFetchCatalog = vi.fn().mockResolvedValue({
+	events: [
+		{
+			id: 'ev-1',
+			programId: null,
+			name: 'Meeting Room',
+			start: '2026-10-01T09:00:00.000Z',
+			status: 'active',
+			publishState: 'published',
+			archived: false,
+		},
+	],
+	programs: [],
+});
+
 const mockDataService = {
 	fetchEventAttendees: mockFetchEventAttendees,
 	fetchEventCapacityStatus: mockFetchEventCapacityStatus,
 	fetchEmailDispatches: mockFetchEmailDispatches,
 	removeAttendee: mockRemoveAttendee,
 	undoCheckIn: mockUndoCheckIn,
+	fetchAttendeeDetail: mockFetchAttendeeDetail,
+	generateAttendeeLeadsBatch: mockGenerateAttendeeLeadsBatch,
+	fetchAttendeeNotes: mockFetchAttendeeNotes,
+	fetchCatalog: mockFetchCatalog,
 };
 
 vi.mock('../hooks/useDataService', () => ({
@@ -114,7 +161,7 @@ function SessionHarness({ session }: { session: Session }) {
 }
 
 function renderAttendees(session: Session = adminSession, path = '/events/ev-1/attendees') {
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter initialEntries={[path]}>
 			<SessionProvider>
 				<ConfirmProvider>
@@ -138,6 +185,32 @@ describe('AttendeesView', () => {
 		mockFetchEmailDispatches.mockReset();
 		mockRemoveAttendee.mockReset();
 		mockUndoCheckIn.mockReset();
+		mockFetchAttendeeDetail.mockReset();
+		mockGenerateAttendeeLeadsBatch.mockReset();
+		mockGenerateAttendeeLeadsBatch.mockResolvedValue({
+			results: [
+				{ contactId: 'c-001', outcome: 'created', leadId: 'lead-1' },
+				{ contactId: 'c-002', outcome: 'updated', leadId: 'lead-2' },
+			],
+		});
+
+		mockFetchAttendeeDetail.mockResolvedValue({
+			contactId: 'c-001',
+			firstName: 'Jane',
+			lastName: 'Doe',
+			email: 'jane@example.com',
+			company: 'Adaptavist',
+			accountManager: 'owner-1',
+			attendeeType: 'customer',
+			checkedIn: false,
+			checkedInAt: null,
+			phone: null,
+			jobTitle: null,
+			dietaryRequirement: null,
+			registrationSource: null,
+			journey: [],
+			registrationAnswerHistory: [],
+		});
 
 		mockFetchEventAttendees.mockResolvedValue({
 			attendees: mockSliceAttendees,
@@ -185,15 +258,24 @@ describe('AttendeesView', () => {
 	it('renders fixed title/meta, attendee table, and check-in filters', async () => {
 		renderAttendees();
 
-		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
-		});
+		// The loading state renders the same title/meta as the loaded view (unlike other
+		// views, there's no differing meta text here) — wait for loaded-only content first so
+		// the assertions below don't race the attendees fetch.
+		await screen.findByText('Jane Doe');
 
+		expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 		expect(screen.getByText('Full attendee roster for the working event')).toBeInTheDocument();
-		expect(screen.getByText('Jane Doe')).toBeInTheDocument();
 		expect(screen.getByText('John Smith')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Checked in' })).toBeInTheDocument();
 		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-1', expect.any(Object));
+	});
+
+	it("shows the working event in the TopBar pill (rail/tab-bar chrome can collapse the picker to an icon)", async () => {
+		renderAttendees();
+
+		await screen.findByText('Jane Doe');
+		expect(screen.getByText('Meeting Room')).toBeInTheDocument();
+		expect(screen.getByText(/Working on:/)).toBeInTheDocument();
 	});
 
 	it('shows unfiltered Registered / Checked in / Not checked in stat tiles', async () => {
@@ -410,8 +492,44 @@ describe('AttendeesView', () => {
 		});
 	});
 
+	it('opens the Attendee Detail modal when a row is clicked outside the action-button cell', async () => {
+		const user = userEvent.setup();
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		await user.click(screen.getByText('Adaptavist'));
+
+		const dialog = await screen.findByRole('dialog');
+		expect(mockFetchAttendeeDetail).toHaveBeenCalledWith('ev-1', 'c-001');
+		expect(within(dialog).getByRole('heading', { name: 'Jane Doe' })).toBeInTheDocument();
+
+		await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+	});
+
+	it('does not open the Attendee Detail modal when clicking Remove or Undo check-in', async () => {
+		const user = userEvent.setup();
+		renderAttendees();
+
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		await user.click(screen.getByRole('button', { name: 'Remove' }));
+		expect(screen.queryByRole('dialog', { name: 'Jane Doe' })).not.toBeInTheDocument();
+		expect(mockFetchAttendeeDetail).not.toHaveBeenCalled();
+
+		await user.click(within(await screen.findByRole('dialog', { name: 'Remove attendee?' })).getByRole('button', { name: 'Cancel' }));
+
+		await user.click(screen.getByRole('button', { name: 'Undo check-in' }));
+		expect(mockFetchAttendeeDetail).not.toHaveBeenCalled();
+	});
+
 	it('redirects non-admin users to the events list', async () => {
-		render(
+		renderWithQueryClient(
 			<MemoryRouter initialEntries={['/events/ev-1/attendees']}>
 				<SessionProvider>
 					<ConfirmProvider>
@@ -578,7 +696,159 @@ describe('AttendeesView', () => {
 		await waitFor(() => {
 			expect(mockUndoCheckIn).toHaveBeenCalledWith('ev-1', 'c-002');
 		});
-		expect(await screen.findByText('Check-in undone')).toBeInTheDocument();
+		expect(await screen.findByText('John Smith: check-in undone.')).toBeInTheDocument();
+	});
+
+	describe('bulk Generate Leads (014-lead-generation US3)', () => {
+		it('shows no bulk action bar until an attendee is selected', async () => {
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+			expect(screen.queryByRole('toolbar', { name: 'Bulk attendee actions' })).not.toBeInTheDocument();
+		});
+
+		it('selecting a row shows the bulk bar; Generate Leads calls the batch API with selected contactIds', async () => {
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select Jane Doe' }));
+
+			expect(screen.getByText('1 selected')).toBeInTheDocument();
+			await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+
+			await waitFor(() => {
+				expect(mockGenerateAttendeeLeadsBatch).toHaveBeenCalledWith('ev-1', {
+					contactIds: ['c-001'],
+					includeFullHistory: false,
+				});
+			});
+		});
+
+		it('passes includeFullHistory: true when the expanded-history checkbox is checked (US4)', async () => {
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select Jane Doe' }));
+			await user.click(screen.getByRole('checkbox', { name: 'Include full cross-event history' }));
+			await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+
+			await waitFor(() => {
+				expect(mockGenerateAttendeeLeadsBatch).toHaveBeenCalledWith('ev-1', {
+					contactIds: ['c-001'],
+					includeFullHistory: true,
+				});
+			});
+		});
+
+		it('select-all-visible checkbox selects every rendered attendee, and Clear selection empties it', async () => {
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select all visible attendees' }));
+			expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+			await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+			expect(screen.queryByRole('toolbar', { name: 'Bulk attendee actions' })).not.toBeInTheDocument();
+		});
+
+		it('shows a per-outcome summary toast after a successful batch generation and clears the selection', async () => {
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select all visible attendees' }));
+			await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+
+			expect(await screen.findByText('Leads generated: 1 created, 1 updated')).toBeInTheDocument();
+			await waitFor(() => {
+				expect(screen.queryByRole('toolbar', { name: 'Bulk attendee actions' })).not.toBeInTheDocument();
+			});
+		});
+
+		it('reports failed outcomes distinctly and does not clobber successes', async () => {
+			mockGenerateAttendeeLeadsBatch.mockResolvedValue({
+				results: [
+					{ contactId: 'c-001', outcome: 'created', leadId: 'lead-1' },
+					{ contactId: 'c-002', outcome: 'failed' },
+				],
+			});
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select all visible attendees' }));
+			await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+
+			expect(await screen.findByText('Leads generated: 1 created, 1 failed')).toBeInTheDocument();
+			expect(screen.getByText('Failed for: c-002')).toBeInTheDocument();
+		});
+
+		it('shows a confirmation dialog and passes batchConfirmed:true at/above the configured threshold', async () => {
+			mockFetchEventAttendees.mockResolvedValue({
+				attendees: mockSliceAttendees,
+				page: 1,
+				pageSize: 50,
+				total: 2,
+			});
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			// Force the threshold path without needing 50 real attendees in the fixture.
+			const { CONFIG } = await import('../config');
+			const originalThreshold = CONFIG.LEAD_BATCH_CONFIRM_THRESHOLD;
+			CONFIG.LEAD_BATCH_CONFIRM_THRESHOLD = 1;
+			try {
+				await user.click(screen.getByRole('checkbox', { name: 'Select Jane Doe' }));
+				await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+
+				const dialog = await screen.findByRole('dialog', { name: 'Generate Leads for a large selection?' });
+				expect(within(dialog).getByText(/1 attendees/)).toBeInTheDocument();
+
+				await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+				expect(mockGenerateAttendeeLeadsBatch).not.toHaveBeenCalled();
+
+				await user.click(screen.getByRole('button', { name: 'Generate Leads' }));
+				await user.click(
+					within(await screen.findByRole('dialog', { name: 'Generate Leads for a large selection?' })).getByRole(
+						'button',
+						{ name: 'Generate Leads' },
+					),
+				);
+
+				await waitFor(() => {
+					expect(mockGenerateAttendeeLeadsBatch).toHaveBeenCalledWith('ev-1', {
+						contactIds: ['c-001'],
+						includeFullHistory: false,
+						batchConfirmed: true,
+					});
+				});
+			} finally {
+				CONFIG.LEAD_BATCH_CONFIRM_THRESHOLD = originalThreshold;
+			}
+		});
+
+		it('clears the selection when the page changes', async () => {
+			mockFetchEventAttendees.mockResolvedValue({
+				attendees: mockSliceAttendees,
+				page: 1,
+				pageSize: 1,
+				total: 2,
+			});
+			const user = userEvent.setup();
+			renderAttendees();
+			await screen.findByText('Jane Doe');
+
+			await user.click(screen.getByRole('checkbox', { name: 'Select Jane Doe' }));
+			expect(screen.getByText('1 selected')).toBeInTheDocument();
+
+			await user.click(screen.getByRole('button', { name: 'Next ›' }));
+			await waitFor(() => {
+				expect(screen.queryByRole('toolbar', { name: 'Bulk attendee actions' })).not.toBeInTheDocument();
+			});
+		});
 	});
 
 	it('does not overflow body horizontally at 375px viewport', async () => {
@@ -600,11 +870,9 @@ describe('AttendeesView', () => {
 		try {
 			const { container } = renderAttendees();
 
-			await waitFor(() => {
-				expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
-			});
+			await screen.findByText('Jane Doe');
 
-			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+			expect(screen.getByRole('heading', { name: 'Registered Attendees' })).toBeInTheDocument();
 			expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,8}/i);
 		} finally {
 			document.documentElement.removeAttribute('data-theme');

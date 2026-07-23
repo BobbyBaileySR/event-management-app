@@ -4,11 +4,13 @@
 **Date**: 2026-07-07  
 **Spec**: [spec.md](./spec.md) · **Plan**: [plan.md](./plan.md)
 
+> Historical implementation research. Catalog-picker routes, tabbed UI, and runtime mock-data decisions were superseded by the shipped event-first redesign and 2026-07-15 mock removal. Use `docs/api-contract.md`, `docs/ui-routes.md`, and the current quickstart for live behaviour.
+
 ---
 
-## R-001: Catalog-scoped routes (not legacy `events/{id}/email`)
+## R-001: Catalog-scoped routes *(superseded by event-first routing)*
 
-**Decision**: All Slice 2 email routes use prefix `programs/{programId}/events/{eventId}/email/…` with **`admin`** RBAC — same pattern as attendees/check-in/capacity. Retire legacy flat `events/{id}/email/*` for this slice.
+**Historical decision**: Slice 2 initially used `programs/{programId}/events/{eventId}/email/…`. The shipped route is `events/{eventId}/email/…`; Program-scoped aliases were retired 2026-07-16.
 
 **Rationale**: Slice 1+ catalog is source of truth (ADR-003 Plan C). Clarification Session 2026-07-07 mandates `#/events/email` + catalog pickers.
 
@@ -50,6 +52,11 @@
 
 **Implementation gate**: Document chosen path in Backend spike ticket; block `USE_MOCK_API: false` email cutover until spike passes on UAT HubSpot.
 
+**Spike outcome (2026-07-16, T002) — partial:**
+- **T002.3 (segment list): passes live.** `crm.lists.read` scope confirmed working; adapter fixed and verified against real UAT data — see R-004 below.
+- **T002.2 (template list): code-fixed, blocked live.** `GET /marketing/v3/emails` returns a live `403` on UAT (`HubSpot marketing email list failed (403)`). Root cause: the endpoint needs the **`content`** scope, distinct from the already-granted `marketing-email` scope (sending/engagement only) — `content` is gated behind CMS Hub Pro/Enterprise or Marketing Hub Pro/Enterprise tier. Tracked as `HS-009` in `Frontend/docs/hubspot-ops-todo.md` — HubSpot-admin action, not an EMS code fix.
+- **T002.4 (one live test send): code shipped 2026-07-16 (`BE-EMAIL-SEND-001`), live send still not exercised.** `HubSpotSingleSendAdapter` now calls the real `POST /marketing/v4/email/single-send` endpoint (per-Contact single-send — list/segment sends are confirmed not API-triggerable at all, see the corrected finding above) and is the default in `Utils/HubSpot/index.ts`, gated end-to-end by `EMAIL_SEND_ENABLED` (default `false`). The request/response JSON shape was implemented to a documented-best-guess HubSpot v4 contract, not a live-verified one — the actual live test send (T002.4 proper) is still an outstanding, deliberate human action before `EMAIL_SEND_ENABLED` is ever set `true` in a real environment. See `Backend/TODO-DONE.md`'s `BE-EMAIL-SEND-001` entry.
+
 ---
 
 ## R-004: HubSpot templates and segments read paths
@@ -62,6 +69,14 @@
 
 **Alternatives considered**:
 - **Cache templates/segments in EMS catalog** — rejected: stale data; HubSpot is system of record for marketing assets.
+
+**Implementation outcome (2026-07-16):** both adapters were rewritten against HubSpot's real, current API contracts (confirmed against official docs). Segments is live-verified end to end on UAT. Templates is code-correct against the documented contract but currently 403s live on UAT for a scope reason (see spike outcome above, `HS-009`) — not a code defect.
+- **Templates** (`EmailTemplatesAdapter.ts`): `listTemplates()` was a hard stub returning `[]` unconditionally (pending this spike). Now calls `GET /marketing/v3/emails` (`paging.next.after` cursor pagination), filtered to `state: "PUBLISHED"` — draft/AB-test variants aren't sendable, so they're excluded rather than offered as a broken pick.
+- **Segments** (`SegmentsAdapter.ts`): `listSegments()`/`getSegmentById()` called the correct endpoint (`POST /crm/v3/lists/search`, `GET /crm/v3/lists/{listId}`) but parsed the wrong response shape, so every real list was silently discarded:
+  - Read `list.listType`, but the real ILS response field is `processingType` (values `MANUAL`/`DYNAMIC`/`SNAPSHOT`, not `STATIC`/`ACTIVE`) — `mapListKind()` always returned `null`, filtering out every list.
+  - `getSegmentById()` treated the response as the list record directly; the real single-GET response wraps it in a `{ list: {...} }` key.
+  - The search request also didn't scope to Contact lists (`objectTypeId: "0-1"`), and pagination recomputed the next offset from `lists.length` instead of using the `offset` value the API returns for the next page.
+  - Both endpoints previously swallowed non-ok responses into an empty result (`return segments` / `return null`) — now throw, matching the rest of `HubSpotApiClient.ts`'s convention, so a real API/auth failure surfaces as an error instead of a silently-empty dropdown.
 
 ---
 

@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ConfirmProvider } from '../components/ConfirmModal';
 import { ToastProvider } from '../components/Toast';
 import { CONFIG } from '../config';
+import { createTestQueryClient } from '../testing/renderWithQueryClient';
 import { SessionProvider, useSession } from '../state/appState';
 import type { Session } from '../types';
 import { EmailDispatchView } from './EmailDispatchView';
@@ -36,6 +38,7 @@ const mockCreateEmailDispatch = vi.fn().mockResolvedValue({
 	recipientCountPlanned: 2,
 	scheduledAtUtc: null,
 	timezone: null,
+	ticketsEnabled: false,
 });
 const mockFetchEmailDispatches = vi.fn().mockResolvedValue({
 	dispatches: [],
@@ -152,18 +155,20 @@ function SessionHarness({ session }: { session: Session }) {
 
 function renderEmailDispatchView() {
 	return render(
-		<MemoryRouter initialEntries={[`/events/${eventId}/email`]}>
-			<SessionProvider>
-				<ConfirmProvider>
-					<ToastProvider>
-						<SessionHarness session={adminSession} />
-						<Routes>
-							<Route path="/events/:eventId/:module" element={<EmailDispatchView />} />
-						</Routes>
-					</ToastProvider>
-				</ConfirmProvider>
-			</SessionProvider>
-		</MemoryRouter>,
+		<QueryClientProvider client={createTestQueryClient()}>
+			<MemoryRouter initialEntries={[`/events/${eventId}/email`]}>
+				<SessionProvider>
+					<ConfirmProvider>
+						<ToastProvider>
+							<SessionHarness session={adminSession} />
+							<Routes>
+								<Route path="/events/:eventId/:module" element={<EmailDispatchView />} />
+							</Routes>
+						</ToastProvider>
+					</ConfirmProvider>
+				</SessionProvider>
+			</MemoryRouter>
+		</QueryClientProvider>,
 	);
 }
 
@@ -220,6 +225,15 @@ describe('EmailDispatchView', () => {
 
 		fireEvent.click(createFirst);
 		expect(await screen.findByRole('dialog', { name: 'New campaign' })).toBeInTheDocument();
+	});
+
+	it('marks Template — the only required field visible by default — with a visible asterisk', async () => {
+		renderEmailDispatchView();
+		await openCompose();
+
+		const dialog = screen.getByRole('dialog', { name: 'New campaign' });
+		expect(within(dialog).getByRole('button', { name: /^Template:/i })).toHaveAttribute('aria-required', 'true');
+		expect(within(dialog).getAllByText('*', { selector: '.required-mark' })).toHaveLength(1);
 	});
 
 	it('loads the hourly limits and shows the event-context header subtitle', async () => {
@@ -323,6 +337,40 @@ describe('EmailDispatchView', () => {
 
 		expect(screen.getByRole('option', { name: /VIP prospects \(Active\)/i })).toBeInTheDocument();
 		expect(screen.getByRole('option', { name: /Static invite list \(Static\)/i })).toBeInTheDocument();
+	});
+
+	it('still shows working HubSpot segments when Templates fails to load (independent per-field loads)', async () => {
+		mockDataService.fetchEmailTemplates.mockRejectedValueOnce(
+			new Error('HubSpot marketing email list failed (403)'),
+		);
+		const user = userEvent.setup();
+		renderEmailDispatchView();
+		await openCompose();
+
+		expect(await screen.findByText('HubSpot marketing email list failed (403)')).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'HubSpot list' }));
+		await waitFor(() => {
+			expect(screen.getByTestId('segment-picker')).toBeInTheDocument();
+		});
+		await user.click(screen.getByTestId('segment-picker'));
+		expect(screen.getByRole('option', { name: /VIP prospects \(Active\)/i })).toBeInTheDocument();
+	});
+
+	it('still shows a working Template picker when Segments fails to load (independent per-field loads)', async () => {
+		mockDataService.fetchEmailSegments.mockRejectedValueOnce(new Error('HubSpot list search failed (403)'));
+		renderEmailDispatchView();
+		await openCompose();
+
+		fireEvent.click(screen.getByRole('button', { name: 'HubSpot list' }));
+		expect(await screen.findByText('HubSpot list search failed (403)')).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Event attendees' }));
+		const sendButton = await screen.findByRole('button', { name: 'Send campaign now' });
+		await waitFor(() => {
+			expect(sendButton).toBeEnabled();
+		});
 	});
 
 	it('previews and sends with hubspot_segment audience', async () => {
@@ -495,6 +543,96 @@ describe('EmailDispatchView', () => {
 		await waitFor(() => {
 			expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
 		});
+		expect(document.querySelector('img[src="x"]')).toBeNull();
+	});
+
+	it('shows a Tickets badge in the schedule list for a dispatch with ticketsEnabled', async () => {
+		mockDataService.fetchEmailDispatches.mockImplementation((_eventId, query) => {
+			if (query?.view === 'log') {
+				return Promise.resolve({
+					dispatches: [
+						{
+							dispatchId: 'dsp-tickets',
+							dispatchName: 'Ticket send',
+							templateName: 'Ticket reminder',
+							audienceSummary: 'All registered (2)',
+							status: 'completed',
+							scheduledAtUtc: null,
+							timezone: null,
+							recipientCountPlanned: 2,
+							recipientCountSent: 2,
+							createdBy: 'admin@adaptavist.com',
+							createdAt: '2026-10-01T10:00:00.000Z',
+							ticketsEnabled: true,
+						},
+						{
+							dispatchId: 'dsp-no-tickets',
+							dispatchName: 'Ordinary send',
+							templateName: 'Reminder',
+							audienceSummary: 'All registered (2)',
+							status: 'completed',
+							scheduledAtUtc: null,
+							timezone: null,
+							recipientCountPlanned: 2,
+							recipientCountSent: 2,
+							createdBy: 'admin@adaptavist.com',
+							createdAt: '2026-10-01T10:00:00.000Z',
+							ticketsEnabled: false,
+						},
+					],
+					page: 1,
+					pageSize: 50,
+					total: 2,
+				});
+			}
+			return Promise.resolve({ dispatches: [], page: 1, pageSize: 50, total: 0 });
+		});
+
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByText('Ticket send')).toBeInTheDocument();
+		});
+		expect(screen.getAllByTestId('dispatch-tickets-badge')).toHaveLength(1);
+		expect(screen.getByText('Ordinary send')).toBeInTheDocument();
+	});
+
+	it('renders the Tickets badge as static text — never the raw ticketsEnabled value (NFR-002)', async () => {
+		mockDataService.fetchEmailDispatches.mockImplementation((_eventId, query) => {
+			if (query?.view === 'log') {
+				return Promise.resolve({
+					dispatches: [
+						{
+							dispatchId: 'dsp-hostile-tickets',
+							dispatchName: 'Hostile tickets field',
+							templateName: 'Reminder',
+							audienceSummary: 'All registered (2)',
+							status: 'completed',
+							scheduledAtUtc: null,
+							timezone: null,
+							recipientCountPlanned: 2,
+							recipientCountSent: 2,
+							createdBy: 'admin@adaptavist.com',
+							createdAt: '2026-10-01T10:00:00.000Z',
+							// Hostile server response should never be interpolated into markup — the badge
+							// always renders the literal "Tickets" text, regardless of this raw value.
+							ticketsEnabled: '<img src=x onerror=alert(1)>',
+						},
+					],
+					page: 1,
+					pageSize: 50,
+					total: 1,
+				});
+			}
+			return Promise.resolve({ dispatches: [], page: 1, pageSize: 50, total: 0 });
+		});
+
+		renderEmailDispatchView();
+
+		await waitFor(() => {
+			expect(screen.getByTestId('dispatch-tickets-badge')).toBeInTheDocument();
+		});
+		expect(screen.getByTestId('dispatch-tickets-badge')).toHaveTextContent('Tickets');
 		expect(document.querySelector('img[src="x"]')).toBeNull();
 	});
 

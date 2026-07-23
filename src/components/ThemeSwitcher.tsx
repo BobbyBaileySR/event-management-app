@@ -7,13 +7,21 @@ interface ThemeSwitcherProps {
 	celebrationAllowed: boolean;
 	onSelect: (theme: ThemeId) => void;
 	className?: string;
+	/**
+	 * 'list' (default): full-label vertical column — desktop sidebar / tablet drawer.
+	 * 'row': horizontal wrapping pills with labels — phone tab bar.
+	 * 'compact': icon-dot only (label kept for screen readers) — tablet icon rail, where
+	 * there's no room for text.
+	 */
+	variant?: 'list' | 'row' | 'compact';
 }
 
-export function ThemeSwitcher({ theme, celebrationAllowed, onSelect, className }: ThemeSwitcherProps) {
+export function ThemeSwitcher({ theme, celebrationAllowed, onSelect, className, variant = 'list' }: ThemeSwitcherProps) {
 	const options = THEMES.filter((option) => !option.gated || celebrationAllowed);
+	const variantClass = variant === 'row' ? styles.row : variant === 'compact' ? styles.compact : '';
 
 	return (
-		<div className={`${styles.switcher} ${className ?? ''}`.trim()} role="group" aria-label="Theme">
+		<div className={`${styles.switcher} ${variantClass} ${className ?? ''}`.trim()} role="group" aria-label="Theme">
 			{options.map((option) => (
 				<button
 					key={option.id}
@@ -21,10 +29,11 @@ export function ThemeSwitcher({ theme, celebrationAllowed, onSelect, className }
 					data-theme-option={option.id}
 					className={`${styles.option} ${theme === option.id ? styles.active : ''}`.trim()}
 					aria-pressed={theme === option.id}
+					title={variant === 'compact' ? option.label : undefined}
 					onClick={() => onSelect(option.id)}
 				>
 					<span className={styles.dot} aria-hidden="true" />
-					{option.label}
+					<span className={variant === 'compact' ? 'sr-only' : undefined}>{option.label}</span>
 				</button>
 			))}
 		</div>

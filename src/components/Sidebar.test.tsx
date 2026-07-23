@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import { SessionProvider, useSession } from '../state/appState';
 import type { Session } from '../types';
 
@@ -69,7 +70,7 @@ function renderSidebar({
 			onThemeChange={vi.fn()}
 		/>
 	);
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter initialEntries={[path]}>
 			<SessionProvider>
 				<SessionHarness session={session} />

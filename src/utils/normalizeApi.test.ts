@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-	normalizeAttendee,
-	normalizeAttendeesResponse,
+	normalizeAttendeeCommunicationsResponse,
+	normalizeAttendeeDetailResponse,
 	normalizeCatalogResponse,
 	normalizeCheckInScanResponse,
 	normalizeConfirmCheckInResponse,
 	normalizeCapacityStatusResponse,
+	normalizeCapacitySummaryResponse,
 	normalizeCreateEmailDispatchResponse,
 	normalizeCancelEmailDispatchResponse,
 	normalizeEmailDispatchDetailResponse,
@@ -14,137 +15,8 @@ import {
 	normalizeEmailPreviewResponse,
 	normalizeEmailSegmentsResponse,
 	normalizeEmailTemplatesResponse,
-	normalizeEvent,
-	normalizeEventResponse,
-	normalizeEventsResponse,
 	normalizeSliceAttendeesResponse,
 } from './normalizeApi';
-
-describe('normalizeEvent', () => {
-	it('maps API startDate to UI date fields', () => {
-		const result = normalizeEvent({
-			id: 'evt-123',
-			name: 'London Q3 Summit',
-			startDate: '2026-10-15T09:00:00.000Z',
-			endDate: '2026-10-15T17:00:00.000Z',
-			location: 'The Shard',
-			status: 'active',
-			attendeeCount: 150,
-		});
-
-		expect(result).toMatchObject({
-			id: 'evt-123',
-			name: 'London Q3 Summit',
-			dateIso: '2026-10-15',
-			location: 'The Shard',
-			status: 'active',
-			attendeeCount: 150,
-		});
-		expect(result?.date).toBeTruthy();
-	});
-
-	it('passes through UI-shaped mock events unchanged', () => {
-		const uiEvent = {
-			id: 'evt-mock',
-			name: 'Mock Event',
-			date: 'Oct 15, 2026',
-			dateIso: '2026-10-15',
-			location: 'London',
-			status: 'active',
-			attendeeCount: 10,
-			capacity: 20,
-			type: 'In-person',
-			owner: 'events@adaptavist.com',
-			registrationClose: 'Oct 10, 2026',
-			hubspotId: 'HS-1',
-			description: 'Test',
-		};
-
-		expect(normalizeEvent(uiEvent)).toEqual(uiEvent);
-	});
-
-	it('returns null for missing input', () => {
-		expect(normalizeEvent(null)).toBeNull();
-		expect(normalizeEvent(undefined)).toBeNull();
-	});
-});
-
-describe('normalizeAttendee', () => {
-	it('combines firstName and lastName and maps API status', () => {
-		const result = normalizeAttendee({
-			id: 'c-001',
-			firstName: 'Jane',
-			lastName: 'Doe',
-			email: 'jane@example.com',
-			company: 'Adaptavist',
-			status: 'checked_in',
-		});
-
-		expect(result).toMatchObject({
-			id: 'c-001',
-			name: 'Jane Doe',
-			email: 'jane@example.com',
-			company: 'Adaptavist',
-			status: 'Checked In',
-		});
-	});
-
-	it('passes through UI-shaped mock attendees unchanged', () => {
-		const uiAttendee = {
-			id: 'c-001',
-			name: 'Jane Doe',
-			email: 'jane@example.com',
-			company: 'Adaptavist',
-			status: 'Registered',
-			ticketType: 'General',
-			registeredAt: '2026-08-01',
-			source: 'HubSpot form',
-		};
-
-		expect(normalizeAttendee(uiAttendee)).toEqual(uiAttendee);
-	});
-});
-
-describe('normalizeEventsResponse', () => {
-	it('normalizes each event in the list', () => {
-		const result = normalizeEventsResponse({
-			events: [{ id: 'evt-1', name: 'Summit', startDate: '2026-10-15T09:00:00.000Z', status: 'active' }],
-			page: 1,
-			total: 1,
-		});
-
-		expect(result.events).toHaveLength(1);
-		expect(result.events[0]?.dateIso).toBe('2026-10-15');
-		expect(result.page).toBe(1);
-	});
-});
-
-describe('normalizeEventResponse', () => {
-	it('unwraps { event } wrapper', () => {
-		const result = normalizeEventResponse({
-			event: { id: 'evt-1', name: 'Summit', startDate: '2026-10-15T09:00:00.000Z' },
-		});
-		expect(result.event?.id).toBe('evt-1');
-	});
-
-	it('accepts a bare event object', () => {
-		const result = normalizeEventResponse({ id: 'evt-2', name: 'Webinar', startDate: '2026-11-02T10:00:00.000Z' });
-		expect(result.event?.id).toBe('evt-2');
-	});
-});
-
-describe('normalizeAttendeesResponse', () => {
-	it('normalizes each attendee in the list', () => {
-		const result = normalizeAttendeesResponse({
-			attendees: [{ id: 'c-1', firstName: 'A', lastName: 'B', status: 'registered' }],
-			total: 1,
-		});
-
-		expect(result.attendees[0]?.name).toBe('A B');
-		expect(result.attendees[0]?.status).toBe('Registered');
-		expect(result.total).toBe(1);
-	});
-});
 
 describe('normalizeCatalogResponse', () => {
 	it('maps API flat catalog fields to UI types', () => {
@@ -325,6 +197,7 @@ describe('normalizeSliceAttendeesResponse', () => {
 					accountManager: 'owner-2',
 					attendeeType: 'partner',
 					checkedIn: true,
+					checkedInAt: '2026-07-16T08:52:00.000Z',
 				},
 			],
 			page: 2,
@@ -354,13 +227,25 @@ describe('normalizeSliceAttendeesResponse', () => {
 					accountManager: 'owner-2',
 					attendeeType: 'partner',
 					checkedIn: true,
-					checkedInAt: null,
+					checkedInAt: '2026-07-16T08:52:00.000Z',
 				},
 			],
 			page: 2,
 			pageSize: 50,
 			total: 120,
 		});
+	});
+
+	it('defaults checkedInAt to null when the API omits it or sends a non-string value', () => {
+		const result = normalizeSliceAttendeesResponse({
+			attendees: [
+				{ contactId: 'c-003', checkedIn: false },
+				{ contactId: 'c-004', checkedIn: true, checkedInAt: 12345 },
+			],
+		});
+
+		expect(result.attendees[0]?.checkedInAt).toBeNull();
+		expect(result.attendees[1]?.checkedInAt).toBeNull();
 	});
 
 	it('defaults missing fields and treats unknown attendeeType as customer', () => {
@@ -444,6 +329,7 @@ describe('normalizeConfirmCheckInResponse', () => {
 			checkedIn: true,
 			alreadyCheckedIn: false,
 			attendeeType: 'partner',
+			checkedInAt: '2026-07-16T09:00:00.000Z',
 		});
 
 		expect(result).toEqual({
@@ -451,6 +337,7 @@ describe('normalizeConfirmCheckInResponse', () => {
 			checkedIn: true,
 			alreadyCheckedIn: false,
 			attendeeType: 'partner',
+			checkedInAt: '2026-07-16T09:00:00.000Z',
 		});
 	});
 
@@ -463,6 +350,17 @@ describe('normalizeConfirmCheckInResponse', () => {
 		});
 
 		expect(result.attendeeType).toBeNull();
+	});
+
+	it('defaults checkedInAt to null when missing (undo response)', () => {
+		const result = normalizeConfirmCheckInResponse({
+			contactId: 'c-003',
+			checkedIn: false,
+			alreadyCheckedIn: true,
+			attendeeType: 'customer',
+		});
+
+		expect(result.checkedInAt).toBeNull();
 	});
 });
 
@@ -490,6 +388,58 @@ describe('normalizeCapacityStatusResponse', () => {
 	it('normalizes unset or zero capacity to null', () => {
 		expect(normalizeCapacityStatusResponse({ capacity: 0 }).capacity).toBeNull();
 		expect(normalizeCapacityStatusResponse({ capacity: null }).capacity).toBeNull();
+	});
+});
+
+describe('normalizeCapacitySummaryResponse', () => {
+	it('maps rows including a standalone (null programId) and a null-capacity event', () => {
+		const result = normalizeCapacitySummaryResponse({
+			events: [
+				{
+					eventId: 'ev-mr-2026',
+					programId: 'prog-atlassian-2026',
+					capacity: 100,
+					registeredCount: 55,
+					checkedInCount: 42,
+				},
+				{ eventId: 'ev-solo-2026', programId: null, capacity: null, registeredCount: 9, checkedInCount: 7 },
+			],
+		});
+
+		expect(result).toEqual({
+			events: [
+				{
+					eventId: 'ev-mr-2026',
+					programId: 'prog-atlassian-2026',
+					capacity: 100,
+					registeredCount: 55,
+					checkedInCount: 42,
+				},
+				{ eventId: 'ev-solo-2026', programId: null, capacity: null, registeredCount: 9, checkedInCount: 7 },
+			],
+		});
+	});
+
+	it('normalizes unset or zero capacity to null, same rule as the per-event route', () => {
+		const result = normalizeCapacitySummaryResponse({
+			events: [
+				{ eventId: 'ev-1', capacity: 0, checkedInCount: 0 },
+				{ eventId: 'ev-2', checkedInCount: 0 },
+			],
+		});
+
+		expect(result.events[0]!.capacity).toBeNull();
+		expect(result.events[1]!.capacity).toBeNull();
+	});
+
+	it('returns an empty array for an empty portfolio and tolerates missing/odd fields', () => {
+		expect(normalizeCapacitySummaryResponse({})).toEqual({ events: [] });
+		expect(normalizeCapacitySummaryResponse({ events: [] })).toEqual({ events: [] });
+
+		const result = normalizeCapacitySummaryResponse({ events: [{}] });
+		expect(result.events).toEqual([
+			{ eventId: '', programId: null, capacity: null, registeredCount: 0, checkedInCount: 0 },
+		]);
 	});
 });
 
@@ -557,7 +507,21 @@ describe('normalizeCreateEmailDispatchResponse', () => {
 			recipientCountPlanned: 12,
 			scheduledAtUtc: null,
 			timezone: null,
+			ticketsEnabled: false,
 		});
+	});
+
+	it('maps ticketsEnabled through when the template was QR-tagged', () => {
+		expect(
+			normalizeCreateEmailDispatchResponse({
+				dispatchId: 'dsp-1',
+				status: 'processing',
+				recipientCountPlanned: 12,
+				scheduledAtUtc: null,
+				timezone: null,
+				ticketsEnabled: true,
+			}),
+		).toMatchObject({ ticketsEnabled: true });
 	});
 });
 
@@ -578,6 +542,7 @@ describe('normalizeEmailDispatchListResponse', () => {
 					createdBy: 'admin@adaptavist.com',
 					createdAt: '2026-10-01T10:00:00.000Z',
 					lockWarning: true,
+					ticketsEnabled: true,
 				},
 			],
 			page: 1,
@@ -586,7 +551,33 @@ describe('normalizeEmailDispatchListResponse', () => {
 		});
 
 		expect(result.dispatches[0]?.lockWarning).toBe(true);
+		expect(result.dispatches[0]?.ticketsEnabled).toBe(true);
 		expect(result.total).toBe(1);
+	});
+
+	it('defaults ticketsEnabled to false when absent', () => {
+		const result = normalizeEmailDispatchListResponse({
+			dispatches: [
+				{
+					dispatchId: 'dsp-2',
+					dispatchName: 'Ordinary reminder',
+					templateName: '48-hour reminder',
+					audienceSummary: 'All registered (2)',
+					status: 'completed',
+					scheduledAtUtc: null,
+					timezone: null,
+					recipientCountPlanned: 2,
+					recipientCountSent: 2,
+					createdBy: 'admin@adaptavist.com',
+					createdAt: '2026-10-01T10:00:00.000Z',
+				},
+			],
+			page: 1,
+			pageSize: 50,
+			total: 1,
+		});
+
+		expect(result.dispatches[0]?.ticketsEnabled).toBe(false);
 	});
 });
 
@@ -632,5 +623,210 @@ describe('normalizeCancelEmailDispatchResponse', () => {
 			dispatchId: 'dsp-1',
 			status: 'cancelled',
 		});
+	});
+});
+
+describe('normalizeAttendeeDetailResponse', () => {
+	it('maps a fully-populated response, including pending fields once real data exists', () => {
+		const result = normalizeAttendeeDetailResponse({
+			contactId: 'c-001',
+			firstName: 'Amara',
+			lastName: 'Okafor',
+			company: 'Northwind',
+			email: 'amara.okafor@northwind.io',
+			accountManager: 'sam@adaptavist.com',
+			attendeeType: 'customer',
+			checkedIn: true,
+			checkedInAt: '2026-09-02T08:52:00.000Z',
+			phone: '+1 415 555 0101',
+			jobTitle: 'Marketing Director',
+			dietaryRequirement: 'Gluten-free',
+			registrationSource: 'form',
+			journey: [
+				{ type: 'registered', timestamp: null, label: 'Registered', source: 'this_event' },
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-08-15T09:00:00.000Z',
+					label: 'Confirmation email sent',
+					source: 'this_event',
+				},
+				{
+					type: 'checked_in',
+					timestamp: '2026-09-02T08:52:00.000Z',
+					label: 'Checked in at the venue',
+					source: 'this_event',
+				},
+			],
+			registrationAnswerHistory: [
+				{
+					answers: { 'What would you like to discuss?': 'Renewal timeline' },
+					source: 'registration',
+					observedAt: '2026-08-01T10:00:00.000Z',
+					slot: 1,
+				},
+			],
+		});
+
+		expect(result).toEqual({
+			contactId: 'c-001',
+			firstName: 'Amara',
+			lastName: 'Okafor',
+			company: 'Northwind',
+			email: 'amara.okafor@northwind.io',
+			accountManager: 'sam@adaptavist.com',
+			attendeeType: 'customer',
+			checkedIn: true,
+			checkedInAt: '2026-09-02T08:52:00.000Z',
+			phone: '+1 415 555 0101',
+			jobTitle: 'Marketing Director',
+			dietaryRequirement: 'Gluten-free',
+			registrationSource: 'form',
+			journey: [
+				{ type: 'registered', timestamp: null, label: 'Registered', source: 'this_event' },
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-08-15T09:00:00.000Z',
+					label: 'Confirmation email sent',
+					source: 'this_event',
+				},
+				{
+					type: 'checked_in',
+					timestamp: '2026-09-02T08:52:00.000Z',
+					label: 'Checked in at the venue',
+					source: 'this_event',
+				},
+			],
+			registrationAnswerHistory: [
+				{
+					answers: { 'What would you like to discuss?': 'Renewal timeline' },
+					source: 'registration',
+					observedAt: '2026-08-01T10:00:00.000Z',
+					slot: 1,
+				},
+			],
+		});
+	});
+
+	it('never fabricates pending fields — missing/non-string values normalize to null, not a placeholder', () => {
+		const result = normalizeAttendeeDetailResponse({
+			contactId: 'c-002',
+			attendeeType: 'partner',
+			checkedIn: false,
+			journey: [],
+		});
+
+		expect(result).toMatchObject({
+			phone: null,
+			jobTitle: null,
+			dietaryRequirement: null,
+			registrationSource: null,
+			checkedInAt: null,
+			journey: [],
+			registrationAnswerHistory: [],
+		});
+	});
+
+	it('falls back an unrecognized journey step type to "registered" rather than throwing', () => {
+		const result = normalizeAttendeeDetailResponse({
+			contactId: 'c-003',
+			attendeeType: 'customer',
+			checkedIn: false,
+			journey: [{ type: 'not_a_real_step', timestamp: null, label: 'Mystery step', source: 'this_event' }],
+		});
+
+		expect(result.journey[0]).toMatchObject({ type: 'registered', label: 'Mystery step' });
+	});
+
+	it('normalizes registrationAnswerHistory multi-select (string[]) answers and defaults an unrecognized source to registration', () => {
+		const result = normalizeAttendeeDetailResponse({
+			contactId: 'c-004',
+			attendeeType: 'customer',
+			checkedIn: false,
+			journey: [],
+			registrationAnswerHistory: [
+				{
+					answers: { 'Which sessions?': ['Keynote', 'Workshop'] },
+					source: 'not_a_real_source',
+					observedAt: '2026-08-01T10:00:00.000Z',
+					slot: 2,
+				},
+			],
+		});
+
+		expect(result.registrationAnswerHistory).toEqual([
+			{
+				answers: { 'Which sessions?': ['Keynote', 'Workshop'] },
+				source: 'registration',
+				observedAt: '2026-08-01T10:00:00.000Z',
+				slot: 2,
+			},
+		]);
+	});
+});
+
+describe('normalizeAttendeeCommunicationsResponse', () => {
+	it('maps a merged timeline of this-Event steps and tagged non-Event communications', () => {
+		const result = normalizeAttendeeCommunicationsResponse({
+			contactId: 'c-001',
+			cutoffTimestamp: '2026-08-15T09:00:00.000Z',
+			timeline: [
+				{ type: 'registered', timestamp: null, label: 'Registered', source: 'this_event' },
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-11-02T09:00:00.000Z',
+					label: 'Post-Event Thank You — Executive Roundtable sent',
+					source: 'other_event',
+					tag: { kind: 'other_event', eventName: 'Executive Roundtable 2026' },
+				},
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-12-10T09:00:00.000Z',
+					label: 'Developer Newsletter — Q4 Digest sent',
+					source: 'external',
+					tag: { kind: 'external' },
+				},
+			],
+		});
+
+		expect(result).toEqual({
+			contactId: 'c-001',
+			cutoffTimestamp: '2026-08-15T09:00:00.000Z',
+			timeline: [
+				{ type: 'registered', timestamp: null, label: 'Registered', source: 'this_event' },
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-11-02T09:00:00.000Z',
+					label: 'Post-Event Thank You — Executive Roundtable sent',
+					source: 'other_event',
+					tag: { kind: 'other_event', eventName: 'Executive Roundtable 2026' },
+				},
+				{
+					type: 'dispatch_sent',
+					timestamp: '2026-12-10T09:00:00.000Z',
+					label: 'Developer Newsletter — Q4 Digest sent',
+					source: 'external',
+					tag: { kind: 'external' },
+				},
+			],
+		});
+	});
+
+	it('returns an empty timeline when the response omits it', () => {
+		expect(normalizeAttendeeCommunicationsResponse({ contactId: 'c-001', cutoffTimestamp: '2026-01-01' })).toEqual({
+			contactId: 'c-001',
+			cutoffTimestamp: '2026-01-01',
+			timeline: [],
+		});
+	});
+
+	it('distinguishes a this_event step from a tagged CommunicationItem by the presence of `tag`, not `source`', () => {
+		const result = normalizeAttendeeCommunicationsResponse({
+			contactId: 'c-001',
+			cutoffTimestamp: '2026-01-01',
+			timeline: [{ type: 'dispatch_sent', timestamp: '2026-01-02', label: 'No tag here', source: 'this_event' }],
+		});
+
+		expect(result.timeline[0]).not.toHaveProperty('tag');
+		expect(result.timeline[0]).toMatchObject({ source: 'this_event' });
 	});
 });

@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useDataService } from './useDataService';
+import { useCatalog } from '../data/hooks/useCatalog';
 
 export interface WorkingEventMeta {
 	loading: boolean;
@@ -17,61 +16,39 @@ const EMPTY_META: Omit<WorkingEventMeta, 'loading'> = {
 };
 
 /**
- * Resolves display metadata for a working event from `fetchCatalog()`.
- * Soft-fails to nulls on error; clears when `eventId` is null.
+ * Resolves display metadata for a working event from the shared, cached catalog query
+ * (`useCatalog`) — previously an independent raw `fetchCatalog()` call on every mount.
+ * `includeArchived: true` is a deliberately different dataset/cache entry from the
+ * non-archived catalog `WorkingEventPicker`/`AppLayout`/the sign-in prefetch share, since an
+ * archived event's Event Details page still needs its name/program to resolve here.
+ * Soft-fails to nulls on error; skips the fetch entirely when `eventId` is null.
  */
 export function useWorkingEventMeta(eventId: string | null): WorkingEventMeta {
-	const data = useDataService();
-	const [loading, setLoading] = useState(Boolean(eventId));
-	const [meta, setMeta] = useState(EMPTY_META);
+	const { data: catalog, isLoading, isError } = useCatalog({
+		includeArchived: true,
+		enabled: Boolean(eventId),
+	});
 
-	useEffect(() => {
-		if (!eventId) {
-			setMeta(EMPTY_META);
-			setLoading(false);
-			return;
-		}
+	if (!eventId) {
+		return { loading: false, ...EMPTY_META };
+	}
 
-		let cancelled = false;
-		setLoading(true);
+	if (isLoading) {
+		return { loading: true, ...EMPTY_META };
+	}
 
-		void data
-			.fetchCatalog({ includeArchived: true })
-			.then(({ events, programs }) => {
-				if (cancelled) {
-					return;
-				}
-				const event = events.find((entry) => entry.id === eventId);
-				if (!event) {
-					setMeta(EMPTY_META);
-					return;
-				}
-				const program =
-					event.programId != null
-						? (programs.find((entry) => entry.id === event.programId) ?? null)
-						: null;
-				setMeta({
-					eventName: event.name,
-					programName: program?.name ?? null,
-					walkInFormUrl: event.walkInFormUrl ?? null,
-					programId: event.programId ?? null,
-				});
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setMeta(EMPTY_META);
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			});
+	const event = isError ? undefined : catalog?.events.find((entry) => entry.id === eventId);
+	if (!event) {
+		return { loading: false, ...EMPTY_META };
+	}
 
-		return () => {
-			cancelled = true;
-		};
-	}, [data, eventId]);
-
-	return { loading, ...meta };
+	const program =
+		event.programId != null ? (catalog?.programs.find((entry) => entry.id === event.programId) ?? null) : null;
+	return {
+		loading: false,
+		eventName: event.name,
+		programName: program?.name ?? null,
+		walkInFormUrl: event.walkInFormUrl ?? null,
+		programId: event.programId ?? null,
+	};
 }

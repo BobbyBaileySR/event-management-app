@@ -1,5 +1,12 @@
 # Grilling brief — data loading, caching & perceived performance
 
+> **SETTLED 2026-07-19.** The grilling session ran; every decision below is resolved in
+> [ADR-015](../docs/decisions/015-client-data-caching-layer.md) (TanStack Query, freshness model,
+> invalidation, session lifecycle, `events/capacity-summary`, big-bang migration) and
+> [ADR-016](../docs/decisions/016-no-prefetch-of-audited-pii.md) (no prefetch of audited PII).
+> Optimistic updates deferred (`FE-PERF-002`). Kept for historical context — do not re-run.
+> Next step: speckit `specify → plan → tasks` as slice `012-data-caching-layer` (`FE-PERF-001` / `BE-PERF-001`).
+>
 > **Purpose.** Seed a `/grilling` session for how EMS fetches, caches, and refreshes data across
 > navigation. This brief is **not** a spec — it frames the interview. The grilling should output an
 > ADR (or two) under `docs/decisions/`, `CONTEXT.md` term updates, and TODO parking for deferred bits.

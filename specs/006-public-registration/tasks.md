@@ -4,6 +4,8 @@ description: "Task list for Public Registration (006-public-registration) — Sl
 
 # Tasks: Public Registration (Slice 3)
 
+> **Do not execute this task list as written.** The feature is not started and these tasks target deleted `CatalogPickers`, `SettingsView`, and `mockData.ts` surfaces. Regenerate tasks after re-planning against the current event-first model.
+
 **Input**: Design documents from `/specs/006-public-registration/`
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [data-model.md](./data-model.md) · [contracts/catalog-registration.md](./contracts/catalog-registration.md) · **001–003** shipped (catalog admin, metadata modals, walk-in URL pattern)

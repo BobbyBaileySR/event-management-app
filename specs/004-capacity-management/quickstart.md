@@ -8,15 +8,11 @@ End-to-end checks for **004-capacity-management** (live attendance on Check-in).
 
 ## Prerequisites
 
-1. **003-check-in** attendees + confirm check-in working (mock or live).
+1. **003-check-in** attendees + confirm check-in working on UAT.
 2. **004 Backend** handlers SFTP-deployed: `OnGetCapacityStatus`, `OnAdjustCapacity`, `CapacityStore`, router + RouteGuard wiring.
-3. Frontend `config.ts`: **`USE_MOCK_API: true`** for local iteration; **`false`** for live QA.
+3. Frontend `API_BASE_URL` points to the intended UAT ScriptRunner environment. EMS has no mock-data mode.
 4. Admin test account; viewer account for RBAC.
-5. Catalog Event with **`capacity`** set (e.g. `100`) — via Catalog admin Event modal.
-
-**Mock shortcut**: Program `prog-atlassian-2026` + Event `ev-mr-2026` (capacity in seed) when `USE_MOCK_API: true`.
-
----
+5. Catalog Event with **`capacity`** set (e.g. `100`) — via **Programs & Events** or Event Details **Edit event**.
 
 ## 1. Backend unit tests (local)
 
@@ -44,16 +40,16 @@ npm run lint
 
 - `capacityTier.test.ts` — tier boundaries at 74/75/89/90/100/101%
 - `CapacityBar` — labels, tier class, ±1 disabled states
-- `CheckInView` — indicator visible with capacity; updates after mock adjust/check-in
-- `dataService` — mock adjust bounds
+- `CheckInView` — indicator visible with capacity; updates after adjust/check-in
+- `dataService` — capacity request/response mapping and bounds
 
 ---
 
-## 3. Capacity indicator (admin, mock)
+## 3. Capacity indicator (admin, UAT)
 
 1. Sign in as **admin**.
-2. Select Program + Event with **capacity** configured.
-3. Open **Check-in** (`#/events/check-in`).
+2. Select a working Event with **capacity** configured.
+3. Open **Check-in** (`#/events/{eventId}/check-in`).
 
 **Expected**:
 
@@ -63,7 +59,7 @@ npm run lint
 
 ---
 
-## 4. Manual adjust ±1 (mock or live)
+## 4. Manual adjust ±1
 
 1. Note current **live** count on indicator.
 2. Tap **−1** (person left).
@@ -102,7 +98,7 @@ npm run lint
 
 ## 6. Threshold visuals
 
-Use mock or seed data to reach tier boundaries (capacity 100):
+Use a dedicated UAT Event or automated tests to reach tier boundaries (capacity 100). Do not manipulate a production Event solely for visual QA.
 
 | Live | Expected tier | Label hint |
 | ---: | :--- | :--- |
@@ -128,7 +124,7 @@ Verify colour + text distinguish tiers without reading exact fraction (SC-003).
 
 ## 8. RBAC
 
-1. Sign in as **non-admin** → navigate to `#/events/check-in`.
+1. Sign in as **non-admin** → navigate to `#/events/{eventId}/check-in`.
 
 **Expected**:
 
@@ -138,19 +134,19 @@ Verify colour + text distinguish tiers without reading exact fraction (SC-003).
 
 ## 9. Walk-in mode (if 003 US3 shipped)
 
-1. Switch to **Walk-in** mode on Check-in.
+1. Open the **+ Add walk-in** modal on Check-in.
 
 **Expected**:
 
-- Capacity indicator and ±1 remain visible above iframe
+- Capacity indicator remains visible on the underlying Check-in page
 - Walk-in submit alone does not change live count until attendee refresh
 
 ---
 
 ## 10. Live smoke (after SFTP)
 
-1. Set `USE_MOCK_API: false`.
-2. Repeat §4–§5 on UAT with real Event + registrants.
+1. Confirm the frontend is using the intended UAT ScriptRunner listener.
+2. Repeat §3–§5 on UAT with a dedicated test Event + registrants.
 
 **Expected**:
 
@@ -159,17 +155,45 @@ Verify colour + text distinguish tiers without reading exact fraction (SC-003).
 
 ---
 
+## C. Operator security comfort checks
+
+### C0. Goal and prerequisites
+
+Prove the capacity snapshot/adjustment is admin-only, bounded, audited, and routed through ScriptRunner. Use UAT with a mapped admin, mapped viewer in a separate profile, and a dedicated Event with capacity configured.
+
+### C1. Checks
+
+| Step | Action | Expected result | Failure signal — stop |
+| :---: | :--- | :--- | :--- |
+| C1.1 | Admin opens `#/events/{eventId}/check-in` with DevTools Network open. | Capacity calls go to ScriptRunner (`?route=events/{eventId}/capacity...`), never directly to HubSpot. | Direct browser→HubSpot request or wrong environment. |
+| C1.2 | Sign out and reopen the deep link. | Login/redirect; no operational data. | Capacity/roster visible without a session. |
+| C1.3 | Viewer opens the same route. | Redirect/deny; no capacity adjustment controls. | Viewer can read the roster/capacity module or adjust it. |
+| C1.4 | Admin performs one −1 then +1 correction. | Both stay within floor/ceiling; Audit shows `capacity.adjust` with Event/id/count context only. | Out-of-bounds adjustment, missing audit, or attendee email/name in metadata. |
+| C1.5 | Trigger adjustments rapidly above the documented limit. | Clear rate-limit response; controls recover after the window. | Unlimited writes. |
+
+### C2. Operator security sign-off
+
+| Step | Check | Pass ☐ | Fail ☐ | Notes |
+| :--- | :--- | :---: | :---: | :--- |
+| C1.1–C1.2 | Data/auth boundary | | | |
+| C1.3 | Viewer denied | | | |
+| C1.4 | Bounds + audit/no PII | | | |
+| C1.5 | Rate limiting | | | |
+
+**Operator:** _______________ **Date:** _______________ **Environment:** ☐ UAT ☐ Live
+
+---
+
 ## Manual QA log
 
 | Date | Tester | §1–§2 Auto | §3 Indicator | §4 ±1 adjust | §5 Check-in | §6 Tiers | §7 No capacity | §8 RBAC | §9 Walk-in | §10 Live | Notes |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| 2026-07-07 | | ✅ | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ mock | ⬜ blocked | T001–T042 ✅; **T043–T044** blocked → **FE-CAP-001** / **X-009** |
+| 2026-07-07 | | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ blocked | Historical row: T001–T042 ✅; live QA was blocked → **FE-CAP-001** / **X-009** |
 
 **Column guide**
 
 - **§1–§2**: automated — `npm test` (Capacity + CheckIn + capacityTier + dataService).
-- **Mock sign-off (interim)**: §3–§6 with `USE_MOCK_API: true` — no HubSpot writes.
-- **Full sign-off**: above + §4–§5 live + §10 — requires UAT SFTP deploy (**BE-CAP-001**).
+- **Full sign-off**: §3–§10 on UAT — requires Backend deploy and safe test data (**BE-CAP-001**).
 
 ---
 

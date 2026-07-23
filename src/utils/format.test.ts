@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capitalizeStatus, statusBadgeClass } from './format';
+import { capitalizeStatus, formatCheckInTime, statusBadgeClass } from './format';
 
 describe('format utilities', () => {
 	it('maps event statuses to badge classes', () => {
@@ -11,5 +11,9 @@ describe('format utilities', () => {
 	it('capitalizes status labels', () => {
 		expect(capitalizeStatus('active')).toBe('Active');
 		expect(capitalizeStatus('checked_in')).toBe('Checked_in');
+	});
+
+	it('formats a check-in timestamp as 24-hour HH:MM', () => {
+		expect(formatCheckInTime('2026-07-16T08:52:00.000Z')).toMatch(/^\d{2}:\d{2}$/);
 	});
 });

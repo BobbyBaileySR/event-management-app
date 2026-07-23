@@ -1,4 +1,4 @@
-import type { CatalogEventSummary, CatalogProgram } from '../types';
+import type { CapacitySummaryRow, CatalogEventSummary, CatalogProgram } from '../types';
 import {
 	deriveEventLifecycleStatus,
 	type EventLifecycleStatus,
@@ -83,28 +83,29 @@ export function catalogEventToPortfolio(
 	};
 }
 
-/** Fan out capacity reads and merge checked-in counts into portfolio rows (FE-REDESIGN-020). */
-export async function enrichPortfolioWithCapacity(
+/**
+ * Merge the bulk capacity summary (`GET events/capacity-summary`, Slice 012) into portfolio
+ * rows, keyed by `eventId`. `PortfolioEvent.attendeeCount` is "Event Capacity" (total
+ * registered, checked-in or not) — sourced from `registeredCount`, matching what Event
+ * Details shows, not `checkedInCount` ("Live Capacity", the Check-in page's on-site count).
+ * A missing row (summary fetch failed, or the event isn't in it yet) falls back to zero
+ * registered with the catalog's own capacity — the same soft-fail shape the old per-event
+ * fan-out used.
+ */
+export function enrichPortfolioWithCapacity(
 	events: CatalogEventSummary[],
 	programs: CatalogProgram[],
-	fetchCapacity: (eventId: string) => Promise<{ checkedInCount: number; capacity: number | null }>,
+	summaryRows: CapacitySummaryRow[] | undefined,
 	now: Date = new Date(),
-): Promise<PortfolioEvent[]> {
-	const capacities = await Promise.all(
-		events.map(async (event) => {
-			try {
-				return await fetchCapacity(event.id);
-			} catch {
-				return { checkedInCount: 0, capacity: event.capacity ?? null };
-			}
-		}),
-	);
+): PortfolioEvent[] {
+	const summaryByEventId = new Map((summaryRows ?? []).map((row) => [row.eventId, row]));
 
-	return events.map((event, index) => {
-		const capacityRow = capacities[index]!;
-		const portfolio = catalogEventToPortfolio(event, programs, capacityRow.checkedInCount, now);
-		if (capacityRow.capacity !== null && capacityRow.capacity > 0) {
-			portfolio.capacity = capacityRow.capacity;
+	return events.map((event) => {
+		const summaryRow = summaryByEventId.get(event.id);
+		const registeredCount = summaryRow?.registeredCount ?? 0;
+		const portfolio = catalogEventToPortfolio(event, programs, registeredCount, now);
+		if (summaryRow && summaryRow.capacity !== null && summaryRow.capacity > 0) {
+			portfolio.capacity = summaryRow.capacity;
 		}
 		return portfolio;
 	});

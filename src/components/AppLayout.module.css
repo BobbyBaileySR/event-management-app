@@ -63,11 +63,14 @@
 	scroll-padding-top: 28px;
 }
 
-@media (max-width: 900px) {
-	.layout {
-		flex-direction: column;
-	}
-
+/*
+ * `.layout` stays row-direction at every tier: desktop shows `Sidebar` + `main`, tablet
+ * shows `IconRail` + `main` (its drawer overlays via `position: fixed`, outside flex flow),
+ * and phone shows `main` alone (`MobileTabBar` is `.shell`'s own full-width bar above
+ * `.layout`, not a flex child inside it) — so there's no tier where `.layout` needs to
+ * stack its children vertically.
+ */
+@media (max-width: 1023px) {
 	.content {
 		padding: 20px 16px;
 	}

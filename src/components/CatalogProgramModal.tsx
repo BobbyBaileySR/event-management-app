@@ -3,6 +3,7 @@ import type { CatalogProgram, CreateCatalogProgramBody, PatchCatalogProgramBody 
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalTextForPatch } from '../utils/catalogMetadata';
 import { CalendarPicker } from './pickers/CalendarPicker';
+import { SelectPicker } from './pickers/SelectPicker';
 import styles from './CatalogProgramModal.module.css';
 
 export interface CatalogProgramModalProps {
@@ -86,8 +87,10 @@ export function CatalogProgramModal({
 	onArchive,
 }: CatalogProgramModalProps) {
 	const titleId = useId();
+	const subtitleId = useId();
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const firstFieldRef = useRef<HTMLInputElement>(null);
+	const ownerId = useId();
 	const startDateId = useId();
 	const endDateId = useId();
 	const [form, setForm] = useState<ProgramFormState>(emptyForm);
@@ -138,7 +141,11 @@ export function CatalogProgramModal({
 		}
 	}
 
-	const title = mode === 'create' ? 'Create Program' : 'Edit Program';
+	const title = mode === 'create' ? 'New program' : 'Edit program';
+	const subtitle =
+		mode === 'create'
+			? 'Group related events under a single program'
+			: 'Update this program’s details';
 	const busy = saving || archiving;
 
 	return (
@@ -147,6 +154,7 @@ export function CatalogProgramModal({
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={titleId}
+			aria-describedby={subtitleId}
 			onClick={(event) => {
 				if (event.target === event.currentTarget) {
 					onCancel();
@@ -154,18 +162,34 @@ export function CatalogProgramModal({
 			}}
 		>
 			<div ref={dialogRef} className={`modal ${styles.modal}`}>
-				<h3 id={titleId}>{title}</h3>
+				<div className={styles.header}>
+					<div>
+						<h3 id={titleId}>{title}</h3>
+						<p id={subtitleId} className={styles.subtitle}>
+							{subtitle}
+						</p>
+					</div>
+					<button type="button" className={styles.closeButton} onClick={onCancel} aria-label="Close">
+						×
+					</button>
+				</div>
 				<form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
 					<label>
-						Program name
-						<span className={styles.requiredMark} aria-hidden="true">
-							{' '}
-							*
+						{/* One wrapping element so the label text and asterisk share a single flex
+						    item — `.form label` is a column flex container, so without this the
+						    asterisk span becomes its own item and drops to the next line. */}
+						<span>
+							Program name
+							<span className="required-mark" aria-hidden="true">
+								{' '}
+								*
+							</span>
 						</span>
 						<input
 							ref={firstFieldRef}
 							value={form.name}
 							onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+							placeholder="e.g. Summit Series 2026"
 							required
 							aria-required="true"
 						/>
@@ -175,9 +199,21 @@ export function CatalogProgramModal({
 						<textarea
 							value={form.description}
 							onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+							placeholder="What is this program about?"
 							rows={3}
 						/>
 					</label>
+					{/* Program owner (hubspot_owner_id) — UI only for now; the owners-list API,
+					    dataService method, and create/patch wiring are parked (see TODO X-REDESIGN-011). */}
+					<SelectPicker
+						id={ownerId}
+						label="Program owner"
+						value=""
+						placeholder="Select program owner"
+						options={[]}
+						disabled
+						onChange={() => undefined}
+					/>
 					<CalendarPicker
 						id={startDateId}
 						label="Start date"
@@ -190,7 +226,7 @@ export function CatalogProgramModal({
 						value={form.endDate}
 						onChange={(endDate) => setForm((current) => ({ ...current, endDate }))}
 					/>
-					<div className="modal__actions">
+					<div className={`modal__actions ${styles.footer}`}>
 						{mode === 'edit' && onArchive && program ? (
 							<button
 								type="button"
@@ -198,14 +234,14 @@ export function CatalogProgramModal({
 								onClick={() => void handleArchive()}
 								disabled={busy}
 							>
-								{archiving ? 'Updating…' : program.archived ? 'Unarchive Program' : 'Archive Program'}
+								{archiving ? 'Updating…' : program.archived ? 'Unarchive program' : 'Archive program'}
 							</button>
 						) : null}
 						<button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary" disabled={busy}>
-							{saving ? 'Saving…' : 'Save Program'}
+							{saving ? 'Saving…' : mode === 'create' ? 'Create program' : 'Save program'}
 						</button>
 					</div>
 				</form>

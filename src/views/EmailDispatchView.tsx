@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState } from 'react';
-import { CatalogPickerSelect } from '../components/CatalogPickerSelect';
+import { useQueryClient } from '@tanstack/react-query';
+import { SelectPicker } from '../components/pickers/SelectPicker';
 import { useConfirm } from '../components/ConfirmModal';
 import { LoadingState } from '../components/LoadingState';
 import { CalendarPicker } from '../components/pickers/CalendarPicker';
@@ -9,6 +10,7 @@ import { useToast } from '../components/Toast';
 import { useDataService } from '../hooks/useDataService';
 import {
 	DETAIL_RECIPIENTS_PAGE_SIZE,
+	isRegisteredContactSelected,
 	type ScheduleMinute,
 	useEmailDispatchWorkflow,
 } from '../hooks/useEmailDispatchWorkflow';
@@ -16,6 +18,7 @@ import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useWorkingEventMeta } from '../hooks/useWorkingEventMeta';
 import { useActiveRoute } from '../router/navigation';
 import type { DispatchStatus, EmailDispatchListItem, SliceAttendee } from '../types';
+import { attendeeInitials, attendeeName } from '../utils/attendeePresentation';
 import {
 	SCHEDULE_MINUTE_OPTIONS,
 	buildTimeSlot,
@@ -23,15 +26,6 @@ import {
 } from '../utils/emailSchedule';
 import styles from './EmailDispatchView.module.css';
 
-function attendeeDisplayName(person: SliceAttendee): string {
-	return `${person.firstName} ${person.lastName}`.trim();
-}
-
-function attendeeInitials(person: SliceAttendee): string {
-	const first = person.firstName.trim().charAt(0);
-	const last = person.lastName.trim().charAt(0);
-	return `${first}${last}`.toUpperCase() || '?';
-}
 
 const AUDIENCE_MODE_LABELS: Record<string, string> = {
 	registered_all: 'All attendees',
@@ -52,6 +46,7 @@ const LOG_STATUS_LABELS: Record<DispatchStatus, string> = {
 
 export function EmailDispatchView() {
 	const data = useDataService();
+	const queryClient = useQueryClient();
 	const { confirm } = useConfirm();
 	const { showToast } = useToast();
 	const { eventId } = useActiveRoute();
@@ -107,7 +102,9 @@ export function EmailDispatchView() {
 		sending,
 		savingEdit,
 		cancellingId,
-		error,
+		limitsError,
+		templatesError,
+		segmentsError,
 		scheduledLockWarnings,
 		editingDispatch,
 		editDispatchName,
@@ -127,7 +124,7 @@ export function EmailDispatchView() {
 		handleScheduleForLater,
 		handleSaveEdit,
 		handleCancelScheduled,
-	} = useEmailDispatchWorkflow({ data, confirm, showToast, eventId });
+	} = useEmailDispatchWorkflow({ data, confirm, showToast, eventId, queryClient });
 
 	const [composeOpen, setComposeOpen] = useState(false);
 	const composeTitleId = useId();
@@ -147,18 +144,8 @@ export function EmailDispatchView() {
 		programName && eventName ? `${programName} — ${eventName}` : eventName ?? 'this event';
 
 	const manualSelectionSet = useMemo(() => new Set(manualContactIds), [manualContactIds]);
-	const isContactSelected = (person: SliceAttendee): boolean => {
-		switch (audienceMode) {
-			case 'registered_all':
-				return true;
-			case 'registered_checked_in':
-				return person.checkedIn;
-			case 'registered_not_checked_in':
-				return !person.checkedIn;
-			default:
-				return manualSelectionSet.has(person.contactId);
-		}
-	};
+	const isContactSelected = (person: SliceAttendee): boolean =>
+		isRegisteredContactSelected(person, audienceMode, manualSelectionSet);
 
 	const selectedTemplateName =
 		templateOptions.find((option) => option.value === templateId)?.label ?? null;
@@ -205,6 +192,7 @@ export function EmailDispatchView() {
 					id={`${options.idPrefix}-date`}
 					className={styles.field}
 					label="Date"
+					required
 					value={options.date}
 					onChange={options.onDateChange}
 				/>
@@ -212,6 +200,7 @@ export function EmailDispatchView() {
 					id={`${options.idPrefix}-time`}
 					className={styles.field}
 					label="Time"
+					required
 					value={timeValue}
 					placeholder="Select time"
 					stepMinutes={15}
@@ -316,6 +305,14 @@ export function EmailDispatchView() {
 											{dispatch.lockWarning ? (
 												<span className={styles.lockBadge} data-testid="dispatch-lock-badge">
 													Locking soon
+												</span>
+											) : null}
+											{dispatch.ticketsEnabled ? (
+												<span
+													className={`badge badge--registered ${styles.ticketsBadge}`}
+													data-testid="dispatch-tickets-badge"
+												>
+													Tickets
 												</span>
 											) : null}
 										</td>
@@ -460,9 +457,9 @@ export function EmailDispatchView() {
 							</button>
 						</div>
 						{loading ? <LoadingState message="Loading compose options…" /> : null}
-						{error ? (
+						{limitsError ? (
 							<div role="alert">
-								<p>{error}</p>
+								<p>{limitsError}</p>
 								<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadComposeData()}>
 									Try again
 								</button>
@@ -475,16 +472,26 @@ export function EmailDispatchView() {
 										<p className={styles.sectionTitle}>Template</p>
 										<p className={styles.sectionHint}>Choose a HubSpot email template to send.</p>
 									</div>
-									<CatalogPickerSelect
-										id="email-template"
-										className={styles.templatePicker}
-										label="Template"
-										value={templateId}
-										placeholder="Select template"
-										options={templateOptions}
-										disabled={templateOptions.length === 0}
-										onChange={setTemplateId}
-									/>
+									{templatesError ? (
+										<div role="alert">
+											<p>{templatesError}</p>
+											<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadComposeData()}>
+												Try again
+											</button>
+										</div>
+									) : (
+										<SelectPicker
+											id="email-template"
+											className={styles.templatePicker}
+											label="Template"
+											required
+											value={templateId}
+											placeholder="Select template"
+											options={templateOptions}
+											disabled={templateOptions.length === 0}
+											onChange={setTemplateId}
+										/>
+									)}
 								</div>
 
 								<div className={styles.section}>
@@ -551,13 +558,13 @@ export function EmailDispatchView() {
 																type="checkbox"
 																checked={isContactSelected(person)}
 																onChange={(event) => toggleRegisteredContact(person, event.target.checked)}
-																aria-label={`Select ${attendeeDisplayName(person)}`}
+																aria-label={`Select ${attendeeName(person)}`}
 															/>
 															<span className={styles.recipientAvatar} aria-hidden="true">
 																{attendeeInitials(person)}
 															</span>
 															<span className={styles.recipientInfo}>
-																<span className={styles.recipientName}>{attendeeDisplayName(person)}</span>
+																<span className={styles.recipientName}>{attendeeName(person)}</span>
 																<span className={styles.recipientMeta}>
 																	{person.company} · {person.attendeeType}
 																</span>
@@ -584,17 +591,31 @@ export function EmailDispatchView() {
 										</>
 									) : (
 										<div className={styles.segmentPicker}>
-											<CatalogPickerSelect
-												id="email-segment"
-												className={styles.segmentListPicker}
-												testId="segment-picker"
-												label="HubSpot list"
-												value={segmentId}
-												placeholder="Select HubSpot list"
-												options={segmentOptions}
-												disabled={segments.length === 0}
-												onChange={setSegmentId}
-											/>
+											{segmentsError ? (
+												<div role="alert">
+													<p>{segmentsError}</p>
+													<button
+														type="button"
+														className="btn btn-outline btn-sm"
+														onClick={() => void loadComposeData()}
+													>
+														Try again
+													</button>
+												</div>
+											) : (
+												<SelectPicker
+													id="email-segment"
+													className={styles.segmentListPicker}
+													testId="segment-picker"
+													label="HubSpot list"
+													required
+													value={segmentId}
+													placeholder="Select HubSpot list"
+													options={segmentOptions}
+													disabled={segments.length === 0}
+													onChange={setSegmentId}
+												/>
+											)}
 											<div className={styles.selectionInfo} data-testid="recipient-preview">
 												<p className={styles.selectionCount}>
 													{previewLoading
@@ -740,18 +761,27 @@ export function EmailDispatchView() {
 						</h2>
 						<p className={styles.editMeta}>{editingDispatch.audienceSummary}</p>
 						<div className={styles.field}>
-							<label htmlFor="edit-dispatch-name">Dispatch name</label>
+							<label htmlFor="edit-dispatch-name">
+								Dispatch name
+								<span className="required-mark" aria-hidden="true">
+									{' '}
+									*
+								</span>
+							</label>
 							<input
 								id="edit-dispatch-name"
 								type="text"
 								value={editDispatchName}
 								onChange={(event) => setEditDispatchName(event.target.value)}
+								required
+								aria-required="true"
 							/>
 						</div>
-						<CatalogPickerSelect
+						<SelectPicker
 							id="edit-template"
 							className={styles.field}
 							label="Template"
+							required
 							value={editTemplateId}
 							placeholder="Select template"
 							options={templateOptions}

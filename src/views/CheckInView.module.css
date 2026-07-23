@@ -121,6 +121,20 @@
 	min-height: 44px;
 }
 
+/* The two action cards can hold a different amount of description text (Scan QR code's is
+   two lines, Walk-in registration's is one), so without this their buttons land at different
+   heights even though the cards themselves are equal height (flex row's default
+   align-items: stretch). Making each card a column flex container and pinning the button to
+   the bottom keeps both buttons level regardless of description length. */
+.actionColumn > :global(.card) {
+	display: flex;
+	flex-direction: column;
+}
+
+.actionColumn > :global(.card) > :global(.btn) {
+	margin-top: auto;
+}
+
 .cardHeader {
 	display: flex;
 	flex-wrap: wrap;
@@ -132,6 +146,12 @@
 
 .cardHeader h3 {
 	margin: 0;
+}
+
+.checkedInSummary {
+	margin: 4px 0 0;
+	font-size: 0.8rem;
+	color: var(--muted);
 }
 
 .searchField {
@@ -173,6 +193,27 @@
 	padding: 18px;
 }
 
+.attendeeCell {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.attendeeAvatar {
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
 .attendeeName {
 	margin: 0;
 	font-weight: 600;
@@ -189,6 +230,35 @@
 	cursor: pointer;
 }
 
+.checkedInRow {
+	background: var(--ice);
+}
+
+.checkedInStatus {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 6px 12px;
+	font-size: 0.8rem;
+	font-weight: 700;
+	font-family: inherit;
+	border: none;
+	border-radius: var(--radius-sm);
+	background: var(--success-bg);
+	color: var(--success);
+	cursor: pointer;
+}
+
+.checkedInStatus:hover:not(:disabled) {
+	filter: brightness(0.95);
+}
+
+.checkedInStatus:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
 @media (min-width: 901px) {
 	.resultsScroll {
 		max-height: 520px;
@@ -198,7 +268,17 @@
 @media (max-width: 900px) {
 	.layout {
 		grid-template-columns: 1fr;
+		/* Action row sized to its own content ("auto"); the attendee list takes the rest
+		   ("1fr") — without this, both rows default to auto and, since `.layout` itself is
+		   flex-stretched taller than their combined content height, the leftover space
+		   collects as dead space between them instead of growing the list (matching the
+		   design's "list area flexes, action area pinned below" tablet/phone intent). */
+		grid-template-rows: auto 1fr;
 		gap: 16px;
+		/* Overrides the unconditional `align-items: start` above (correct for desktop's
+		   side-by-side columns) so the list card actually stretches to fill its 1fr row
+		   instead of staying content-sized and top-aligned within it. */
+		align-items: stretch;
 	}
 
 	.actionColumn {
@@ -211,7 +291,10 @@
 	}
 
 	.resultsScroll {
-		max-height: min(50vh, 420px);
+		/* No fixed cap here (unlike desktop's 520px) — the card now fills the 1fr row via
+		   `align-items: stretch` above, so flex:1 (base rule) sizes this to the actual space
+		   available rather than an arbitrary vh fraction. */
+		max-height: none;
 	}
 }
 

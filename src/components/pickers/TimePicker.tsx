@@ -9,6 +9,8 @@ interface TimePickerProps {
 	value: string;
 	placeholder?: string;
 	disabled?: boolean;
+	/** Shows a red `*` next to the label — the field's own validation still enforces it. */
+	required?: boolean;
 	className?: string;
 	testId?: string;
 	/** Minute increment between options. */
@@ -40,6 +42,7 @@ export function TimePicker({
 	value,
 	placeholder = 'Select time…',
 	disabled = false,
+	required = false,
 	className,
 	testId,
 	stepMinutes = 15,
@@ -55,6 +58,7 @@ export function TimePicker({
 			placeholder={placeholder}
 			options={options}
 			disabled={disabled}
+			required={required}
 			className={className}
 			triggerClassName={styles.triggerTime}
 			testId={testId}

@@ -1,10 +1,11 @@
 import { createElement, useEffect } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from 'react-router-dom';
 import { ConfirmProvider } from '../components/ConfirmModal';
 import { ToastProvider } from '../components/Toast';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import { SessionProvider, useSession } from '../state/appState';
 import type { Session, SliceAttendee } from '../types';
 import { CheckInView } from './CheckInView';
@@ -15,6 +16,7 @@ const {
 	mockUndoCheckIn,
 	mockCheckInScan,
 	mockFetchEventCapacityStatus,
+	mockFetchCapacitySummary,
 	mockAdjustCapacity,
 	mockFetchCatalog,
 	mockDataService,
@@ -41,7 +43,7 @@ const {
 				accountManager: 'owner-2',
 				attendeeType: 'partner',
 				checkedIn: true,
-				checkedInAt: null,
+				checkedInAt: '2026-07-16T08:52:00.000Z',
 			},
 		],
 		page: 1,
@@ -53,12 +55,14 @@ const {
 		checkedIn: true,
 		alreadyCheckedIn: false,
 		attendeeType: 'customer',
+		checkedInAt: '2026-07-16T09:00:00.000Z',
 	});
 	const undoCheckIn = vi.fn().mockResolvedValue({
 		contactId: 'mock-202',
 		checkedIn: false,
 		alreadyCheckedIn: true,
 		attendeeType: 'partner',
+		checkedInAt: null,
 	});
 	const checkInScan = vi.fn().mockResolvedValue({
 		programId: '_standalone',
@@ -90,6 +94,8 @@ const {
 		departureCount: 1,
 		liveAttendance: 0,
 	});
+	/** Never called from this view (T034) — Check-in keeps the per-event route, not the bulk summary. */
+	const fetchCapacitySummary = vi.fn();
 	const fetchCatalog = vi.fn().mockResolvedValue({
 		events: [
 			{
@@ -113,6 +119,7 @@ const {
 		mockUndoCheckIn: undoCheckIn,
 		mockCheckInScan: checkInScan,
 		mockFetchEventCapacityStatus: fetchEventCapacityStatus,
+		mockFetchCapacitySummary: fetchCapacitySummary,
 		mockAdjustCapacity: adjustCapacity,
 		mockFetchCatalog: fetchCatalog,
 		mockDataService: {
@@ -121,6 +128,7 @@ const {
 			undoCheckIn,
 			checkInScan,
 			fetchEventCapacityStatus,
+			fetchCapacitySummary,
 			adjustCapacity,
 			fetchCatalog,
 		},
@@ -148,7 +156,7 @@ const mockSliceAttendees: SliceAttendee[] = [
 		accountManager: 'owner-2',
 		attendeeType: 'partner',
 		checkedIn: true,
-		checkedInAt: null,
+		checkedInAt: '2026-07-16T08:52:00.000Z',
 	},
 ];
 
@@ -215,7 +223,7 @@ function renderCheckIn(
 	});
 
 	const path = eventId ? `/events/${eventId}/check-in` : '/events';
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter initialEntries={[path]}>
 			<ToastProvider>
 				<ConfirmProvider>
@@ -246,6 +254,7 @@ describe('CheckInView', () => {
 			checkedIn: false,
 			alreadyCheckedIn: true,
 			attendeeType: 'partner',
+			checkedInAt: null,
 		});
 		mockFetchEventAttendees.mockResolvedValue({
 			attendees: mockSliceAttendees,
@@ -258,6 +267,7 @@ describe('CheckInView', () => {
 			checkedIn: true,
 			alreadyCheckedIn: false,
 			attendeeType: 'customer',
+			checkedInAt: '2026-07-16T09:00:00.000Z',
 		});
 		mockCheckInScan.mockResolvedValue({
 			programId: 'prog-atlassian-2026',
@@ -291,19 +301,20 @@ describe('CheckInView', () => {
 		});
 	});
 
-	it('offers Undo check-in for already-checked-in search results', async () => {
+	it('loads the full roster by default and offers Undo check-in for checked-in attendees', async () => {
 		const user = userEvent.setup();
 		renderCheckIn();
 
-		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
-			target: { value: 'Pat' },
-		});
-
 		await waitFor(() => {
-			expect(screen.getByText('Pat Lee')).toBeInTheDocument();
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
+				page: 1,
+				pageSize: 200,
+			});
 		});
+		expect(await screen.findByText('Pat Lee')).toBeInTheDocument();
+		expect(screen.getByText('Jane Doe')).toBeInTheDocument();
 
-		await user.click(screen.getByRole('button', { name: 'Undo check-in' }));
+		await user.click(screen.getByRole('button', { name: /In/ }));
 		await user.click(
 			within(await screen.findByRole('dialog', { name: 'Undo check-in?' })).getByRole('button', {
 				name: 'Undo check-in',
@@ -316,7 +327,14 @@ describe('CheckInView', () => {
 		expect(await screen.findByText(/check-in undone/i)).toBeInTheDocument();
 	});
 
-	it('opens a confirm-check-in modal from the search results and confirms', async () => {
+	it("shows the working event in the TopBar pill (rail/tab-bar chrome can collapse the picker to an icon)", async () => {
+		renderCheckIn();
+
+		expect(await screen.findByText('Meeting Room')).toBeInTheDocument();
+		expect(screen.getByText(/Working on:/)).toBeInTheDocument();
+	});
+
+	it('opens a confirm-check-in modal from the roster and confirms', async () => {
 		renderCheckIn();
 
 		await waitFor(() => {
@@ -325,21 +343,25 @@ describe('CheckInView', () => {
 			).toBeInTheDocument();
 		});
 
-		expect(screen.getByText(/Type at least 2 characters to search registrants/i)).toBeInTheDocument();
-		expect(mockFetchEventAttendees).not.toHaveBeenCalled();
+		await waitFor(() => {
+			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+		});
+
+		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
+			page: 1,
+			pageSize: 200,
+		});
 
 		fireEvent.change(screen.getByLabelText('Search attendees for check-in'), {
 			target: { value: 'Jane' },
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText('Jane Doe')).toBeInTheDocument();
-		});
-
-		expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
-			q: 'Jane',
-			page: 1,
-			pageSize: 200,
+			expect(mockFetchEventAttendees).toHaveBeenCalledWith('ev-mr-2026', {
+				q: 'Jane',
+				page: 1,
+				pageSize: 200,
+			});
 		});
 
 		fireEvent.click(screen.getAllByRole('button', { name: 'Check in' })[0]!);
@@ -453,7 +475,7 @@ describe('CheckInView', () => {
 	});
 
 	it('redirects non-admin users to the events list', async () => {
-		render(
+		renderWithQueryClient(
 			<MemoryRouter initialEntries={['/events/check-in']}>
 				<ToastProvider>
 					<ConfirmProvider>
@@ -700,7 +722,7 @@ describe('CheckInView', () => {
 				{ initialEntries: ['/events/ev-mr-2026/check-in'] },
 			);
 
-			render(
+			renderWithQueryClient(
 				<ToastProvider>
 					<ConfirmProvider>
 						<SessionProvider>
@@ -730,6 +752,18 @@ describe('CheckInView', () => {
 				expect(mockFetchEventCapacityStatus).toHaveBeenCalledWith('ev-mr-2026');
 			});
 			expect(screen.getByLabelText('Live capacity: 1 of 100 on site, 1 percent full')).toBeInTheDocument();
+		});
+
+		it('keeps using the per-event capacity route, never the bulk capacity-summary route (T034/US4-4)', async () => {
+			mockFetchEventCapacityStatus.mockClear();
+			mockFetchCapacitySummary.mockClear();
+
+			renderCheckIn();
+
+			await waitFor(() => {
+				expect(mockFetchEventCapacityStatus).toHaveBeenCalledWith('ev-mr-2026');
+			});
+			expect(mockFetchCapacitySummary).not.toHaveBeenCalled();
 		});
 
 		it('refetches capacity after confirm check-in', async () => {

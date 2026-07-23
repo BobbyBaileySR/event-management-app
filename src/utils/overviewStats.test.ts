@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PortfolioEvent } from './catalogEventPresentation';
-import { getUpcomingEvents, isInSameMonth, isWithinNextDays, isWithinPastDays } from './overviewStats';
+import { getUpcomingEvents, getEventDateBadgeParts, isInSameMonth, isWithinNextDays, isWithinPastDays } from './overviewStats';
 
 const NOW = new Date('2026-07-14T12:00:00.000Z');
 
@@ -61,6 +61,20 @@ describe('isWithinNextDays', () => {
 
 	it('is false for a past date', () => {
 		expect(isWithinNextDays('2026-07-01T00:00:00.000Z', 7, NOW)).toBe(false);
+	});
+});
+
+describe('getEventDateBadgeParts', () => {
+	it('returns uppercase month abbr and day number', () => {
+		expect(getEventDateBadgeParts('2026-03-12T09:00:00.000Z')).toEqual({
+			month: 'MAR',
+			day: '12',
+		});
+	});
+
+	it('returns placeholders for empty or invalid dates', () => {
+		expect(getEventDateBadgeParts('')).toEqual({ month: '—', day: '—' });
+		expect(getEventDateBadgeParts('not-a-date')).toEqual({ month: '—', day: '—' });
 	});
 });
 

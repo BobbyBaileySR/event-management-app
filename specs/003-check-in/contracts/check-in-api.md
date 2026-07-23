@@ -1,10 +1,10 @@
 # Check-in API Contract (003)
 
-**Status**: Provisional — merge into `Frontend/docs/api-contract.md` when editing that file locally.
+**Status**: Superseded — historical Slice 1 design contract. The live event-scoped contract is in [`Frontend/docs/api-contract.md`](../../../docs/api-contract.md); do not implement the Program-scoped paths below.
 
 **RBAC**: All routes **`admin`** only (see `Frontend/docs/rbac.md`).
 
-**Base path**: `/api/ems` (same origin; `X-EMS-Route` header in production)
+**Historical transport/path**: the body below predates the `route` query parameter and event-first routing.
 
 ---
 

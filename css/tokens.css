@@ -83,10 +83,14 @@
      * Theme-swatch reference colors (FE-REDESIGN-013) — NOT swapped per [data-theme]. The
      * theme switcher needs to show every theme's own accent dot at once, including the two
      * themes that aren't currently active, so it can't read the live (single-active) --accent
-     * role token. These mirror each theme file's own --accent value exactly (theme-aurora.css /
-     * theme-celebration.css / theme-dark-aurora.css) — keep in sync if a theme's accent changes.
+     * role token. Aurora/Celebration mirror their theme file's own --accent value exactly
+     * (theme-aurora.css / theme-celebration.css) — keep in sync if either changes.
+     * Dark Aurora's real --accent is the *same* brand orange as Aurora's (theme-dark-aurora.css)
+     * — intentional, both stay on-brand — but that makes their swatch dots indistinguishable
+     * in the switcher, so this one deliberately uses Dark Aurora's --surface tone instead of
+     * mirroring --accent, so the dot itself reads as "the dark theme" at a glance.
      */
     --theme-swatch-aurora: #FF6633;
     --theme-swatch-celebration: #EC6C93;
-    --theme-swatch-dark-aurora: #FF6633;
+    --theme-swatch-dark-aurora: #0B0E1A;
 }

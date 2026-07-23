@@ -5,6 +5,7 @@ import { AuditView } from './AuditView';
 import { CatalogAdminView } from './CatalogAdminView';
 import { AttendeesView } from './AttendeesView';
 import { CheckInView } from './CheckInView';
+import { ConversationsView } from './ConversationsView';
 import { EventHubView } from './EventHubView';
 import { EventsView } from './EventsView';
 import { OverviewView } from './OverviewView';
@@ -33,6 +34,8 @@ export function ViewRouter() {
 			return <AttendeesRouteGate />;
 		case 'check-in':
 			return <CheckInRouteGate />;
+		case 'conversations':
+			return <ConversationsRouteGate />;
 		case 'email':
 			return <EmailRouteGate />;
 		default:
@@ -56,6 +59,15 @@ function CheckInRouteGate() {
 		return <Navigate to="/events" replace />;
 	}
 	return <CheckInView />;
+}
+
+/** Conversations requires a working event in the URL (`#/events/{eventId}/conversations`). */
+function ConversationsRouteGate() {
+	const { eventId } = useActiveRoute();
+	if (!eventId) {
+		return <Navigate to="/events" replace />;
+	}
+	return <ConversationsView />;
 }
 
 /** Email requires admin + a working event in the URL (`#/events/{eventId}/email`). */

@@ -40,3 +40,29 @@ export function isAllowedHubSpotFormUrl(url: string): boolean {
 
 	return isAllowedHubSpotFormHost(parsed.hostname);
 }
+
+/**
+ * Field/render validation message for a walk-in form URL, or null when the URL is empty
+ * (optional field) or a valid HubSpot form URL. Shared by the Catalog Event modal (which
+ * edits the URL) and the Check-in view (which renders it), so the message never drifts.
+ */
+export function walkInFormUrlError(url: string): string | null {
+	const trimmed = url.trim();
+	if (!trimmed) {
+		return null;
+	}
+	if (isAllowedHubSpotFormUrl(trimmed)) {
+		return null;
+	}
+
+	try {
+		const parsed = new URL(trimmed);
+		if (parsed.protocol !== 'https:') {
+			return 'Walk-in form URL must use HTTPS';
+		}
+	} catch {
+		return 'Walk-in form URL must use HTTPS';
+	}
+
+	return 'Walk-in form URL must be a HubSpot form URL';
+}

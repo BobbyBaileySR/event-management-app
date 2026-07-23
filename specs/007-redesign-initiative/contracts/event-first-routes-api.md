@@ -1,10 +1,10 @@
-# Contract: Event-First Routing + Registration (Phase B — GATED)
+# Contract: Event-First Routing + Registration (Phase B — shipped)
 
-**Feature**: 007 Redesign · **Phase**: B · **Status**: ⛔ **GATED** (objects created in UAT; write-gates remain) + design-it-twice `X-REDESIGN-002/003` · **Date**: 2026-07-13
+**Feature**: 007 Redesign · **Phase**: B · **Status**: Implemented; legacy Program-scoped routes retired 2026-07-16 · **Date**: 2026-07-13 (status updated 2026-07-17)
 
-> **Gate status (2026-07-13):** custom objects created in **UAT** — Program `2-65757052`, Event `2-65757130`, Program→Event association `286` (gate #1/#3 ✔). **Do not implement or merge writes until:** (1) workflow-association test confirms a HubSpot workflow can set the Contact↔Event `registered` label (gate #2, `X-REDESIGN-001`); (2) `CustomObjectAdapter` interface design-it-twice done (`X-REDESIGN-002`); (3) event-first routing shape design-it-twice done (`X-REDESIGN-003`); (4) HubSpot attributes + Contact↔Event association/labels created and verified in [docs/hubspot-schema.md](../../../docs/hubspot-schema.md) (`X-REDESIGN-004`). Object/association IDs are read from **ScriptRunner Connect Parameters** (research R-012), never hardcoded. Proposed property/label names live in hubspot-schema.md; confirm on creation.
+> **Outcome:** all feasibility/design gates passed. `CustomObjectAdapter`, event-first routes, association-based registration, and the flat catalog shipped; object/association IDs remain portal-specific ScriptRunner Parameters.
 
-**Conventions**: `X-EMS-Route` header; `Authorization: Bearer`; JSON errors `{ "message", "code"? }`.
+**Conventions**: logical route in the `route` query parameter (legacy `X-EMS-Route` fallback); `Authorization: Bearer`; JSON errors `{ "message", "code"? }`.
 
 ---
 
@@ -36,9 +36,9 @@ Reasons, beyond the pros/cons above: today's Slice 1 handlers call `resolveCatal
 
 ## Routing change (breaking) — full target-state table
 
-Program membership is a **1-to-many HubSpot association (type ID `286`, Parameter `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`)** resolved inside `CustomObjectAdapter`, **never** a route param or `programId` property. **The api-contract.md + rbac.md + `RouteGuard.ts` change must land together** with the route-table change. A dual-read window keeps both patterns registered against the same handlers during migration (`X-REDESIGN-005`) — remove the `programs/:programId/...` entries only once the frontend has fully cut over.
+Program membership is a **1-to-many HubSpot association (type ID `286`, Parameter `HUBSPOT_ASSOC_PROGRAM_TO_EVENT`)** resolved inside `CustomObjectAdapter`, never a route param. The migration completed and the dual-read Program-scoped entries were removed 2026-07-16.
 
-| Slice 1 (current) | Event-first (target) | Method |
+| Historical Program-scoped route | Current event-scoped route | Method |
 | :--- | :--- | :---: |
 | `programs/{programId}/events/{eventId}/attendees` | `events/{eventId}/attendees` | GET |
 | `programs/{programId}/events/{eventId}/checkin/scan` | `events/{eventId}/checkin/scan` | POST |

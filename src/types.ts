@@ -162,7 +162,8 @@ export interface SliceAttendee {
 	accountManager: string;
 	attendeeType: 'customer' | 'partner';
 	checkedIn: boolean;
-	checkedInAt: null;
+	/** ISO timestamp for the current check-in; `null` when not checked in (R-009 Record Storage cache). */
+	checkedInAt: string | null;
 }
 
 export interface SliceAttendeesResponse {
@@ -175,6 +176,90 @@ export interface SliceAttendeesResponse {
 export interface RemoveAttendeeResponse {
 	contactId: string;
 	removed: boolean;
+}
+
+/** One entry in `AttendeeDetail.journey` or `AttendeeCommunicationsResponse.timeline` (010-attendee-detail-modal). */
+export interface AttendeeJourneyStep {
+	type: 'registered' | 'dispatch_sent' | 'dispatch_opened' | 'checked_in';
+	/** `null` only when the underlying timestamp isn't tracked yet — render "Not yet", never fabricate a date. */
+	timestamp: string | null;
+	label: string;
+	source: 'this_event';
+}
+
+export type CommunicationTag = { kind: 'other_event'; eventName: string } | { kind: 'external' };
+
+/** A timeline entry not part of the currently-open Event — "Show all communications" expansion only. */
+export interface CommunicationItem {
+	type: 'registered' | 'dispatch_sent' | 'dispatch_opened' | 'checked_in';
+	timestamp: string | null;
+	label: string;
+	source: 'other_event' | 'external';
+	tag: CommunicationTag;
+}
+
+export type AttendeeTimelineItem = AttendeeJourneyStep | CommunicationItem;
+
+/**
+ * One entry in `AttendeeDetail.registrationAnswerHistory` (013-registration-form-bridge). `answers`
+ * values are free text authored directly by an anonymous public form submitter — render with JSX
+ * `{text}` only, never `dangerouslySetInnerHTML` (spec FR-007).
+ */
+export interface RegistrationAnswerHistoryEntry {
+	answers: Record<string, string | string[]>;
+	source: 'registration' | 'amendment';
+	observedAt: string;
+	slot: number;
+}
+
+/** `GET events/{evId}/attendees/{contactId}` response (010-attendee-detail-modal). */
+export interface AttendeeDetail {
+	contactId: string;
+	firstName: string;
+	lastName: string;
+	company: string;
+	email: string;
+	accountManager: string;
+	attendeeType: 'customer' | 'partner';
+	checkedIn: boolean;
+	checkedInAt: string | null;
+	/** `null` until `HS-010` (property allowlisted) — omit rather than show a placeholder. */
+	phone: string | null;
+	jobTitle: string | null;
+	dietaryRequirement: string | null;
+	/** `null` until `BE-ATTENDEE-DETAIL-002` closes — no persisted signal distinguishes these today. */
+	registrationSource: 'form' | 'walk-in' | null;
+	journey: AttendeeJourneyStep[];
+	/** `[]` if none recorded (013-registration-form-bridge) — never overwritten, only appended to. */
+	registrationAnswerHistory: RegistrationAnswerHistoryEntry[];
+}
+
+/**
+ * One conversation note (015-conversation-notes, contracts/attendee-notes.md). `content` is
+ * staff-authored free text — render with JSX `{text}` only, never `dangerouslySetInnerHTML`.
+ * `eventId` is always present (even in the this-event-only default scope) so the UI can tag
+ * cross-event entries when `allEvents` is requested.
+ */
+export interface ConversationNoteEntry {
+	noteId: string;
+	content: string;
+	authorEmail: string;
+	createdAt: string;
+	editHistory: { previousContent: string; editorEmail: string; editedAt: string }[];
+	eventId: string;
+}
+
+/** `GET events/{evId}/attendees/{contactId}/notes` response. */
+export interface AttendeeNotesResponse {
+	notes: ConversationNoteEntry[];
+}
+
+/** `GET attendees/{contactId}/communications` response (010-attendee-detail-modal). */
+export interface AttendeeCommunicationsResponse {
+	contactId: string;
+	/** Earliest event-related timestamp used to bound the query — for debugging/QA, not required by the UI. */
+	cutoffTimestamp: string;
+	timeline: AttendeeTimelineItem[];
 }
 
 export interface CheckInContactSummary {
@@ -194,11 +279,23 @@ export interface CheckInScanResponse {
 	eventId: string;
 }
 
+/**
+ * `POST events/{evId}/attendees/lookup` response (015-conversation-notes, US1) — read-only
+ * attendee lookup for the Conversations screen's QR scan. Same `contact` summary shape as
+ * `CheckInScanResponse`, but no `programId` (never writes or audits a check-in).
+ */
+export interface AttendeeLookupResponse {
+	contact: CheckInContactSummary;
+	eventId: string;
+}
+
 export interface ConfirmCheckInResponse {
 	contactId: string;
 	checkedIn: boolean;
 	alreadyCheckedIn: boolean;
 	attendeeType: 'customer' | 'partner' | null;
+	/** ISO timestamp of this check-in/undo; `null` after undo (R-009 Record Storage cache). */
+	checkedInAt: string | null;
 }
 
 /** Same payload shape as confirm — `alreadyCheckedIn` means the contact *was* checked in before undo. */
@@ -444,6 +541,8 @@ export interface CreateEmailDispatchResponse {
 	recipientCountPlanned: number;
 	scheduledAtUtc: string | null;
 	timezone: string | null;
+	/** 008-qr-ticket-emails — detected server-side from the chosen templateId, never client-supplied. */
+	ticketsEnabled: boolean;
 }
 
 export interface EmailDispatchListItem {
@@ -460,6 +559,8 @@ export interface EmailDispatchListItem {
 	createdBy: string;
 	createdAt: string;
 	lockWarning?: boolean;
+	/** 008-qr-ticket-emails — same value stamped at create time, never re-detected on read. */
+	ticketsEnabled: boolean;
 }
 
 export interface EmailDispatchListResponse {
@@ -467,6 +568,31 @@ export interface EmailDispatchListResponse {
 	page: number;
 	pageSize: number;
 	total: number;
+}
+
+/** Portfolio-wide aggregate for the Overview "Emails scheduled this week" tile (FE-REDESIGN-020). */
+export interface ScheduledEmailSummary {
+	emailsScheduledThisWeek: number;
+	eventsWithScheduledEmails: number;
+}
+
+/**
+ * One row of `GET events/capacity-summary` (Slice 012). `registeredCount` is "Event Capacity"
+ * (total registered, checked-in or not) — what Programs & Events/Overview/Event Details
+ * display. `checkedInCount` is "Live Capacity" (on-site count), matching the Check-in page —
+ * not used for the portfolio views' capacity display.
+ */
+export interface CapacitySummaryRow {
+	eventId: string;
+	programId: string | null;
+	capacity: number | null;
+	registeredCount: number;
+	checkedInCount: number;
+}
+
+/** Portfolio-wide capacity/checked-in aggregate for Programs & Events (`FE-PERF-001`) — replaces the per-event capacity fan-out. */
+export interface CapacitySummaryResponse {
+	events: CapacitySummaryRow[];
 }
 
 export interface DispatchRecipientRow {
@@ -498,6 +624,41 @@ export interface PatchEmailDispatchBody {
 	timezone: string | null;
 	/** Required when recipientCountPlanned >= largeSendThreshold (FR-010). */
 	largeSendConfirmed?: true;
+}
+
+// --- Lead generation (014-lead-generation, ADR-018) ---
+
+export type LeadGenerationOutcome = 'created' | 'updated' | 'created_separate';
+
+/** `failed` only appears in batch results — a single-attendee generation either succeeds or errors. */
+export type LeadGenerationBatchOutcome = LeadGenerationOutcome | 'failed';
+
+export interface GenerateLeadRequestBody {
+	includeFullHistory?: boolean;
+}
+
+/** `POST events/{evId}/attendees/{contactId}/lead` response (contracts/post-attendee-lead.md). */
+export interface GenerateLeadResponse {
+	outcome: LeadGenerationOutcome;
+	leadId: string;
+}
+
+export interface GenerateLeadBatchRequestBody {
+	contactIds: string[];
+	includeFullHistory?: boolean;
+	/** Required (`true`) once `contactIds.length` meets the configured batch threshold. */
+	batchConfirmed?: boolean;
+}
+
+export interface GenerateLeadBatchResultEntry {
+	contactId: string;
+	outcome: LeadGenerationBatchOutcome;
+	leadId?: string;
+}
+
+/** `POST events/{evId}/attendees/lead-batch` response (contracts/post-attendee-lead-batch.md). */
+export interface GenerateLeadBatchResponse {
+	results: GenerateLeadBatchResultEntry[];
 }
 
 /** `GET user/prefs` / `PUT user/prefs/theme` response (contracts/theme-preference-api.md). */

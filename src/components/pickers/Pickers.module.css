@@ -10,6 +10,12 @@
 	color: var(--text);
 }
 
+/* Plain inline wrapper — keeps the label text and an optional required-mark sibling on one
+   line as a single flex item inside `.field` (flex-direction: column). */
+.labelRow {
+	display: inline;
+}
+
 .wrap {
 	position: relative;
 	width: 100%;
@@ -76,15 +82,38 @@
 	left: 0;
 	right: 0;
 	z-index: 20;
-	margin: 0;
-	padding: 4px;
-	list-style: none;
 	border: 1px solid var(--border);
 	border-radius: 8px;
 	background: var(--panel);
 	box-shadow: 0 8px 24px rgba(0, 10, 39, 0.12);
+	overflow: hidden;
+}
+
+.search {
+	width: 100%;
+	box-sizing: border-box;
+	min-height: 44px;
+	border: none;
+	border-bottom: 1px solid var(--border);
+	background: var(--input-bg);
+	color: var(--text);
+	padding: 8px 10px;
+	font: inherit;
+	outline: none;
+}
+
+.optionsList {
+	margin: 0;
+	padding: 4px;
+	list-style: none;
 	max-height: min(280px, 50vh);
 	overflow-y: auto;
+}
+
+.empty {
+	padding: 10px 12px;
+	font-size: 0.85rem;
+	color: var(--muted);
 }
 
 .option {
@@ -198,6 +227,7 @@
 
 @media (max-width: 900px) {
 	.trigger,
+	.search,
 	.option {
 		font-size: 16px;
 	}

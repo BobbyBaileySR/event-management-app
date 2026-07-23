@@ -6,7 +6,7 @@ This guide supplements [project-blueprint.md](project-blueprint.md). Cursor rule
 
 Backend work: use [../Backend/AGENTS_EMS.md](../Backend/AGENTS_EMS.md) — not the full ScriptRunner platform doc.
 
-**Team overrides:** [AGENTS_ANNEX.md](AGENTS_ANNEX.md) supersedes conflicting guidance if present.
+**Team overrides:** `AGENTS_ANNEX.md` (if present in this repo) supersedes conflicting guidance. Backend overrides live in [../Backend/AGENTS_ANNEX.md](../Backend/AGENTS_ANNEX.md).
 
 ---
 
@@ -44,7 +44,7 @@ Frontend/src/
 ├── router/          Route helpers
 ├── state/           Session (appState.tsx — memory only)
 ├── services/        authService.ts, dataService.ts
-├── api/client.ts    Bearer + X-EMS-Route
+├── api/client.ts    Bearer + logical `route` query parameter
 ├── views/           One component per screen
 └── components/      Shared UI
 ```

@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CatalogProgramModal } from './CatalogProgramModal';
-import styles from './CatalogProgramModal.module.css';
 
 describe('CatalogProgramModal', () => {
 	const onCancel = vi.fn();
@@ -19,7 +18,7 @@ describe('CatalogProgramModal', () => {
 			<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />,
 		);
 
-		expect(container.querySelectorAll(`.${styles.requiredMark}`)).toHaveLength(1);
+		expect(container.querySelectorAll('.required-mark')).toHaveLength(1);
 	});
 
 	it('renders create dialog with a11y attributes and focuses first field', async () => {
@@ -27,10 +26,19 @@ describe('CatalogProgramModal', () => {
 
 		const dialog = screen.getByRole('dialog');
 		expect(dialog).toHaveAttribute('aria-modal', 'true');
-		expect(screen.getByRole('heading', { name: 'Create Program' })).toHaveAttribute('id', dialog.getAttribute('aria-labelledby'));
+		expect(screen.getByRole('heading', { name: 'New program' })).toHaveAttribute('id', dialog.getAttribute('aria-labelledby'));
+		const subtitle = screen.getByText('Group related events under a single program');
+		expect(subtitle).toHaveAttribute('id', dialog.getAttribute('aria-describedby'));
 
 		const nameField = screen.getByLabelText(/^Program name/);
 		expect(nameField).toHaveFocus();
+	});
+
+	it('renders a close button and a parked (disabled) program owner field', () => {
+		render(<CatalogProgramModal mode="create" open onCancel={onCancel} onSave={onSave} />);
+
+		expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+		expect(screen.getByRole('button', { name: /Program owner/ })).toBeDisabled();
 	});
 
 	it('submits create payload without empty optional metadata', async () => {
@@ -39,7 +47,7 @@ describe('CatalogProgramModal', () => {
 
 		await user.type(screen.getByLabelText(/^Program name/), 'Summit 2026');
 		await user.type(screen.getByLabelText('Description'), 'Annual event');
-		await user.click(screen.getByRole('button', { name: 'Save Program' }));
+		await user.click(screen.getByRole('button', { name: 'Create program' }));
 
 		expect(onSave).toHaveBeenCalledWith({
 			name: 'Summit 2026',
@@ -66,7 +74,7 @@ describe('CatalogProgramModal', () => {
 		const user = userEvent.setup();
 
 		await user.clear(screen.getByLabelText('Description'));
-		await user.click(screen.getByRole('button', { name: 'Save Program' }));
+		await user.click(screen.getByRole('button', { name: 'Save program' }));
 
 		expect(onSave).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -107,7 +115,7 @@ describe('CatalogProgramModal', () => {
 				onArchive={onArchive}
 			/>,
 		);
-		await userEvent.setup().click(screen.getByRole('button', { name: 'Archive Program' }));
+		await userEvent.setup().click(screen.getByRole('button', { name: 'Archive program' }));
 		expect(onArchive).toHaveBeenCalled();
 	});
 

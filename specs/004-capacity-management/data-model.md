@@ -2,7 +2,7 @@
 
 **Feature**: Slice 1  
 **Date**: 2026-07-07  
-**Prerequisites**: [003-check-in](../003-check-in/spec.md), [001-catalog-admin](../001-catalog-admin/spec.md) Event `capacity` metadata
+**Prerequisites**: [003-check-in](../003-check-in/spec.md), [001-catalog-admin](../_shipped/001-catalog-admin/spec.md) Event `capacity` metadata
 
 ---
 

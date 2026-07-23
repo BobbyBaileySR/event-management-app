@@ -1,0 +1,142 @@
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.sectionTitle {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--muted);
+}
+
+.allEventsToggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.82rem;
+	color: var(--text);
+}
+
+.addForm {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.textarea {
+	width: 100%;
+	min-height: 44px;
+	resize: vertical;
+	font-family: inherit;
+	font-size: 0.88rem;
+	padding: 10px 12px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	background: var(--surface);
+	color: var(--text);
+}
+
+.textarea:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.addForm > button {
+	align-self: flex-end;
+}
+
+.empty {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.errorBlock {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.errorMessage {
+	margin: 0;
+	font-size: 0.85rem;
+	color: var(--danger);
+}
+
+.list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.entry {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-md);
+	padding: 12px 14px;
+	background: var(--ice);
+}
+
+.entryMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+
+.entryAuthor {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.entryTimestamp {
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.editedTag {
+	font-size: 0.72rem;
+	color: var(--muted);
+	font-style: italic;
+}
+
+.content {
+	margin: 0;
+	font-size: 0.88rem;
+	color: var(--text);
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+.contentWithActions {
+	margin-bottom: 8px;
+}
+
+.entryActions {
+	display: flex;
+	gap: 8px;
+}
+
+.editForm {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.editActions {
+	display: flex;
+	gap: 8px;
+}

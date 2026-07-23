@@ -1,5 +1,7 @@
 # Research: Public Registration (Slice 3)
 
+> **Historical research — revalidate before implementation.** Runtime mock-data and Plan C catalog/Settings assumptions were superseded by the event-first HubSpot custom-object model. `docs/hubspot-schema.md` is authoritative for current Event registration fields.
+
 **Feature**: 006-public-registration  
 **Date**: 2026-07-07  
 **Spec**: [spec.md](./spec.md) (Clarifications 2026-07-07)

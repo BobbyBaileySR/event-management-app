@@ -1,13 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LoadingState } from '../components/LoadingState';
+import { RefetchFailureBanner } from '../components/RefetchFailureBanner';
+import { SelectPicker } from '../components/pickers/SelectPicker';
 import { TopBar } from '../components/TopBar';
 import { ViewErrorState } from '../components/ViewErrorState';
-import { useDataService } from '../hooks/useDataService';
+import { useAuditLog } from '../data/hooks/useAuditLog';
+import { describeQueryStatus } from '../data/queryStatus';
 import { useSession } from '../state/appState';
-import type { AuditLogEntry } from '../types';
 import { isAuditLogListResult } from '../types';
 import {
+	KNOWN_AUDIT_ACTIONS,
+	KNOWN_AUDIT_RESOURCE_TYPES,
 	actorInitials,
 	categorizeAuditAction,
 	describeAuditAction,
@@ -19,86 +23,96 @@ import styles from './AuditView.module.css';
 
 const DEFAULT_PAGE_SIZE = 50;
 
+interface AuditFilters {
+	action: string;
+	actor: string;
+	resourceType: string;
+	resourceId: string;
+}
+
+const EMPTY_FILTERS: AuditFilters = { action: '', actor: '', resourceType: '', resourceId: '' };
+
+function hasAnyFilter(filters: AuditFilters): boolean {
+	return Boolean(filters.action || filters.actor || filters.resourceType || filters.resourceId);
+}
+
 export function AuditView() {
 	const { session } = useSession();
-	const data = useDataService();
-	const [entries, setEntries] = useState<AuditLogEntry[]>([]);
-	const [page, setPage] = useState(1);
-	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-	const [total, setTotal] = useState(0);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [reloadKey, setReloadKey] = useState(0);
 	const isAdmin = session?.role === 'admin';
+	const [page, setPage] = useState(1);
+	const [draftFilters, setDraftFilters] = useState<AuditFilters>(EMPTY_FILTERS);
+	const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(EMPTY_FILTERS);
 
-	useEffect(() => {
-		if (!isAdmin) {
-			return;
-		}
+	const actionOptions = useMemo(
+		() => [{ value: '', label: 'All actions' }, ...KNOWN_AUDIT_ACTIONS.map((action) => ({ value: action, label: action }))],
+		[],
+	);
+	const resourceTypeOptions = useMemo(
+		() => [
+			{ value: '', label: 'All resource types' },
+			...KNOWN_AUDIT_RESOURCE_TYPES.map((resourceType) => ({ value: resourceType, label: resourceType })),
+		],
+		[],
+	);
 
-		let cancelled = false;
-		setLoading(true);
-		setError(null);
-
-		void data
-			.fetchAuditLog(undefined, { page, pageSize: DEFAULT_PAGE_SIZE })
-			.then((result) => {
-				if (!cancelled && isAuditLogListResult(result)) {
-					setEntries(result.entries);
-					setPage(result.page);
-					setPageSize(result.pageSize);
-					setTotal(result.total);
-				}
-			})
-			.catch((err: unknown) => {
-				if (!cancelled) {
-					setError(err instanceof Error ? err.message : 'Failed to load audit log');
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data, isAdmin, page, reloadKey]);
+	const auditQuery = useAuditLog(
+		{
+			page,
+			pageSize: DEFAULT_PAGE_SIZE,
+			action: appliedFilters.action || undefined,
+			actor: appliedFilters.actor || undefined,
+			resourceType: appliedFilters.resourceType || undefined,
+			resourceId: appliedFilters.resourceId || undefined,
+		},
+		{ enabled: isAdmin },
+	);
 
 	if (!isAdmin) {
 		return <Navigate to="/events" replace />;
 	}
 
-	const totalPages = Math.max(1, Math.ceil(total / pageSize));
-	const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
-	const rangeEnd = Math.min(page * pageSize, total);
-	const showPagination = total > pageSize;
+	function handleApply() {
+		setPage(1);
+		setAppliedFilters(draftFilters);
+	}
 
-	if (loading) {
+	function handleClear() {
+		setPage(1);
+		setDraftFilters(EMPTY_FILTERS);
+		setAppliedFilters(EMPTY_FILTERS);
+	}
+
+	const auditStatus = describeQueryStatus(auditQuery, 'Failed to load audit log');
+
+	if (auditStatus.kind === 'loading') {
 		return (
 			<section id="view-audit" className={styles.view}>
 				<TopBar title="Audit log" meta="Loading recent activity…" />
-				<div className={`card ${styles.card}`}>
-					<LoadingState message="Loading audit entries…" variant="panel" skeleton="table" skeletonRows={8} />
-				</div>
+				<LoadingState message="Loading audit entries…" />
 			</section>
 		);
 	}
 
-	if (error) {
+	if (auditStatus.kind === 'error') {
 		return (
 			<ViewErrorState
 				viewId="view-audit"
 				title="Audit log"
-				message={error}
-				onRetry={() => {
-					setError(null);
-					setReloadKey((current) => current + 1);
-				}}
+				message={auditStatus.message}
+				onRetry={() => void auditQuery.refetch()}
 			/>
 		);
 	}
+
+	const result = auditQuery.data;
+	const entries = result && isAuditLogListResult(result) ? result.entries : [];
+	const total = result && isAuditLogListResult(result) ? result.total : 0;
+	const pageSize = result && isAuditLogListResult(result) ? result.pageSize : DEFAULT_PAGE_SIZE;
+
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
+	const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+	const rangeEnd = Math.min(page * pageSize, total);
+	const showPagination = total > pageSize;
 
 	const meta =
 		total > 0
@@ -112,11 +126,80 @@ export function AuditView() {
 				meta={meta}
 			/>
 
+			{auditStatus.refetchFailed ? (
+				<RefetchFailureBanner
+					message="Couldn't refresh the audit log — showing the last loaded entries."
+					onRetry={() => void auditQuery.refetch()}
+				/>
+			) : null}
+
 			<div className={`card ${styles.card}`}>
+				<div className={`filter-row ${styles.filterBar}`}>
+					<SelectPicker
+						id="audit-filter-action"
+						className={styles.filterField}
+						label="Action"
+						value={draftFilters.action}
+						placeholder="All actions"
+						options={actionOptions}
+						onChange={(value) => setDraftFilters((current) => ({ ...current, action: value }))}
+					/>
+					<div className={`form-group ${styles.filterField}`}>
+						<label htmlFor="audit-filter-actor">Actor</label>
+						<input
+							id="audit-filter-actor"
+							type="text"
+							value={draftFilters.actor}
+							placeholder="name@adaptavist.com"
+							onChange={(event) =>
+								setDraftFilters((current) => ({ ...current, actor: event.target.value }))
+							}
+						/>
+					</div>
+					<SelectPicker
+						id="audit-filter-resource-type"
+						className={styles.filterField}
+						label="Resource type"
+						value={draftFilters.resourceType}
+						placeholder="All resource types"
+						options={resourceTypeOptions}
+						onChange={(value) => setDraftFilters((current) => ({ ...current, resourceType: value }))}
+					/>
+					<div className={`form-group ${styles.filterField}`}>
+						<label htmlFor="audit-filter-resource-id">Resource ID</label>
+						<input
+							id="audit-filter-resource-id"
+							type="text"
+							value={draftFilters.resourceId}
+							placeholder="ev-mr-2026"
+							onChange={(event) =>
+								setDraftFilters((current) => ({ ...current, resourceId: event.target.value }))
+							}
+						/>
+					</div>
+					<div className={styles.filterActions}>
+						<button type="button" className="btn btn-primary" onClick={handleApply}>
+							Apply
+						</button>
+						<button
+							type="button"
+							className="btn btn-outline"
+							disabled={!hasAnyFilter(draftFilters) && !hasAnyFilter(appliedFilters)}
+							onClick={handleClear}
+						>
+							Clear
+						</button>
+					</div>
+				</div>
+
 				<div className={styles.tableWrap}>
 					<div className={styles.feedScroll}>
 						{entries.length === 0 ? (
-							<p className={styles.empty}>No audit entries recorded yet.</p>
+							<p className={styles.empty}>
+								{hasAnyFilter(appliedFilters)
+									? 'No entries match the selected filters.'
+									: 'No audit entries recorded yet.'}
+							</p>
 						) : (
 							<ul className={styles.feed}>
 								{entries.map((entry) => {

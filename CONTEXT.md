@@ -2,17 +2,21 @@
 
 Ubiquitous language for Adaptavist EMS. **Glossary only** — no implementation, API shapes, or storage choices. See `docs/hubspot-schema.md`, `docs/api-contract.md`, and `docs/decisions/` for technical detail.
 
-> **Last updated:** 2026-07-12 (UI-redesign grilling — target-model transition banner + [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md))
+> **Last updated:** 2026-07-21 (live event conversation notes grilling — **Conversation note** + [ADR-019](docs/decisions/019-live-event-conversation-notes.md)); previously same-day (lead-generation grilling — **Lead / Lead generation**, **Lead interest summary** + [ADR-018](docs/decisions/018-hubspot-lead-generation.md)); previously 2026-07-20 (registration-form bridge grilling — **Registration slot**, **Registration answer / Registration answer history** + [ADR-017](docs/decisions/017-registration-slots-and-answer-history.md); **Registration wave** entry updated to note what ADR-017 does/doesn't resolve); previously 2026-07-19 (data-caching grilling — **Cache**, **Stale-while-revalidate**, **Prefetch**, **Query key / cache invalidation** + [ADR-015](docs/decisions/015-client-data-caching-layer.md) / [ADR-016](docs/decisions/016-no-prefetch-of-audited-pii.md)); previously 2026-07-17 (Attendee Detail modal grilling — **Attendee journey** / **Attendee communications view** + [ADR-014](docs/decisions/014-attendee-communications-hubspot-engagement-pull.md); also 2026-07-17 **Attendee index** term, and 2026-07-12 UI-redesign grilling — target-model transition banner + [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md))
 
 ---
 
-> ## ⚠️ Redesign transition — two models in flight
+> ## Current model and historical Plan C terms
 >
-> A UI redesign + HubSpot **custom-objects** migration is in progress. The terms below (Program, Event, Parts Attended, Registered attendee, Checked-in attendee, Email dispatch, navigation, …) describe the **shipped "Plan C" model** ([ADR-003](docs/decisions/003-phase1-attendees-checkin.md)) and remain accurate **until [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) ship** (gated on freeing two HubSpot custom-object slots).
+> The HubSpot custom-object/event-first model in [**Current event-first model**](#current-event-first-model) is the shipped model. [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) and [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) shipped in July 2026; the legacy Program-scoped routes were retired 2026-07-16.
 >
-> The **target model** is captured in the [**Redesign transition — target model**](#redesign-transition--target-model) section at the end of this glossary. Where the two disagree, the target model is the intended future; the Plan-C terms are today's reality. Do **not** delete the Plan-C terms yet — they document Live behaviour during the dual-read migration window.
+> The [**Historical (Plan C)**](#historical-plan-c) section below retains superseded vocabulary (Record Storage catalog, Parts Attended, Program-first nav). Where it conflicts with the current-model section, the current model wins.
 
 ---
+
+# Historical (Plan C)
+
+> Superseded workaround model (ADR-003 Plan C). Kept for reading older specs and changelogs only — not current product behaviour.
 
 ## Program
 
@@ -30,7 +34,7 @@ Program display name, dates, and location are set in the EMS catalog admin UI (o
 
 A child item under a **Program** — a specific part or sub-event the team tracks separately (e.g. “Meeting Room”, “VIP Event”).
 
-In the current HubSpot workaround, each Event maps to an **option** on a Contact **Parts Attended** multi-select property (customer or partner track — see below), not to a HubSpot Event custom object. Each Event also stores an **`attendanceProperty`** — the HubSpot Contact property EMS updates on check-in.
+In the Plan C HubSpot workaround, each Event maps to an **option** on a Contact **Parts Attended** multi-select property (customer or partner track — see below), not to a HubSpot Event custom object. Each Event also stores an **`attendanceProperty`** — the HubSpot Contact property EMS updates on check-in.
 
 ---
 
@@ -107,6 +111,8 @@ Default staff flow: choose a **Program** (e.g. “Atlassian Event 2026”), then
 
 ---
 
+# Shared and current terms
+
 ## Staff EMS vs public registration
 
 **Staff EMS** — Adaptavist-only UI (Google sign-in, ScriptRunner session). Used by the events team to view attendees, check-in, email ops, analytics. **Not** the public-facing registration website.
@@ -141,7 +147,7 @@ _Avoid_: Conflating with **walk-in form URL** (staff Check-in iframe) or raw Hub
 
 ## Registration publish state
 
-Whether staff treat public registration as **draft** or **published**. **EMS-owned** — staff set it when configuring URLs; EMS does not infer it from HubSpot. Lives on the **Program**; an **Event** with an override URL has its **own** publish state (independent of Program). Governs what the **Registration panel** shows and whether “copy registration link” is offered for that resolved URL. HubSpot remains where pages are actually published.
+Historical Slice 3 design term for whether staff treat public registration as **draft** or **published**. Slice 3 is not implemented and must be re-planned against the current Event custom object's verified `publish_state` / `registration_form` fields; do not treat the earlier Program-inheritance model as current.
 
 _Avoid_: Mirroring HubSpot page publish APIs in Slice 3; using Event catalog `status` (active/draft/cancelled) as a proxy for registration openness.
 
@@ -149,7 +155,7 @@ _Avoid_: Mirroring HubSpot page publish APIs in Slice 3; using Event catalog `st
 
 ## Registration panel
 
-Slice 3 staff UI section (under Event **Settings**) for the selected **Program + Event**: **resolved registration URL**, **registration publish state**, **copy link**, and **Open in HubSpot** (HubSpot admin page editor — **derived from the public URL** where HubSpot allows; no separate admin URL field in Slice 3). **`admin` role only** — non-admins do not see the panel or registration controls. Admins may edit URL and publish state **inline** on the panel; catalog Program/Event modals stay in sync. Does not build or host pages.
+Historical Slice 3 UI concept. No Event **Settings** view exists in the shipped app, and Slice 3 is not implemented. Re-plan its eventual event-scoped surface against Programs & Events / Event Details before building; it remains `admin`-only and must not become a standalone public-page builder.
 
 _Avoid_: “Registration settings” as a standalone top-level app — stays under event context; “Open in HubSpot” opening the public Contact-facing page as the only action.
 
@@ -223,6 +229,8 @@ A Program where mass automated outreach (registration page blast, follow-up “s
 
 For one **Program**, the **first Event** is often open for registration long before other Events (venues unconfirmed). Today: one HubSpot form gains new pages when more Events open; HubSpot cannot hide pages conditionally, so registrants **re-enter data** for Events they already completed. Desired future: second touch only for **new** Events (e.g. email to first-wave registrants inviting additional sign-ups). **Technology TBD**; closely tied to HubSpot forms limits and $0 budget.
 
+**Partially addressed by [ADR-017](docs/decisions/017-registration-slots-and-answer-history.md) (2026-07-20):** the *data-loss* half of this pain is fixed — **Registration answer history** means no answer is ever silently destroyed when a later wave reopens the form. The *ergonomic* half is **not** fixed — amendments are still full-form resubmissions (ADR-017 decision #7), so a registrant must still re-tick and re-answer every previously-completed Event alongside the new one. "Second touch only for new Events" remains open.
+
 ---
 
 ## QR check-in app (separate from staff EMS)
@@ -231,9 +239,9 @@ A **separate application** historically handled QR generation for registrants an
 
 **QR payload:** a **JWT** whose claims encode the Contact’s **HubSpot record UUID** and the **EMS catalog Event id**. Signed with a key stored in **ScriptRunner Connect Parameters** (not in the browser or frontend). On scan, ScriptRunner **rejects** the token if the JWT Event id does **not** match the **Event** staff have open in EMS — prevents check-in at the wrong sub-event when multiple Events exist under a Program.
 
-**QR generation (pre-event email):** **not confirmed for Phase 1.** Likely **HubSpot** (workflow/email) produces QR images or links; EMS may **control or trigger** that flow later — out of scope until decided. Phase 1 EMS scope is **scan, validate, display summary, check-in write** only.
+**QR generation (pre-event email):** implemented 2026-07-16 per [ADR-010](docs/decisions/010-qr-ticket-email-single-send.md). Event+contact JWTs are lazy-minted at campaign send, selected through HubSpot template-snippet detection, sent via HubSpot Marketing Single-Send v4, and associated to the HubSpot Campaign for reporting. Remaining work is live UAT/operator governance and sign-off, not feature code.
 
-**QR capacity (2026-07-07 QA):** check-in JWTs are **long** (~550–800+ chars). QR encoders must store the **entire** token. Tools that cap at ~400 characters produce scannable codes that fail verify (`invalid_checkin_signature`). See `docs/hubspot-schema.md` § QR payload size and `Frontend/TODO.md` **FE-QR-GEN-001** before building ticket/email QR generation.
+**QR capacity (2026-07-07 QA):** check-in JWTs are **long** (~550–800+ chars). QR encoders must store the **entire** token. Tools that cap at ~400 characters produce scannable codes that fail verify (`invalid_checkin_signature`). See `docs/hubspot-schema.md` § QR payload size before building ticket/email QR generation.
 
 **On scan (in EMS):** staff scan the QR in the EMS check-in module → EMS calls ScriptRunner → SRC validates the JWT, loads the Contact, and returns a **fixed summary** for staff (same fields for every Event): **name, company, email, account manager** *(HubSpot property names — see `hubspot-schema.md`)*. Staff confirm identity, then press **check-in**; SRC **writes back to HubSpot** to mark attendance.
 
@@ -248,33 +256,26 @@ This flow is **staff-mediated** (scan → review → button), not customer self-
 Confirming a **Contact** as physically/virtually present at an **Event**. Staff channels include:
 
 1. **QR scan** — in **staff EMS** (ported from the former separate check-in app): JWT → SRC validate → Contact summary → staff check-in button → HubSpot write.  
-2. **Search by name** (no QR) — **substring (contains)** match on **name or company** within the **registered attendee list** for the selected **Program + Event** (e.g. `smith` or `acme`). If no match, staff treat them as a **walk-in**.  
-3. **Walk-in** — staff form in EMS (see **Walk-in**).
+2. **Search by name** (no QR) — **substring (contains)** match on **name or company** within the registered attendee list for the working Event. If no match, staff use the Event's walk-in form.
+3. **Walk-in** — HubSpot form embedded in EMS (see **Walk-in**).
 
 For **pre-registered** contacts, check-in **only** updates attended/checked-in in HubSpot; registration is unchanged.
 
 **RBAC:** attendee list, check-in actions (QR confirm, name search confirm, walk-in submit), **email dispatch** (Slice 2), and catalog admin all require the **`admin`** role. Other roles do not see attendee PII, check-in, or email modules until a future role split.
 
-**Duplicate check-in:** **idempotent** — if the Contact’s attendance property is already `Yes`, show **“already checked in”**; do not write HubSpot again.
+**Duplicate check-in:** **idempotent** — if the Contact↔Event association is already labelled `checked-in`, show **“already checked in”**; do not write HubSpot again.
 
 ---
 
 ## Walk-in
 
-A person who arrives **without prior registration** (or without a scannable QR). Staff complete a **walk-in form** in EMS. Required fields match the **public HubSpot registration form** for that **Program** (not a fixed minimal set in EMS). Then:
-
-- **Existing Contact** (matched by **email**) → update HubSpot: **Parts Attended** (Event option) + **attended**, and record a **form submission** (or HubSpot equivalent) for that Program’s registration form — plus persist walk-in form field values on the Contact as needed.  
-- **New Contact** → create in HubSpot with walk-in form data, set Parts Attended + attended, and record the Program **form submission**.
-
-Walk-in therefore **waives** the normal two-step rule (Program form + Parts Attended) in one staff-mediated action — but HubSpot should still show the **form leg** for reporting via submission record.
-
-**Contact matching:** **email only** — exact match on the Contact’s email property; if no match, **create a new Contact** in HubSpot.
+A person who arrives **without prior registration** (or without a scannable QR). Staff open the Event's allowlisted HubSpot walk-in form inside EMS. HubSpot owns the form submission and registration workflow; EMS exposes no walk-in POST handler. After the workflow creates/updates the Contact↔Event association, the attendee appears in the roster and can be checked in through the normal EMS action.
 
 ---
 
 ## Attendee list
 
-The staff-facing list of **Registered attendees** (and checked-in state) for an **Event** under a **Program**, derived from HubSpot rules plus EMS catalog mapping until HubSpot objects exist. **`admin` role only** — same gate as check-in (includes email and account manager on each row).
+The staff-facing list of **Registered attendees** (and checked-in state) for the working **Event**, backed by the Contact↔Event association and the derived **Attendee index**. A Program is optional. **`admin` role only** — same gate as check-in (includes email and account manager on each row).
 
 **Columns (fixed, all Events):** name, company, email, account manager, **attendee type** (customer/partner), **checked-in status** — same field set as the QR check-in confirm screen, plus track and checked-in state.
 
@@ -282,78 +283,147 @@ The staff-facing list of **Registered attendees** (and checked-in state) for an 
 
 ---
 
+## Attendee index
+
+The Record Storage-backed cache the **Attendee list** is read from — one row per registered contact per Event, holding only the display fields the list/search/pagination need (name, company, email, account manager, checked-in state). Exists so `GET attendees` never re-fetches the full roster from HubSpot per request. Kept fresh by three mechanisms (write-through on EMS mutations, a HubSpot-Workflow webhook for registrations made outside EMS, and a scheduled reconciliation sweep) — see [ADR-011](decisions/011-attendee-index-freshness.md). Purely a derived cache: HubSpot stays system of record, so the index can always be rebuilt from HubSpot if lost.
+_Avoid_: Attendee cache, roster cache — use **Attendee index** to keep it distinct from the **Attendee list** (the staff-facing UI feature this index backs).
+
+---
+
+## Attendee journey
+
+The read-only per-attendee timeline shown in the **Attendee Detail modal** (opened by clicking a row on the **Attendee list**): this **Event's** registration step, this Event's **Email dispatch** sent/opened steps, and checked-in. Default/collapsed view — scoped to the single Event currently open, not the Contact's full history. See **Attendee communications view** for the expanded form.
+
+_Avoid_: implying this shows the Contact's full communication history by default — that's the separate, explicitly-opted-into **Attendee communications view**.
+
+## Attendee communications view
+
+The expanded form of the **Attendee journey**, shown after staff click "Show all communications." Merges the Attendee journey with (1) this Contact's other **Email dispatches** across other Events, and (2) the Contact's full HubSpot marketing-email engagement history — decided [ADR-014](docs/decisions/014-attendee-communications-hubspot-engagement-pull.md). Anything not part of the currently-open Event is tagged: the other Event's name when it's known to be one of EMS's own dispatches, or a generic "OTHER DISPATCH" tag when it's a HubSpot send EMS never touched. Capped to communications at/after the attendee's earliest event-related timestamp (no separate pagination). Viewing it is an **audited** read — the first EMS surface that pulls PII beyond the currently-open Event/Program.
+
+_Avoid_: "Campaign" in this view's copy — the full rename has not shipped (see **Campaign (partial rename)** below); keep saying **Email dispatch** in Attendee Detail until broader rename lands.
+
+---
+
 ## Phase 1 MVP (staff EMS)
 
 First shipped slice (stakeholder priority): **B**
 
-1. Staff select **Program → Event** and see a **registered attendee list** (HubSpot-derived, read-only). Default: all registered; optional checked-in filter.  
+1. Staff select a working **Event** (optionally grouped under a Program) and see its registered attendee list.
 2. **During the event:** staff **check-in** in EMS via QR scan (camera in-app), name search, or walk-in — with updates **written back to HubSpot**. Replaces the former separate QR check-in app.  
-3. **Catalog admin:** events team **self-service** in EMS (Settings) to create/update **Programs** and **Events** (form IDs, Parts Attended mapping) — **`admin` role only** (viewers/operators use catalog read-only via navigation).
+3. **Programs & Events:** events team self-service to create/update/archive HubSpot **Programs** and **Events** — **`admin` role only**.
 
-**Slice 1 shipped.** **Slice 2:** email dispatch, schedules, dispatch log (see **Slice 2 (email dispatch)**). **Slice 3:** HubSpot-hosted public registration pages (see **Slice 3 (public registration)**). Still deferred: second registration wave / form UX fix, post-event feedback, opens/clicks analytics dashboard, **QR email generation** in EMS.
+**Slice 1 shipped. Slice 2 shipped:** email dispatch, schedules, dispatch log, and QR ticket generation. **Slice 3:** HubSpot-hosted public registration pages (see **Slice 3 (public registration)**). Still deferred: second registration wave / form UX fix, post-event feedback, and opens/clicks analytics dashboard.
 
-*QR JWT minting for registrant emails — **not confirmed**; likely HubSpot-driven, possible future EMS control.*
+*QR JWT minting for registrant emails — settled by [ADR-010](docs/decisions/010-qr-ticket-email-single-send.md): EMS-driven, lazy-minted at Campaign send time (not HubSpot-driven, no registration webhook).*
 
 *Check-in uses per-Event `attendanceProperty` from catalog — see `docs/hubspot-schema.md`.*
 
 ---
 
-# Redesign transition — target model
+# Current event-first model
 
-Target-model vocabulary from the 2026-07-12 UI-redesign grilling. **Not yet Live** — gated on [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) feasibility (two custom-object slots freed). Until then the Plan-C terms above describe actual behaviour. Where a term below **replaces** a Plan-C term, that is called out.
+Vocabulary settled in the 2026-07-12 UI-redesign grilling and shipped in July 2026 after [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) / [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md) feasibility gates passed. These definitions describe **current** behaviour.
 
-## Program (target)
+## Program
 
 Optional grouping of related **Events** for a multi-part effort. **No longer mandatory** — an Event may stand alone with no Program ([ADR-008](docs/decisions/008-standalone-events-event-first-nav.md)). Becomes a **HubSpot custom object** ([ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md)); catalog metadata lives on object properties. **Replaces** the Plan-C rule that every Event sits under a Program and that a Program holds registration `hubspotFormIds`.
 
-## Event (target)
+## Event
 
 The **primary entity**. May belong to a Program (optional `programId`) but does not require one — a **standalone Event** is fully functional (attendees, check-in, capacity, campaigns). Becomes a **HubSpot custom object**. **Retires** `partsAttendedOption` and the global `attendanceProperty`; keeps a **walk-in form reference** and **public registration URL**. **Replaces** the Plan-C Event (a Parts-Attended option under a Program).
 
-## Registration / attendee (target)
+## Registration / attendee
 
 An attendee **is a Contact↔Event association**. Registration exists ⇔ the association exists. **Attendee lifecycle and type are association labels**: `registered`, `checked-in`, `customer`, `partner`. **Replaces** the Plan-C "two-leg" **Registered attendee** (Program form submission + Parts-Attended option) and the derived `attendeeType`.
 
-## Association label (target)
+## Association label
 
 A HubSpot **association label** on a Contact↔Event association carrying attendee state/type (`registered`, `checked-in`, `customer`, `partner`). HubSpot has **no general "association properties"** (verified 2026-07-12 — labels only); richer per-registration detail lives in Record Storage instead.
 
-## Standalone Event (target)
+## Registration slot
+
+One of ten fixed, reusable hidden-property-plus-workflow pairs on the public registration form, each an independent copy of the single-event match-key mechanism, letting one form submission register a Contact for several Events at once. A slot is bound to whichever Event section is currently visible on the form — not to one Event permanently — so the same ten slots get repointed at different Events as the form's offerings change over time. Settled [ADR-017](docs/decisions/017-registration-slots-and-answer-history.md).
+_Avoid_: "match-key property" as the primary term for the whole pairing — that's just the property half; **slot** is the property + its workflow together.
+
+## Conversation note
+
+A staff-authored note about a conversation with an attendee at an event, captured live (typed today; AI transcription explicitly deferred to a later phase — [ADR-019](docs/decisions/019-live-event-conversation-notes.md)). Attributed to the staff member who wrote it, timestamped. **Any `admin` may edit or soft-delete any note** (not author-locked — the first-considered author-only restriction was rejected in the 2026-07-21 gap review, since no other permission in this app carries per-user ownership) — every edit/delete tracks who made the change, and a delete hides rather than destroys the entry. Surfaced in a new "Notes" section on the existing Attendee Detail modal via its own dedicated, audited fetch (viewing notes is a PII read, tracked the same lightweight way as `attendees.list` — not bolted onto the unaudited base attendee-detail response), defaulting to the current event's notes with an opt-in expand to every event. Reachable via a new event-scoped nav item showing **checked-in attendees only** (narrower than Check-in's own full-roster list), with the same list-or-QR-scan pattern as Check-in.
+
+_Avoid_: confusing this with **Registration answer** (public-submitted, immutable, append-only) or **Lead interest summary** (auto-derived from Registration answer history, set once, never edited) — a Conversation note is staff-authored, editable, and a distinct kind of content from both. At Lead generation, each Conversation note becomes its **own** separate HubSpot Note on the Lead's timeline — not merged into the Lead interest summary or its Note.
+
+## Lead / Lead generation
+
+**Lead** — a HubSpot Sales Hub CRM object, distinct from Contact and Deal, representing a person qualified as worth sales follow-up. Confirmed enabled on this portal. A Contact may have at most one EMS-generated Lead at a time — generating again for a Contact who already has one **updates** that Lead rather than creating a second.
+
+**Lead generation** — the staff-initiated EMS action that creates or updates a Contact's Lead, carrying a **Lead interest summary** onto it. Single-attendee (Attendee Detail modal) and bulk (Attendee list multi-select) are the same underlying action at different selection sizes — settled [ADR-018](docs/decisions/018-hubspot-lead-generation.md).
+
+_Avoid_: conflating this with **Registered attendee**/**registration** (the Contact↔Event association) — a Lead is a downstream sales artifact EMS optionally creates *from* an attendee, never a substitute for or trigger of registration itself.
+
+## Lead interest summary
+
+The content EMS writes onto a generated Lead describing what the attendee expressed interest in — sourced from **Registration answer history** ([ADR-017](docs/decisions/017-registration-slots-and-answer-history.md)). Defaults to the current Event's answer only; staff may opt to include the Contact's full cross-event history instead (that expanded read is itself an audited PII read, same as **Attendee communications view** — 2026-07-21 gap review). Written **once, at first creation only**, as a permanent "why this lead was created" record — never overwritten. Every generation afterward (including the first) logs a HubSpot **Note** on the Lead instead of growing this property, giving a native chronological history. Its presence (even empty, when the attendee has no recorded answer) is also how EMS tells its own Leads apart from ones created outside EMS — a Lead without it is never updated by EMS, only left alone in favor of creating a new one.
+
+_Avoid_: assuming every Lead has a non-empty summary — attendance alone is a valid reason to generate one. Assuming this property reflects the *latest* event — it reflects the *first*; later activity lives in Notes.
+
+## Registration answer / Registration answer history
+
+**Registration answer** — the free-text or multi-select response to a conditional follow-up question shown when a specific Event is selected on the registration form (e.g. a private-meeting topic, guest names). Distinct from **registration** itself (the Contact↔Event association, which drives capacity/check-in) — an answer carries no roster or capacity meaning.
+
+**Registration answer history** — every registration answer for a given Contact+Event, kept as an appended, timestamped log rather than the latest value overwriting the last (Record Storage, keyed `contactId+eventId`). A resubmission (**amendment**) adds a new entry even when the answer is unchanged — this is a submission log, not a diff. Surfaced to staff via the Attendee Detail modal's "Registration history" panel — settled [ADR-017](docs/decisions/017-registration-slots-and-answer-history.md).
+_Avoid_: Assuming a missed webhook loses an answer permanently — the raw submission still exists in HubSpot's own Form Submissions history; recovery there is a manual staff lookup, not an automated EMS tool (deliberately not built, per ADR-017).
+
+## Standalone Event
 
 An Event with **no Program** ([ADR-008](docs/decisions/008-standalone-events-event-first-nav.md)). First-class; the redesign's **event-first navigation** lands staff on Events, with Program as an **optional filter/grouping** rather than a mandatory first step. **Replaces** the Plan-C Program-first navigation.
 
-## Checked-in (target)
+## Checked-in
 
 Attendance is the **per-Event `checked-in` association label** (flip `registered` → `checked-in`; **undo** reverses it). Rich detail (`checkedInAt`, scan method, QR JWT/nonce) lives in a **Record Storage per-registration cache** keyed by `contactId + eventId`, **purged on Event archive**; the **audit log is the durable backstop** for "when". **Replaces** the Plan-C global Yes/No `attendanceProperty` on the Contact.
 
-## Status (target)
+## Status
 
 Event **status = Active / Cancelled** (set manually) + **Completed** (auto-derived once the end date passes). **Publish state** (registration draft/published) is tracked **separately** from status. **Replaces** the Plan-C `active/draft/cancelled` catalog status (drops `draft`).
 
-## Remove attendee (target)
+## Remove attendee
 
 Deletes the **Contact↔Event association only** (the Contact is untouched), **audited**, behind a confirm. **Blocked while `checked-in`** — staff must **undo check-in** first.
 
-## Undo check-in (target)
+## Undo check-in
 
 Error-correction only: flips `checked-in` → `registered`, **audited**. **Not** presence/check-out tracking. Distinct from the Check-in screen's **±1 Live Capacity** walk-out adjustment (occupancy, not registration state).
 
-## Campaign (target)
+## Campaign (partial rename)
 
-**Renames Slice-2 "Email dispatch" → "Campaign"** (accepting the HubSpot marketing-term collision, per the grilling vocab decision). Preserves all Slice-2 richness — staff-entered name, timezone-aligned 15-minute scheduling, edit/cancel before lock, audience filtering, and a **campaign log** with per-Contact outcome. Compose/edit move into a **modal** (edit reopens the modal, which offers delete). **Replaces** the "Email dispatch" / "dispatch log" naming above and the earlier _Avoid: "Campaign"_ guidance.
+Grilling accepted renaming Slice-2 **"Email dispatch" → "Campaign"** (HubSpot marketing-term collision acknowledged). **UI today is mixed:** module/nav still say **Email** / **Email schedule**; compose uses **+ New campaign**; API/docs often still say dispatch. Treat **Campaign** as the target vocabulary for new copy; do not assume a full rename has shipped. Preserves Slice-2 richness — staff-entered name, timezone-aligned 15-minute scheduling, edit/cancel before lock, audience filtering, and a **campaign/dispatch log** with per-Contact outcome. Compose/edit live in a **modal**.
 
-## Live capacity / occupancy (target)
+## Live capacity / occupancy
 
 Two distinct capacity views, **both may exceed 100%** (overbooking shown, not capped): **Event Details "Filled %"** = registration fill (registered ÷ capacity); **Check-in "Live Capacity"** = occupancy (checked-in − walk-outs) with **±1** controls. The ±1 walk-out adjustment and **undo check-in** stay separate concepts.
 
-## Archive vs delete (target)
+## Archive vs delete
 
 **Archive-by-default** for Programs/Events: a soft, restorable hidden flag; the record is **retained** for audit and historical attendee/check-in context. **Hard delete is permitted only for *empty* records** (no registrations/associations and no history). The redesign's "Delete" control is therefore **context-sensitive** — it archives when a record has history, and only offers a true delete when the record is empty.
 
-## Walk-in (target)
+## Walk-in
 
 Walk-in is a **mode within Check-in** ("+ Add walk-in"). An **embedded HubSpot form (iframe) + workflow registers only** (creates the `registered` association) — it does **not** auto-check-in; staff then check the person in through the audited EMS path. **UX caveat:** there is a **propagation lag** between the HubSpot form submit and the new attendee appearing on the EMS roster (workflow + read latency), so the walk-in UI must set that expectation rather than imply an instant roster update.
 
-## No bulk "import attendees" (target)
+## No bulk "import attendees"
 
 The redesign's proposed **"import attendees"** action is **dropped**. Registration is **HubSpot-workflow-side** ([ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) §4) — EMS has no register/import write path; attendees enter via public forms or walk-in registration, not an EMS-side bulk import.
+
+## Cache (client data cache)
+
+An **in-memory, per-tab** store of recently fetched EMS data, so navigating back to a screen paints instantly instead of re-fetching from scratch. **Dies with the session** — cleared on sign-out and on signing in as anyone else; never written to disk. Settled in [ADR-015](docs/decisions/015-client-data-caching-layer.md). The browser still never holds HubSpot credentials; the cache holds only what the signed-in operator already fetched through the authenticated API.
+
+## Stale-while-revalidate
+
+The cache's refresh behaviour: on revisiting a screen, show the **previous data immediately** while quietly re-fetching the current data in the background, then swap it in. How stale is tolerable differs per data type — catalog tolerates minutes, capacity seconds, and **attendee lists and the audit log always re-fetch on every view** (see **Prefetch** for why).
+
+## Prefetch
+
+Fetching data **before** the operator navigates to the screen that shows it, so it's already warm. **Only non-PII data (catalog, capacity) may ever be prefetched.** Attendee and audit reads are **never** prefetched: every PII read is audited server-side as "this operator viewed this PII", and a speculative fetch would make the audit trail lie ([ADR-016](docs/decisions/016-no-prefetch-of-audited-pii.md)). **Audit integrity beats speed.**
+
+## Query key / cache invalidation
+
+Each cached fetch is identified by a **query key** (what data, for which Event, which page/filters). **Invalidation** marks keys as outdated after a mutation so affected screens re-fetch — e.g. a check-in invalidates that Event's attendee list and capacity everywhere at once. When in doubt the app **over-invalidates** (a spurious re-fetch is cheap; showing an operator stale data is not).

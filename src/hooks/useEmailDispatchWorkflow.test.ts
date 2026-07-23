@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '../config';
 import type { EmailDispatchListItem } from '../types';
@@ -65,15 +66,17 @@ function renderWorkflow(deps: Partial<EmailDispatchWorkflowDeps> = {}) {
 	const data = deps.data ?? makeData();
 	const confirm = deps.confirm ?? vi.fn().mockResolvedValue(true);
 	const showToast = deps.showToast ?? vi.fn();
+	const queryClient = deps.queryClient ?? new QueryClient();
 	const result = renderHook(() =>
 		useEmailDispatchWorkflow({
 			data,
 			confirm,
 			showToast,
 			eventId: deps.eventId ?? eventId,
+			queryClient,
 		}),
 	);
-	return { ...result, data, confirm, showToast };
+	return { ...result, data, confirm, showToast, queryClient };
 }
 
 /** Render and wait for the initial compose load + first recipient preview to settle. */
@@ -121,6 +124,45 @@ describe('useEmailDispatchWorkflow', () => {
 			expect(result.current.segmentId).toBe('seg-1');
 			expect(result.current.recipientCount).toBe(2);
 			expect(result.current.limits?.largeSendThreshold).toBe(50);
+		});
+
+		it('still loads segments when templates fails (independent per-field loads, not one Promise.all)', async () => {
+			const data = makeData(0, {
+				fetchEmailTemplates: vi.fn().mockRejectedValue(new Error('HubSpot marketing email list failed (403)')),
+			});
+			const harness = renderWorkflow({ data });
+			await waitFor(() => expect(harness.result.current.loading).toBe(false));
+
+			expect(harness.result.current.templatesError).toBe('HubSpot marketing email list failed (403)');
+			expect(harness.result.current.segmentOptions).toEqual([{ value: 'seg-1', label: 'VIP (Active)' }]);
+			expect(harness.result.current.segmentId).toBe('seg-1');
+			expect(harness.result.current.templateOptions).toEqual([]);
+		});
+
+		it('still loads templates when segments fails, and surfaces a segments-only error', async () => {
+			const data = makeData(0, {
+				fetchEmailSegments: vi.fn().mockRejectedValue(new Error('HubSpot list search failed (403)')),
+			});
+			const harness = renderWorkflow({ data });
+			await waitFor(() => expect(harness.result.current.loading).toBe(false));
+
+			expect(harness.result.current.segmentsError).toBe('HubSpot list search failed (403)');
+			expect(harness.result.current.templateOptions).toEqual([{ value: 'tpl-1', label: 'Reminder' }]);
+			expect(harness.result.current.templateId).toBe('tpl-1');
+			expect(harness.result.current.segments).toEqual([]);
+		});
+
+		it('falls back to the configured large-send threshold when limits fails, without blocking templates/segments', async () => {
+			const data = makeData(0, {
+				fetchEmailLimits: vi.fn().mockRejectedValue(new Error('Failed to load send limits')),
+			});
+			const harness = renderWorkflow({ data });
+			await waitFor(() => expect(harness.result.current.loading).toBe(false));
+
+			expect(harness.result.current.limitsError).toBe('Failed to load send limits');
+			expect(harness.result.current.limits).toBeNull();
+			expect(harness.result.current.templateOptions).toEqual([{ value: 'tpl-1', label: 'Reminder' }]);
+			expect(harness.result.current.segmentOptions).toEqual([{ value: 'seg-1', label: 'VIP (Active)' }]);
 		});
 	});
 
@@ -214,6 +256,27 @@ describe('useEmailDispatchWorkflow', () => {
 				}),
 			);
 			expect(result.current.activeTab).toBe('scheduled');
+		});
+
+		it('rejects a past schedule date before ever calling the data service', async () => {
+			const { result, data, showToast } = await renderSettled();
+
+			act(() => {
+				result.current.setDispatchName('Scheduled blast');
+				result.current.setSendMode('schedule');
+				result.current.setScheduleDate('2000-01-01');
+			});
+			const previewCallsBeforeSubmit = (data.previewEmailDispatch as ReturnType<typeof vi.fn>).mock.calls.length;
+
+			let outcome: boolean | undefined;
+			await act(async () => {
+				outcome = await result.current.handleScheduleForLater();
+			});
+
+			expect(outcome).toBe(false);
+			expect(showToast).toHaveBeenCalledWith('Choose a time in the future.', 'error');
+			expect((data.previewEmailDispatch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(previewCallsBeforeSubmit);
+			expect(data.createEmailDispatch).not.toHaveBeenCalled();
 		});
 	});
 

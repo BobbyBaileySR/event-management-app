@@ -128,6 +128,9 @@
 @media (min-width: 480px) {
 	.toast {
 		left: auto;
+		/* Track the centered app frame's right edge (AppLayout.module.css .frame, max-width: 1400px)
+		   instead of the raw viewport edge, so the toast stays near visible app content on wide screens. */
+		right: max(16px, calc((100vw - 1400px) / 2 + 16px));
 		width: 340px;
 	}
 }

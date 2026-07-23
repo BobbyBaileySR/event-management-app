@@ -88,6 +88,14 @@ export default defineConfig(async ({ mode }) => {
 			globals: true,
 			css: true,
 			setupFiles: './src/test/setup.ts',
+			coverage: {
+				enabled: true,
+				provider: 'v8' as const,
+				reporter: ['text-summary', 'html', 'lcov'],
+				reportsDirectory: './coverage',
+				include: ['src/**/*.{ts,tsx}'],
+				exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx', 'src/vite-env.d.ts'],
+			},
 		},
 	};
 });
