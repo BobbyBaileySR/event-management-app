@@ -1,0 +1,92 @@
+/* Phone-only (<768px) — `AppLayout` only mounts this component in that tier
+   (`useViewportTier`), so no `display` gating is needed here. */
+.chrome {
+	display: flex;
+	flex-direction: column;
+	background: var(--panel);
+	border-bottom: 1px solid var(--border);
+}
+
+.tabs {
+	display: flex;
+	overflow-x: auto;
+	gap: 4px;
+	padding: 8px 12px;
+	-webkit-overflow-scrolling: touch;
+}
+
+.tab {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 44px;
+	padding: 8px 14px;
+	border: none;
+	border-radius: 9px;
+	background: transparent;
+	color: var(--text);
+	font-weight: 600;
+	font-size: 0.85rem;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.tab:hover,
+.tab:focus-visible {
+	background: var(--accent-soft);
+	outline: none;
+}
+
+.tab:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: -2px;
+}
+
+.tab.active {
+	background: var(--accent-soft);
+	color: var(--accent);
+}
+
+.tab:disabled {
+	color: var(--muted);
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.tabIcon {
+	flex-shrink: 0;
+}
+
+.pickerRow {
+	padding: 0 12px 8px;
+}
+
+.themeRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--border);
+}
+
+.signOut {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 6px 14px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: transparent;
+	color: var(--text);
+	font-family: inherit;
+	font-size: 0.85rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.signOut:hover {
+	background: var(--ice);
+}

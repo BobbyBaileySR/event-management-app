@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoadingState } from '../components/LoadingState';
+import { RefetchFailureBanner } from '../components/RefetchFailureBanner';
 import { StatusBadge } from '../components/StatusBadge';
 import { TopBar } from '../components/TopBar';
 import { ViewErrorState } from '../components/ViewErrorState';
-import { useDataService } from '../hooks/useDataService';
+import { useCapacitySummary } from '../data/hooks/useCapacity';
+import { useCatalog } from '../data/hooks/useCatalog';
+import { useAuditLog } from '../data/hooks/useAuditLog';
+import { useScheduledDispatchSummary } from '../data/hooks/useDispatches';
 import { eventPath } from '../router/navigation';
 import type { AuditLogEntry } from '../types';
 import { isAuditLogListResult } from '../types';
@@ -12,7 +16,7 @@ import { describeAuditAction } from '../utils/auditDisplay';
 import { getOccupancyPercent } from '../utils/capacityTier';
 import { enrichPortfolioWithCapacity, type PortfolioEvent } from '../utils/catalogEventPresentation';
 import { formatDateTime } from '../utils/format';
-import { getUpcomingEvents, isInSameMonth, isWithinNextDays } from '../utils/overviewStats';
+import { getEventDateBadgeParts, getUpcomingEvents, isInSameMonth } from '../utils/overviewStats';
 import styles from './OverviewView.module.css';
 
 const RECENT_ACTIVITY_LIMIT = 5;
@@ -26,130 +30,98 @@ interface OverviewStats {
 	emailsScheduledThisWeek: number;
 }
 
-async function loadStats(
-	portfolio: PortfolioEvent[],
-	data: ReturnType<typeof useDataService>,
-	now: Date,
-): Promise<OverviewStats> {
-	const eventsThisMonth = portfolio.filter((event) => isInSameMonth(event.dateIso, now));
-	const programsThisMonth = new Set(eventsThisMonth.map((event) => event.programId).filter(Boolean)).size;
-	const totalRegistered = portfolio.reduce((sum, event) => sum + event.attendeeCount, 0);
-
-	// Neither the catalog nor the capacity fan-out carries a registration timestamp (slice
-	// attendees have no registeredAt), so "this week" can't be derived — surface 0 rather
-	// than a guessed value.
-	const registeredThisWeek = 0;
-
-	// Cancelled/completed events won't gain new sends, so only fan out over active ones.
-	const activeEvents = portfolio.filter((event) => event.status === 'active');
-	const scheduledByEvent = await Promise.all(activeEvents.map((event) => data.fetchScheduledEmails(event.id)));
-
-	let emailsScheduledThisWeek = 0;
-	let eventsWithScheduledEmails = 0;
-	scheduledByEvent.forEach(({ scheduled }) => {
-		const upcoming = scheduled.filter((email) => isWithinNextDays(email.scheduledAt, 7, now));
-		emailsScheduledThisWeek += upcoming.length;
-		if (upcoming.length > 0) {
-			eventsWithScheduledEmails += 1;
-		}
-	});
-
-	return {
-		eventsThisMonth: eventsThisMonth.length,
-		programsThisMonth,
-		totalRegistered,
-		registeredThisWeek,
-		eventsWithScheduledEmails,
-		emailsScheduledThisWeek,
-	};
-}
-
 export function OverviewView() {
 	const navigate = useNavigate();
-	const data = useDataService();
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [portfolio, setPortfolio] = useState<PortfolioEvent[]>([]);
-	const [stats, setStats] = useState<OverviewStats | null>(null);
-	const [activity, setActivity] = useState<AuditLogEntry[]>([]);
-	const [reloadKey, setReloadKey] = useState(0);
 
-	useEffect(() => {
-		let cancelled = false;
-		setLoading(true);
-		setError(null);
-		const now = new Date();
+	const catalogQuery = useCatalog();
+	const capacitySummaryQuery = useCapacitySummary();
+	const auditQuery = useAuditLog({ page: 1, pageSize: RECENT_ACTIVITY_LIMIT });
+	const dispatchSummaryQuery = useScheduledDispatchSummary();
 
-		Promise.all([data.fetchCatalog(), data.fetchAuditLog(undefined, { page: 1, pageSize: RECENT_ACTIVITY_LIMIT })])
-			.then(async ([catalogResult, auditResult]) => {
-				if (cancelled) {
-					return;
-				}
-				if (isAuditLogListResult(auditResult)) {
-					setActivity(auditResult.entries.slice(0, RECENT_ACTIVITY_LIMIT));
-				}
-				const enriched = await enrichPortfolioWithCapacity(
-					catalogResult.events,
-					catalogResult.programs,
-					(eventId) => data.fetchEventCapacityStatus(eventId),
-					now,
-				);
-				if (cancelled) {
-					return;
-				}
-				setPortfolio(enriched);
-				const computed = await loadStats(enriched, data, now);
-				if (!cancelled) {
-					setStats(computed);
-				}
-			})
-			.catch((err: unknown) => {
-				if (!cancelled) {
-					setError(err instanceof Error ? err.message : 'Failed to load overview');
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data, reloadKey]);
+	const portfolio: PortfolioEvent[] = useMemo(
+		() =>
+			enrichPortfolioWithCapacity(
+				catalogQuery.data?.events ?? [],
+				catalogQuery.data?.programs ?? [],
+				capacitySummaryQuery.data?.events,
+			),
+		[catalogQuery.data, capacitySummaryQuery.data],
+	);
 
 	const upcomingEvents = useMemo(() => getUpcomingEvents(portfolio, 4), [portfolio]);
 
-	if (loading) {
+	const activity: AuditLogEntry[] = useMemo(() => {
+		const result = auditQuery.data;
+		if (!result || !isAuditLogListResult(result)) {
+			return [];
+		}
+		return result.entries.slice(0, RECENT_ACTIVITY_LIMIT);
+	}, [auditQuery.data]);
+
+	// Neither the catalog nor the capacity summary carries a registration timestamp (slice
+	// attendees have no registeredAt), so "this week" can't be derived — surface 0 rather
+	// than a guessed value.
+	const stats: OverviewStats | null = useMemo(() => {
+		if (!dispatchSummaryQuery.data) {
+			return null;
+		}
+		const now = new Date();
+		const eventsThisMonth = portfolio.filter((event) => isInSameMonth(event.dateIso, now));
+		const programsThisMonth = new Set(eventsThisMonth.map((event) => event.programId).filter(Boolean)).size;
+		const totalRegistered = portfolio.reduce((sum, event) => sum + event.attendeeCount, 0);
+		return {
+			eventsThisMonth: eventsThisMonth.length,
+			programsThisMonth,
+			totalRegistered,
+			registeredThisWeek: 0,
+			eventsWithScheduledEmails: dispatchSummaryQuery.data.eventsWithScheduledEmails,
+			emailsScheduledThisWeek: dispatchSummaryQuery.data.emailsScheduledThisWeek,
+		};
+	}, [portfolio, dispatchSummaryQuery.data]);
+
+	// Catalog, recent-activity and the scheduled-email aggregate gate first paint (matches the
+	// prior combined-effect ladder); capacity summary is enrichment only — its failure never
+	// blanks the page (per-row fallback in enrichPortfolioWithCapacity), same as EventsView.
+	const blockingQueries = [catalogQuery, auditQuery, dispatchSummaryQuery];
+	const isLoading = blockingQueries.some((query) => query.data === undefined && !query.isError);
+	const loadErrorQuery = blockingQueries.find((query) => query.data === undefined && query.isError);
+
+	function refreshAll() {
+		return Promise.all([
+			catalogQuery.refetch(),
+			capacitySummaryQuery.refetch(),
+			auditQuery.refetch(),
+			dispatchSummaryQuery.refetch(),
+		]);
+	}
+
+	if (isLoading) {
 		return (
 			<section id="view-overview" className={styles.view}>
 				<TopBar title="Overview" meta="Everything happening across your events" />
-				<LoadingState message="Loading overview…" skeleton="cards" />
+				<LoadingState message="Loading overview…" />
 			</section>
 		);
 	}
 
-	if (error) {
+	if (loadErrorQuery) {
+		const message = loadErrorQuery.error instanceof Error ? loadErrorQuery.error.message : 'Failed to load overview';
 		return (
-			<ViewErrorState
-				viewId="view-overview"
-				title="Overview"
-				message={error}
-				onRetry={() => {
-					setError(null);
-					setReloadKey((current) => current + 1);
-				}}
-			/>
+			<ViewErrorState viewId="view-overview" title="Overview" message={message} onRetry={() => void refreshAll()} />
 		);
 	}
+
+	const showRefetchFailureBanner = blockingQueries.some((query) => query.isError) || capacitySummaryQuery.isError;
 
 	const tiles = stats
 		? [
 				{
 					label: 'Events this month',
 					value: stats.eventsThisMonth,
-					delta: stats.programsThisMonth > 0 ? `Across ${stats.programsThisMonth} program${stats.programsThisMonth === 1 ? '' : 's'}` : 'No programs linked',
+					delta:
+						stats.programsThisMonth > 0
+							? `Across ${stats.programsThisMonth} program${stats.programsThisMonth === 1 ? '' : 's'}`
+							: 'No programs linked',
 				},
 				{
 					label: 'Total registered',
@@ -173,32 +145,39 @@ export function OverviewView() {
 		<section id="view-overview" className={styles.view}>
 			<TopBar title="Overview" meta="Everything happening across your events" />
 
-			<div className="grid-4">
+			{showRefetchFailureBanner ? (
+				<RefetchFailureBanner
+					message="Couldn't refresh overview data — showing the last loaded values."
+					onRetry={() => void refreshAll()}
+				/>
+			) : null}
+
+			<div className={styles.statsGrid}>
 				{tiles.map((tile) => (
-					<div className="card hub-stat" key={tile.label}>
-						<p className="hub-stat__label">{tile.label}</p>
-						<p className="hub-stat__value">{tile.value}</p>
-						<p className="hub-stat__delta">{tile.delta}</p>
+					<div className={styles.statTile} key={tile.label}>
+						<span className={styles.statAccent} aria-hidden="true" />
+						<p className={styles.statValue}>{tile.value}</p>
+						<p className={styles.statLabel}>{tile.label}</p>
+						<p className={styles.statDelta}>{tile.delta}</p>
 					</div>
 				))}
 			</div>
 
-			<div className="grid-2">
-				<div className="card">
-					<div className="card__header">
-						<div className={styles.cardHeaderRow}>
-							<h2>Upcoming events</h2>
-							<button type="button" className={styles.linkButton} onClick={() => navigate('/events')}>
-								View all ›
-							</button>
-						</div>
+			<div className={styles.split}>
+				<div className={styles.upcomingCard}>
+					<div className={styles.cardHeaderRow}>
+						<h2 className={styles.cardTitle}>Upcoming events</h2>
+						<button type="button" className={styles.linkButton} onClick={() => navigate('/events')}>
+							View all ›
+						</button>
 					</div>
 					{upcomingEvents.length === 0 ? (
-						<p className="shell-note">No upcoming events.</p>
+						<p className={styles.emptyNote}>No upcoming events.</p>
 					) : (
 						<ul className={styles.eventList}>
 							{upcomingEvents.map((event) => {
 								const pct = getOccupancyPercent(event.attendeeCount, event.capacity);
+								const { month, day } = getEventDateBadgeParts(event.dateIso);
 								return (
 									<li key={event.id} className={styles.eventRow}>
 										<button
@@ -207,8 +186,9 @@ export function OverviewView() {
 											aria-label={`Open ${event.name}`}
 											onClick={() => navigate(eventPath(event.id))}
 										>
-											<span className={styles.eventDate} aria-hidden="true">
-												{event.date}
+											<span className={styles.dateBadge} aria-hidden="true">
+												<span className={styles.dateBadgeMonth}>{month}</span>
+												<span className={styles.dateBadgeDay}>{day}</span>
 											</span>
 											<span className={styles.eventInfo}>
 												<span className={styles.eventName}>{event.name}</span>
@@ -216,7 +196,10 @@ export function OverviewView() {
 											</span>
 											<span className={styles.eventCapacity}>
 												<span className={styles.eventCapacityLabel}>
-													{event.attendeeCount}/{event.capacity} · {pct}%
+													<span>
+														{event.attendeeCount}/{event.capacity}
+													</span>
+													<span className={styles.eventCapacityPct}>{pct}%</span>
 												</span>
 												<span className={styles.miniBarTrack}>
 													<span
@@ -225,7 +208,9 @@ export function OverviewView() {
 													/>
 												</span>
 											</span>
-											<StatusBadge status={event.status} />
+											<span className={styles.eventStatus}>
+												<StatusBadge status={event.status} />
+											</span>
 										</button>
 									</li>
 								);
@@ -234,22 +219,20 @@ export function OverviewView() {
 					)}
 				</div>
 
-				<div className="card">
-					<div className="card__header">
-						<h2>Recent activity</h2>
-					</div>
-					<ul className="activity-list">
+				<div className={styles.activityCard}>
+					<h2 className={styles.cardTitle}>Recent activity</h2>
+					<ul className={styles.activityList}>
 						{activity.length === 0 ? (
-							<li>No recent activity.</li>
+							<li className={styles.emptyNote}>No recent activity.</li>
 						) : (
 							activity.map((entry) => (
-								<li key={entry.id}>
-									<span className={styles.activityRow}>
-										<span className={styles.activityDot} aria-hidden="true" />
-										<span>
+								<li key={entry.id} className={styles.activityRow}>
+									<span className={styles.activityDot} aria-hidden="true" />
+									<span className={styles.activityBody}>
+										<p className={styles.activityText}>
 											<strong>{entry.actor}</strong> {describeAuditAction(entry.action)}
-											<span className="activity-list__meta">{formatDateTime(entry.timestamp)}</span>
-										</span>
+										</p>
+										<p className={styles.activityMeta}>{formatDateTime(entry.timestamp)}</p>
 									</span>
 								</li>
 							))

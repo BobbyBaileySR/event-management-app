@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '../components/Toast';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import type { CatalogEventSummary, CatalogProgram } from '../types';
 import '../styles/fonts.css';
 import '../../css/components.css';
@@ -83,6 +84,7 @@ const archivedEvents: CatalogEventSummary[] = [
 
 const {
 	mockFetchCatalog,
+	mockFetchCapacitySummary,
 	mockFetchEventCapacityStatus,
 	mockCreateProgram,
 	mockCreateEvent,
@@ -91,14 +93,17 @@ const {
 	mockDataService,
 } = vi.hoisted(() => {
 	const mockFetchCatalog = vi.fn();
+	const mockFetchCapacitySummary = vi.fn();
+	/** Never called from this view (T034) — present only so a regression to the old per-event fan-out would be caught. */
 	const mockFetchEventCapacityStatus = vi.fn();
 	const mockCreateProgram = vi.fn();
 	const mockCreateEvent = vi.fn();
 	const mockUpdateProgram = vi.fn();
 	const mockUpdateEvent = vi.fn();
-	/** Stable service object — a fresh object each render would retrigger loadCatalog via [data]. */
+	/** Stable service object — the `useCatalog`/`useCapacitySummary` hooks key off this via useDataService. */
 	const mockDataService = {
 		fetchCatalog: mockFetchCatalog,
+		fetchCapacitySummary: mockFetchCapacitySummary,
 		fetchEventCapacityStatus: mockFetchEventCapacityStatus,
 		createProgram: mockCreateProgram,
 		createEvent: mockCreateEvent,
@@ -107,6 +112,7 @@ const {
 	};
 	return {
 		mockFetchCatalog,
+		mockFetchCapacitySummary,
 		mockFetchEventCapacityStatus,
 		mockCreateProgram,
 		mockCreateEvent,
@@ -121,7 +127,7 @@ vi.mock('../hooks/useDataService', () => ({
 }));
 
 function renderEventsView() {
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter>
 			<ToastProvider>
 				<EventsView />
@@ -150,19 +156,15 @@ describe('EventsView (Programs & Events)', () => {
 			}
 			return { events: mockEvents, programs: mockPrograms };
 		});
-		mockFetchEventCapacityStatus.mockImplementation(async (eventId: string) => {
-			const event =
-				mockEvents.find((entry) => entry.id === eventId) ??
-				archivedEvents.find((entry) => entry.id === eventId);
-			return {
-				programId: event?.programId ?? '_standalone',
-				eventId,
-				capacity: event?.capacity ?? 0,
-				checkedInCount: eventId === 'evt-1' ? 10 : 0,
-				departureCount: 0,
-				liveAttendance: eventId === 'evt-1' ? 10 : 0,
-			};
-		});
+		mockFetchCapacitySummary.mockImplementation(async () => ({
+			events: [...mockEvents, ...archivedEvents].map((event) => ({
+				eventId: event.id,
+				programId: event.programId,
+				capacity: event.capacity ?? null,
+				registeredCount: event.id === 'evt-1' ? 10 : 0,
+					checkedInCount: event.id === 'evt-1' ? 10 : 0,
+			})),
+		}));
 		mockCreateProgram.mockResolvedValue({ program: mockPrograms[0] });
 		mockCreateEvent.mockResolvedValue({ event: mockEvents[0] });
 		mockUpdateProgram.mockResolvedValue({ program: mockPrograms[0] });
@@ -188,10 +190,11 @@ describe('EventsView (Programs & Events)', () => {
 	it('renders Programs & Events chrome with Active/Archived tabs and create buttons', async () => {
 		renderEventsView();
 
-		await waitFor(() => {
-			expect(screen.getByRole('heading', { name: 'Programs & Events' })).toBeInTheDocument();
-		});
+		// The loading state renders the same heading text (different meta) — wait for
+		// loaded content first so the assertions below don't race the catalog/capacity fetch.
+		await screen.findByText('London Summit');
 
+		expect(screen.getByRole('heading', { name: 'Programs & Events' })).toBeInTheDocument();
 		expect(screen.getByText('Create, manage and archive your event lineup')).toBeInTheDocument();
 		expect(screen.getByRole('tab', { name: 'Active' })).toHaveAttribute('aria-selected', 'true');
 		expect(screen.getByRole('tab', { name: 'Archived' })).toHaveAttribute('aria-selected', 'false');
@@ -309,11 +312,30 @@ describe('EventsView (Programs & Events)', () => {
 		await screen.findByText('London Summit');
 
 		await user.click(screen.getByRole('button', { name: '+ New program' }));
-		expect(screen.getByRole('heading', { name: 'Create Program' })).toBeInTheDocument();
+		expect(screen.getByRole('heading', { name: 'New program' })).toBeInTheDocument();
 		await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
 		await user.click(screen.getByRole('button', { name: '+ New event' }));
 		expect(screen.getByRole('heading', { name: 'Create Event' })).toBeInTheDocument();
+	});
+
+	it('shows a newly created Program immediately, even if the follow-up catalog refetch has not caught up yet (HubSpot list-read lag)', async () => {
+		const user = userEvent.setup();
+		const newProgram: CatalogProgram = { id: 'prog-new', name: 'Winter Series', archived: false };
+		mockCreateProgram.mockResolvedValue({ program: newProgram });
+		// `mockFetchCatalog` keeps returning the pre-create dataset on every call, including the
+		// invalidate-triggered refetch fired right after create — simulating HubSpot's list
+		// endpoint not yet reflecting the just-created object. If "Winter Series" still shows up,
+		// it's because the create response was merged into the cache directly, not the refetch.
+
+		renderEventsView();
+		await screen.findByText('London Summit');
+
+		await user.click(screen.getByRole('button', { name: '+ New program' }));
+		await user.type(screen.getByLabelText(/Program name/i), 'Winter Series');
+		await user.click(screen.getByRole('button', { name: 'Create program' }));
+
+		expect(await screen.findByText('Winter Series')).toBeInTheDocument();
 	});
 
 	it('navigates to Event Details on event row click (no row edit/archive controls)', async () => {
@@ -374,6 +396,92 @@ describe('EventsView (Programs & Events)', () => {
 		});
 
 		expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{3,8}/i);
+	});
+
+	it('issues exactly one fetchCatalog + one fetchCapacitySummary call regardless of event count (no per-event fan-out)', async () => {
+		// This suite's shared mocks accumulate call history across tests (no global mock
+		// reset) — clear just before rendering so the count below reflects only this render.
+		mockFetchCatalog.mockClear();
+		mockFetchCapacitySummary.mockClear();
+		mockFetchEventCapacityStatus.mockClear();
+
+		renderEventsView();
+
+		await screen.findByText('London Summit');
+
+		expect(mockFetchCatalog).toHaveBeenCalledTimes(1);
+		expect(mockFetchCapacitySummary).toHaveBeenCalledTimes(1);
+		expect(mockFetchEventCapacityStatus).not.toHaveBeenCalled();
+	});
+
+	it('renders the catalog with fallback capacity values when the initial capacity summary request fails, instead of a blank error screen (US4-2)', async () => {
+		mockFetchCapacitySummary.mockRejectedValueOnce(new Error('capacity summary request failed'));
+
+		renderEventsView();
+
+		await screen.findByText('London Summit');
+
+		// Fallback shape from enrichPortfolioWithCapacity: 0 checked-in + the catalog's own
+		// capacity, not a gate on first paint — the row still renders, just unenriched.
+		expect(screen.getByText('0/100')).toBeInTheDocument();
+		expect(screen.getByRole('alert')).toHaveTextContent(
+			"Couldn't refresh capacity data — showing the last loaded values.",
+		);
+		expect(screen.queryByRole('heading', { name: /Programs & Events/ })).toBeInTheDocument();
+	});
+
+	it('keeps the last loaded rows + a non-blocking retry banner when the capacity summary background-refetch fails, instead of blanking to an error state', async () => {
+		mockFetchCapacitySummary
+			.mockResolvedValueOnce({
+				events: mockEvents.map((event) => ({
+					eventId: event.id,
+					programId: event.programId,
+					capacity: event.capacity ?? null,
+					registeredCount: event.id === 'evt-1' ? 10 : 0,
+					checkedInCount: event.id === 'evt-1' ? 10 : 0,
+				})),
+			})
+			.mockRejectedValueOnce(new Error('capacity summary request failed'));
+
+		const { queryClient } = renderEventsView();
+		await screen.findByText('London Summit');
+		expect(screen.getByText('10/100')).toBeInTheDocument();
+
+		await queryClient.refetchQueries({ queryKey: ['capacity', 'summary'] });
+
+		await waitFor(() => {
+			expect(screen.getByRole('alert')).toHaveTextContent(
+				"Couldn't refresh capacity data — showing the last loaded values.",
+			);
+		});
+		expect(screen.getByText('London Summit')).toBeInTheDocument();
+		expect(screen.getByText('10/100')).toBeInTheDocument();
+	});
+
+	it('paints the previous (stale) rows instantly during a background refetch, then swaps in the new data once it resolves (SC-006 stale-while-revalidate)', async () => {
+		const { queryClient } = renderEventsView();
+		await screen.findByText('London Summit');
+
+		let resolveSecondFetch: (value: { events: CatalogEventSummary[]; programs: CatalogProgram[] }) => void;
+		const secondFetch = new Promise<{ events: CatalogEventSummary[]; programs: CatalogProgram[] }>((resolve) => {
+			resolveSecondFetch = resolve;
+		});
+		mockFetchCatalog.mockImplementationOnce(() => secondFetch);
+
+		const refetchPromise = queryClient.refetchQueries({ queryKey: ['catalog'] });
+
+		// The background refetch is in flight but not yet resolved — the previous (stale)
+		// rows stay on screen instantly, no loading flash and no blank state.
+		expect(screen.getByText('London Summit')).toBeInTheDocument();
+
+		resolveSecondFetch!({
+			events: [{ ...mockEvents[1]!, name: 'Refetched Roadshow' }],
+			programs: mockPrograms,
+		});
+		await refetchPromise;
+
+		await screen.findByText('Refetched Roadshow');
+		expect(screen.queryByText('London Summit')).not.toBeInTheDocument();
 	});
 });
 

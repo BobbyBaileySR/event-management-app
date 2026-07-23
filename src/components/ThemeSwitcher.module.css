@@ -57,3 +57,34 @@
 .option[data-theme-option='darkAurora'] .dot {
 	background: var(--theme-swatch-dark-aurora);
 }
+
+/* variant="row" — phone tab bar: horizontal wrapping pills with labels, matching the nav
+   tabs' visual language instead of the desktop vertical list. */
+.row {
+	flex-direction: row;
+	flex-wrap: wrap;
+	width: 100%;
+}
+
+.row .option {
+	width: auto;
+	flex: 1 1 0;
+	min-width: min(96px, 100%);
+	justify-content: center;
+	text-align: center;
+}
+
+/* variant="compact" — tablet icon rail: no room for labels, so only the swatch dot shows;
+   the label stays in the DOM for screen readers (`.sr-only`, `css/base.css`) and as a
+   hover/focus `title` tooltip. Button itself stays >=44px for the touch-target rule even
+   though the visible dot is small. */
+.compact {
+	align-items: center;
+}
+
+.compact .option {
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	justify-content: center;
+}

@@ -38,7 +38,10 @@ export function CapacityBar({
 	const tierLabel = variant === 'live' ? TIER_LABELS[resolvedTier] : null;
 	const showControls = variant === 'live' && onAdjust && checkedInCount !== undefined;
 	const disableDown = value <= 0 || adjusting;
-	const disableUp = checkedInCount !== undefined && value >= checkedInCount;
+	// Unlocked (BE-CHECKIN-001) — staff have full discretion to correct live attendance above
+	// the checked-in count too (e.g. a walk-in who checked in through a side channel), not
+	// just back up to it. Only the in-flight request disables this now.
+	const disableUp = adjusting;
 	const isLive = variant === 'live';
 	const remaining = Math.max(0, capacity - value);
 
@@ -57,7 +60,11 @@ export function CapacityBar({
 								<span className={styles.liveMeta}> / {capacity}</span>
 							</p>
 							{manualAdjustmentCount ? (
-								<p className={styles.adjustmentNote}>Includes manual adjustment of {manualAdjustmentCount}</p>
+								<p className={styles.adjustmentNote}>
+									{manualAdjustmentCount > 0
+										? `Includes manual adjustment of ${manualAdjustmentCount}`
+										: `Includes manual adjustment of ${Math.abs(manualAdjustmentCount)} above checked-in`}
+								</p>
 							) : null}
 						</div>
 						{showControls ? (

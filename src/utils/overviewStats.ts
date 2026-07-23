@@ -40,6 +40,21 @@ export function isWithinNextDays(dateStr: string, days: number, reference: Date)
 	return diff >= 0 && diff <= days * DAY_MS;
 }
 
+/** Month abbr + day number for the Overview upcoming-event date badge (design_handoff 2). */
+export function getEventDateBadgeParts(dateIso: string): { month: string; day: string } {
+	if (!dateIso) {
+		return { month: '—', day: '—' };
+	}
+	const parsed = new Date(dateIso);
+	if (Number.isNaN(parsed.getTime())) {
+		return { month: '—', day: '—' };
+	}
+	return {
+		month: new Intl.DateTimeFormat('en-US', { month: 'short' }).format(parsed).toUpperCase(),
+		day: String(parsed.getDate()),
+	};
+}
+
 /** Non-cancelled, non-completed events sorted soonest-first — for the "Upcoming events" card list. */
 export function getUpcomingEvents(events: PortfolioEvent[], limit = 4): PortfolioEvent[] {
 	return events

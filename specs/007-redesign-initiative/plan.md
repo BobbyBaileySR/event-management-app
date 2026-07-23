@@ -1,19 +1,21 @@
 # Implementation Plan: Redesign Initiative (Slice 007)
 
+> **Status note (2026-07-17):** Phase A and the Phase B event-first/custom-object core are **shipped**. The file tree under Project Structure below is a **historical snapshot from plan time** — e.g. `celebrationTheme.ts`, `CatalogPickerSelect`, and `data/mockData.ts` were later retired or replaced (`theme/`, `SelectPicker`/`CalendarPicker`/`TimePicker`, no mock-data path). Prefer [quickstart.md](./quickstart.md), [tasks.md](./tasks.md), and current `src/` for live structure.
+
 **Branch**: `007-redesign-initiative` | **Date**: 2026-07-13 | **Spec**: [spec.md](./spec.md)
 
-**Input**: `/speckit-plan` — full Redesign initiative: UI redesign + HubSpot custom-objects migration, recreated from `Frontend/design_handoff 2/`, phased A (unblocked) / B (gated on `X-REDESIGN-001`). See [ADR-007](../../docs/decisions/007-hubspot-custom-objects-registration.md), [ADR-008](../../docs/decisions/008-standalone-events-event-first-nav.md), [ADR-009](../../docs/decisions/009-redesign-ui-platform-theming-typography.md).
+**Input**: `/speckit-plan` — full Redesign initiative: UI redesign + HubSpot custom-objects migration, recreated from `Frontend/design_handoff 2/`. Phase A and the Phase B event-first/custom-object core have shipped. See [ADR-007](../../docs/decisions/007-hubspot-custom-objects-registration.md), [ADR-008](../../docs/decisions/008-standalone-events-event-first-nav.md), [ADR-009](../../docs/decisions/009-redesign-ui-platform-theming-typography.md).
 
 ## Summary
 
 Deliver the EMS redesign in two phases against the `design_handoff 2/` prototype as the visual source of truth:
 
-- **Phase A (unblocked now):** a **two-tier token system** (primitive brand tokens + a semantic role layer remapped per theme), **3 themes** on `data-theme` — Aurora (default light), Celebration (allowlist-gated pink), and net-new **Dark Aurora** — a **user-chosen theme switcher**, **self-hosted Manrope + Material Symbols** subset fonts (`font-src 'self'`), **shared accessible field pickers** (calendar / time / select), and a **write-gated backend theme-preference endpoint** (cross-device, no PII, Celebration re-validated server-side). Applied globally via tokens without rebuilding IA-dependent layouts.
-- **Phase B (gated on `X-REDESIGN-001` — objects now created in UAT, remaining gates below):** **event-first navigation**, **standalone Events** (Program membership via 1-to-many **association ID `286`**, no `programId` property), **registration-as-association** (Contact↔Event labels `registered`/`checked-in` only this pass; attendee type deferred to existing Parts Attended flags) behind a new `CustomObjectAdapter`, per-registration detail in Record Storage, live capacity/occupancy ±1, and the Campaign modal. Object/association IDs read from **ScriptRunner Connect Parameters** (research R-012). Nothing in Phase B writes until attributes/labels are created + verified (`X-REDESIGN-004`) and the workflow-association test passes (gate #2).
+- **Phase A (shipped):** semantic tokens, Aurora/Celebration/Dark Aurora, theme switcher, self-hosted fonts/icons, accessible field pickers, and theme-preference API.
+- **Phase B (substantially shipped):** **event-first navigation**, standalone Events, association-based registration behind `CustomObjectAdapter`, per-registration detail, capacity, and the Campaign compose modal. Object/association IDs are ScriptRunner Parameters. Remaining work is tracked as polish/ops/deferred TODO items.
 
 **Build order**: Phase A token refactor → fonts/icons → pickers → theme switcher + backend pref endpoint → *(gate)* → Phase B design-it-twice (`CustomObjectAdapter`, event-first routing) → backend adapter + routes → frontend event-first shell/views → migration/backfill → tests + quickstart sign-off.
 
-**Gate status (2026-07-13):** Program (`2-65757052`) + Event (`2-65757130`) custom objects **created in HubSpot UAT** — gate #1 (slots) ✔, gate #3 (labels: Program→Event assoc `286`, Contact↔Event needs 2 labels) ✔. **Remaining before any Phase B write:** gate #2 (workflow can set Contact↔Event association — assumed, needs a test) and `X-REDESIGN-004` (attributes + Contact↔Event association/labels created and verified). Design-it-twice (`X-REDESIGN-002/003`) and Parameter setup (research R-012) can proceed now. See [research.md](./research.md) R-005/R-012 and [docs/hubspot-schema.md](../../docs/hubspot-schema.md).
+**Gate outcome (updated 2026-07-17):** all feasibility gates passed 2026-07-14; adapter/routing implementation and legacy-route retirement completed by 2026-07-16. See [docs/hubspot-schema.md](../../docs/hubspot-schema.md).
 
 ## Technical Context
 
@@ -138,7 +140,7 @@ Backend/node/tests/
 6. Backend `UserPrefsStore` + `GET user/prefs` + `PUT user/prefs/theme` (session → RBAC → validate → rate limit → act; **Celebration re-validated server-side**, fallback Aurora).
 7. Contract/RBAC merge for the theme-pref route; `dataService` + mock parity; Vitest + Jest.
 
-### Phase B — Event-first + custom objects (gated on `X-REDESIGN-001`)
+### Phase B — Event-first + custom objects (shipped core)
 
 0. **Pre-write gates**: create HubSpot attributes + Contact↔Event association/labels per [docs/hubspot-schema.md](../../docs/hubspot-schema.md), confirm confirmed API names; add ScriptRunner Connect **Parameters** (R-012); run a **workflow-association test** (gate #2) proving a HubSpot workflow can set the Contact↔Event `registered` label.
 1. `CustomObjectAdapter` behind the ADR-005 seam (reads IDs from Parameters); catalog CRUD against custom objects; Program↔Event via association `286`.

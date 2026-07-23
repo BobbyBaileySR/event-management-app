@@ -30,8 +30,8 @@ export function splitApiPath(path: string): { route: string; query: string } {
 
 /**
  * Single fetch entry point to the ScriptRunner listener. Logical routes travel in the
- * X-EMS-Route header (the listener URL path is flat). Ported from js/api/client.js;
- * the session token is now passed in explicitly rather than read from global state.
+ * `route` query parameter (the listener URL path is flat; legacy `X-EMS-Route` is a
+ * backend fallback only). Session token is passed in explicitly rather than read from global state.
  */
 export async function apiRequest<T = unknown>(
 	path: string,

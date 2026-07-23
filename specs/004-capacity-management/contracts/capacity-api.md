@@ -1,10 +1,10 @@
 # Capacity API Contract (004)
 
-**Status**: Provisional — merge into `Frontend/docs/api-contract.md` when implementing.
+**Status**: Superseded — historical Slice 004 design contract. The live event-scoped contract is in [`Frontend/docs/api-contract.md`](../../../docs/api-contract.md); do not implement the Program-scoped paths below.
 
 **RBAC**: All routes **`admin`** only (see `Frontend/docs/rbac.md`).
 
-**Base path**: `/api/ems` (same origin; `X-EMS-Route` header in production)
+**Historical transport/path**: the body below predates the `route` query parameter and event-first routing.
 
 **Depends on**: [003 check-in-api.md](../../003-check-in/contracts/check-in-api.md) — same Program + Event path prefix and session auth.
 
@@ -90,7 +90,7 @@ Successful adjust writes audit action `capacity.adjust` with `programId`, `direc
 | GET | `fetchCapacityStatus(programId, eventId)` |
 | POST | `adjustCapacity(programId, eventId, direction)` |
 
-Mock layer (`USE_MOCK_API: true`): same routes via `mockData` in-memory departure map.
+Historical note: this design originally had an in-memory mock layer; that runtime path was removed 2026-07-15.
 
 ---
 

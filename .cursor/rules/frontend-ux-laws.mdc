@@ -26,7 +26,7 @@ alwaysApply: false
 
 ## Patterns EMS already uses
 
-- **Jakob's Law:** Event list → event hub → module; sidebar nav; catalog pickers for slice scope
+- **Jakob's Law:** Event list → event hub → module; sidebar nav; WorkingEventPicker for event scope
 - **Humane / finite:** Pagination or explicit page controls — no infinite scroll
 - **Aesthetic-usability:** Brand tokens + shared components — do not one-off styling
 

@@ -4,11 +4,18 @@
  */
 
 import type {
-	Attendee,
+	AttendeeCommunicationsResponse,
+	AttendeeDetail,
+	AttendeeJourneyStep,
+	AttendeeLookupResponse,
+	AttendeeNotesResponse,
+	AttendeeTimelineItem,
 	CancelEmailDispatchResponse,
 	CapacityStatus,
+	CapacitySummaryResponse,
 	CheckInContactSummary,
 	CheckInScanResponse,
+	CommunicationTag,
 	ConfirmCheckInResponse,
 	CreateEmailDispatchResponse,
 	DispatchRecipientRow,
@@ -19,139 +26,26 @@ import type {
 	EmailPreviewResponse,
 	EmailSegmentsListResponse,
 	EmailTemplatesListResponse,
-	Event,
+	GenerateLeadBatchResponse,
+	GenerateLeadBatchResultEntry,
+	GenerateLeadResponse,
+	LeadGenerationBatchOutcome,
 	CatalogEvent,
 	CatalogEventPublishState,
 	CatalogEventStatus,
 	CatalogEventSummary,
 	CatalogProgram,
 	CatalogResponse,
+	ConversationNoteEntry,
 	HubSpotSegmentOption,
 	MarketingTemplateOption,
+	RegistrationAnswerHistoryEntry,
 	RemoveAttendeeResponse,
+	ScheduledEmailSummary,
 	SliceAttendeesResponse,
 	ThemePreference,
 } from '../types';
 import { DEFAULT_THEME_ID, isThemeId } from '../theme/themeTokens';
-
-const ATTENDEE_STATUS_FROM_API: Record<string, Attendee['status']> = {
-	registered: 'Registered',
-	checked_in: 'Checked In',
-	cancelled: 'Cancelled',
-};
-
-function formatEventDate(iso: string | undefined): string {
-	if (!iso) {
-		return '';
-	}
-	return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(iso));
-}
-
-function toDateIso(iso: string | undefined): string {
-	if (!iso) {
-		return '';
-	}
-	return iso.split('T')[0] ?? '';
-}
-
-function isUiEventShape(raw: Record<string, unknown>): boolean {
-	return Boolean(raw.date && !raw.startDate);
-}
-
-function isUiAttendeeShape(raw: Record<string, unknown>): boolean {
-	return Boolean(raw.name && !raw.firstName && !raw.lastName);
-}
-
-export function normalizeEvent(raw: Record<string, unknown> | null | undefined): Event | null {
-	if (!raw || typeof raw !== 'object') {
-		return null;
-	}
-
-	if (isUiEventShape(raw)) {
-		return raw as unknown as Event;
-	}
-
-	const startDate = typeof raw.startDate === 'string' ? raw.startDate : '';
-	const endDateIso = typeof raw.endDate === 'string' ? raw.endDate : undefined;
-
-	return {
-		id: String(raw.id ?? ''),
-		name: String(raw.name ?? ''),
-		date: typeof raw.date === 'string' ? raw.date : formatEventDate(startDate),
-		dateIso: typeof raw.dateIso === 'string' ? raw.dateIso : toDateIso(startDate),
-		endDate:
-			typeof raw.endDate === 'string' && !endDateIso?.includes('T')
-				? raw.endDate
-				: endDateIso
-					? formatEventDate(endDateIso)
-					: undefined,
-		location: String(raw.location ?? ''),
-		status: String(raw.status ?? 'draft'),
-		attendeeCount: Number(raw.attendeeCount ?? 0),
-		capacity: Number(raw.capacity ?? raw.attendeeCount ?? 0),
-		type: String(raw.type ?? 'In-person'),
-		owner: String(raw.owner ?? ''),
-		registrationClose: String(raw.registrationClose ?? ''),
-		hubspotId: String(raw.hubspotId ?? raw.id ?? ''),
-		description: String(raw.description ?? ''),
-		programId: raw.programId === null || raw.programId === undefined ? undefined : String(raw.programId),
-		programName: raw.programName === null || raw.programName === undefined ? undefined : String(raw.programName),
-	};
-}
-
-export function normalizeAttendee(raw: Record<string, unknown> | null | undefined): Attendee {
-	if (!raw || typeof raw !== 'object') {
-		return raw as unknown as Attendee;
-	}
-
-	if (isUiAttendeeShape(raw)) {
-		return raw as unknown as Attendee;
-	}
-
-	const firstName = String(raw.firstName ?? '');
-	const lastName = String(raw.lastName ?? '');
-	const combinedName = [firstName, lastName].filter(Boolean).join(' ');
-	const apiStatus = typeof raw.status === 'string' ? raw.status : '';
-	const status = ATTENDEE_STATUS_FROM_API[apiStatus] ?? (raw.status as Attendee['status']) ?? 'Registered';
-
-	return {
-		id: String(raw.id ?? ''),
-		name: combinedName || String(raw.name ?? ''),
-		email: String(raw.email ?? ''),
-		company: String(raw.company ?? ''),
-		status,
-		ticketType: String(raw.ticketType ?? ''),
-		registeredAt: String(raw.registeredAt ?? ''),
-		source: String(raw.source ?? ''),
-	};
-}
-
-export function normalizeEventsResponse(response: Record<string, unknown>): { events: Event[] } & Record<string, unknown> {
-	const events = Array.isArray(response.events) ? response.events : [];
-	return {
-		...response,
-		events: events.map((event) => normalizeEvent(event as Record<string, unknown>)).filter(Boolean) as Event[],
-	};
-}
-
-export function normalizeEventResponse(
-	response: Record<string, unknown> | null | undefined,
-): { event: Event | null } {
-	if (response && typeof response === 'object' && 'event' in response) {
-		return { event: normalizeEvent(response.event as Record<string, unknown>) };
-	}
-	return { event: normalizeEvent(response ?? undefined) };
-}
-
-export function normalizeAttendeesResponse(
-	response: Record<string, unknown>,
-): { attendees: Attendee[] } & Record<string, unknown> {
-	const attendees = Array.isArray(response.attendees) ? response.attendees : [];
-	return {
-		...response,
-		attendees: attendees.map((attendee) => normalizeAttendee(attendee as Record<string, unknown>)),
-	};
-}
 
 function copyOptionalString(raw: Record<string, unknown>, key: string): string | undefined {
 	const value = raw[key];
@@ -248,7 +142,7 @@ export function normalizeSliceAttendeesResponse(response: Record<string, unknown
 				accountManager: String(raw.accountManager ?? ''),
 				attendeeType: raw.attendeeType === 'partner' ? 'partner' : 'customer',
 				checkedIn: Boolean(raw.checkedIn),
-				checkedInAt: null,
+				checkedInAt: typeof raw.checkedInAt === 'string' ? raw.checkedInAt : null,
 			};
 		}),
 		page: Number(response.page ?? 1),
@@ -294,6 +188,19 @@ export function normalizeCheckInScanResponse(response: Record<string, unknown>):
 	};
 }
 
+export function normalizeAttendeeLookupResponse(response: Record<string, unknown>): AttendeeLookupResponse {
+	const contactRaw = response.contact;
+	const contact =
+		contactRaw && typeof contactRaw === 'object'
+			? normalizeCheckInContact(contactRaw as Record<string, unknown>)
+			: normalizeCheckInContact({});
+
+	return {
+		contact,
+		eventId: String(response.eventId ?? ''),
+	};
+}
+
 export function normalizeConfirmCheckInResponse(response: Record<string, unknown>): ConfirmCheckInResponse {
 	const attendeeType = response.attendeeType;
 	return {
@@ -301,6 +208,7 @@ export function normalizeConfirmCheckInResponse(response: Record<string, unknown
 		checkedIn: Boolean(response.checkedIn),
 		alreadyCheckedIn: Boolean(response.alreadyCheckedIn),
 		attendeeType: attendeeType === 'partner' ? 'partner' : attendeeType === 'customer' ? 'customer' : null,
+		checkedInAt: typeof response.checkedInAt === 'string' ? response.checkedInAt : null,
 	};
 }
 
@@ -320,6 +228,30 @@ export function normalizeCapacityStatusResponse(response: Record<string, unknown
 		checkedInCount: Number(response.checkedInCount ?? 0),
 		departureCount: Number(response.departureCount ?? 0),
 		liveAttendance: Number(response.liveAttendance ?? 0),
+	};
+}
+
+export function normalizeCapacitySummaryResponse(response: Record<string, unknown>): CapacitySummaryResponse {
+	const events = Array.isArray(response.events) ? response.events : [];
+	return {
+		events: events.map((row) => {
+			const raw = row as Record<string, unknown>;
+			const rawCapacity = raw.capacity;
+			const capacity =
+				rawCapacity === null || rawCapacity === undefined
+					? null
+					: Number.isFinite(Number(rawCapacity)) && Number(rawCapacity) > 0
+						? Number(rawCapacity)
+						: null;
+			const programId = raw.programId;
+			return {
+				eventId: String(raw.eventId ?? ''),
+				programId: typeof programId === 'string' ? programId : null,
+				capacity,
+				registeredCount: Number(raw.registeredCount ?? 0),
+				checkedInCount: Number(raw.checkedInCount ?? 0),
+			};
+		}),
 	};
 }
 
@@ -368,7 +300,7 @@ function normalizeDispatchStatus(value: unknown): EmailDispatchListItem['status'
 	return 'pending';
 }
 
-function normalizeEmailDispatchListItem(raw: Record<string, unknown>): EmailDispatchListItem {
+export function normalizeEmailDispatchListItem(raw: Record<string, unknown>): EmailDispatchListItem {
 	const item: EmailDispatchListItem = {
 		dispatchId: String(raw.dispatchId ?? ''),
 		dispatchName: String(raw.dispatchName ?? ''),
@@ -381,6 +313,7 @@ function normalizeEmailDispatchListItem(raw: Record<string, unknown>): EmailDisp
 		recipientCountSent: Number(raw.recipientCountSent ?? 0),
 		createdBy: String(raw.createdBy ?? ''),
 		createdAt: String(raw.createdAt ?? ''),
+		ticketsEnabled: raw.ticketsEnabled === true,
 	};
 	if (raw.lockWarning === true) {
 		item.lockWarning = true;
@@ -406,6 +339,13 @@ export function normalizeEmailLimitsResponse(response: Record<string, unknown>):
 		dispatchLimitPerHour: Number(response.dispatchLimitPerHour ?? 10),
 		dispatchUsedThisHour: Number(response.dispatchUsedThisHour ?? 0),
 		largeSendThreshold: Number(response.largeSendThreshold ?? 50),
+	};
+}
+
+export function normalizeScheduledEmailSummaryResponse(response: Record<string, unknown>): ScheduledEmailSummary {
+	return {
+		emailsScheduledThisWeek: Number(response.emailsScheduledThisWeek ?? 0),
+		eventsWithScheduledEmails: Number(response.eventsWithScheduledEmails ?? 0),
 	};
 }
 
@@ -437,6 +377,7 @@ export function normalizeCreateEmailDispatchResponse(response: Record<string, un
 		scheduledAtUtc:
 			response.scheduledAtUtc === null || response.scheduledAtUtc === undefined ? null : String(response.scheduledAtUtc),
 		timezone: response.timezone === null || response.timezone === undefined ? null : String(response.timezone),
+		ticketsEnabled: response.ticketsEnabled === true,
 	};
 }
 
@@ -485,5 +426,183 @@ export function normalizeRemoveAttendeeResponse(response: Record<string, unknown
 	return {
 		contactId: String(response.contactId ?? ''),
 		removed: Boolean(response.removed),
+	};
+}
+
+const LEAD_OUTCOMES: readonly LeadGenerationBatchOutcome[] = ['created', 'updated', 'created_separate', 'failed'];
+
+function normalizeLeadOutcome(value: unknown): LeadGenerationBatchOutcome {
+	return (LEAD_OUTCOMES as readonly unknown[]).includes(value) ? (value as LeadGenerationBatchOutcome) : 'failed';
+}
+
+export function normalizeGenerateLeadResponse(response: Record<string, unknown>): GenerateLeadResponse {
+	return {
+		outcome: normalizeLeadOutcome(response.outcome) as GenerateLeadResponse['outcome'],
+		leadId: String(response.leadId ?? ''),
+	};
+}
+
+function normalizeGenerateLeadBatchResultEntry(raw: Record<string, unknown>): GenerateLeadBatchResultEntry {
+	const entry: GenerateLeadBatchResultEntry = {
+		contactId: String(raw.contactId ?? ''),
+		outcome: normalizeLeadOutcome(raw.outcome),
+	};
+	const leadId = copyOptionalString(raw, 'leadId');
+	if (leadId) {
+		entry.leadId = leadId;
+	}
+	return entry;
+}
+
+export function normalizeGenerateLeadBatchResponse(response: Record<string, unknown>): GenerateLeadBatchResponse {
+	const results = Array.isArray(response.results) ? response.results : [];
+	return {
+		results: results.map((entry) => normalizeGenerateLeadBatchResultEntry(entry as Record<string, unknown>)),
+	};
+}
+
+const JOURNEY_STEP_TYPES: readonly AttendeeJourneyStep['type'][] = [
+	'registered',
+	'dispatch_sent',
+	'dispatch_opened',
+	'checked_in',
+];
+
+function normalizeJourneyStepType(value: unknown): AttendeeJourneyStep['type'] {
+	return (JOURNEY_STEP_TYPES as readonly unknown[]).includes(value) ? (value as AttendeeJourneyStep['type']) : 'registered';
+}
+
+function copyNullableString(raw: Record<string, unknown>, key: string): string | null {
+	const value = raw[key];
+	return typeof value === 'string' ? value : null;
+}
+
+function normalizeAttendeeJourneyStep(raw: Record<string, unknown>): AttendeeJourneyStep {
+	return {
+		type: normalizeJourneyStepType(raw.type),
+		timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : null,
+		label: String(raw.label ?? ''),
+		source: 'this_event',
+	};
+}
+
+function normalizeCommunicationTag(raw: unknown): CommunicationTag {
+	const tag = raw as Record<string, unknown> | undefined;
+	if (tag?.kind === 'other_event') {
+		return { kind: 'other_event', eventName: String(tag.eventName ?? '') };
+	}
+	return { kind: 'external' };
+}
+
+/** Distinguishes a `CommunicationItem` (has `tag`) from a this-Event `AttendeeJourneyStep` within one merged timeline. */
+function normalizeAttendeeTimelineItem(raw: Record<string, unknown>): AttendeeTimelineItem {
+	if (raw.tag) {
+		return {
+			type: normalizeJourneyStepType(raw.type),
+			timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : null,
+			label: String(raw.label ?? ''),
+			source: raw.source === 'external' ? 'external' : 'other_event',
+			tag: normalizeCommunicationTag(raw.tag),
+		};
+	}
+	return normalizeAttendeeJourneyStep(raw);
+}
+
+/** Values authored directly by an anonymous public form submitter — never validated beyond shape (spec FR-007). */
+function normalizeAnswerValue(value: unknown): string | string[] {
+	if (Array.isArray(value)) {
+		return value.map((item) => String(item ?? ''));
+	}
+	return String(value ?? '');
+}
+
+function normalizeAnswers(raw: unknown): Record<string, string | string[]> {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+		return {};
+	}
+	const answers: Record<string, string | string[]> = {};
+	for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+		answers[key] = normalizeAnswerValue(value);
+	}
+	return answers;
+}
+
+function normalizeRegistrationAnswerHistoryEntry(raw: Record<string, unknown>): RegistrationAnswerHistoryEntry {
+	return {
+		answers: normalizeAnswers(raw.answers),
+		source: raw.source === 'amendment' ? 'amendment' : 'registration',
+		observedAt: String(raw.observedAt ?? ''),
+		slot: typeof raw.slot === 'number' ? raw.slot : 0,
+	};
+}
+
+export function normalizeAttendeeDetailResponse(response: Record<string, unknown>): AttendeeDetail {
+	const journey = Array.isArray(response.journey) ? response.journey : [];
+	const registrationSource = response.registrationSource;
+	const registrationAnswerHistory = Array.isArray(response.registrationAnswerHistory)
+		? response.registrationAnswerHistory
+		: [];
+	return {
+		contactId: String(response.contactId ?? ''),
+		firstName: String(response.firstName ?? ''),
+		lastName: String(response.lastName ?? ''),
+		company: String(response.company ?? ''),
+		email: String(response.email ?? ''),
+		accountManager: String(response.accountManager ?? ''),
+		attendeeType: response.attendeeType === 'partner' ? 'partner' : 'customer',
+		checkedIn: Boolean(response.checkedIn),
+		checkedInAt: typeof response.checkedInAt === 'string' ? response.checkedInAt : null,
+		phone: copyNullableString(response, 'phone'),
+		jobTitle: copyNullableString(response, 'jobTitle'),
+		dietaryRequirement: copyNullableString(response, 'dietaryRequirement'),
+		registrationSource:
+			registrationSource === 'form' || registrationSource === 'walk-in' ? registrationSource : null,
+		journey: journey.map((step) => normalizeAttendeeJourneyStep(step as Record<string, unknown>)),
+		registrationAnswerHistory: registrationAnswerHistory.map((entry) =>
+			normalizeRegistrationAnswerHistoryEntry(entry as Record<string, unknown>),
+		),
+	};
+}
+
+export function normalizeAttendeeCommunicationsResponse(
+	response: Record<string, unknown>,
+): AttendeeCommunicationsResponse {
+	const timeline = Array.isArray(response.timeline) ? response.timeline : [];
+	return {
+		contactId: String(response.contactId ?? ''),
+		cutoffTimestamp: String(response.cutoffTimestamp ?? ''),
+		timeline: timeline.map((item) => normalizeAttendeeTimelineItem(item as Record<string, unknown>)),
+	};
+}
+
+function normalizeConversationNoteEditHistoryEntry(
+	raw: Record<string, unknown>,
+): ConversationNoteEntry['editHistory'][number] {
+	return {
+		previousContent: String(raw.previousContent ?? ''),
+		editorEmail: String(raw.editorEmail ?? ''),
+		editedAt: String(raw.editedAt ?? ''),
+	};
+}
+
+/** Note content is staff-authored free text — never trust shape beyond this (render with JSX `{text}` only). */
+export function normalizeConversationNoteEntry(raw: Record<string, unknown>): ConversationNoteEntry {
+	const editHistory = Array.isArray(raw.editHistory) ? raw.editHistory : [];
+	return {
+		noteId: String(raw.noteId ?? ''),
+		content: String(raw.content ?? ''),
+		authorEmail: String(raw.authorEmail ?? ''),
+		createdAt: String(raw.createdAt ?? ''),
+		editHistory: editHistory.map((entry) =>
+			normalizeConversationNoteEditHistoryEntry(entry as Record<string, unknown>),
+		),
+		eventId: String(raw.eventId ?? ''),
+	};
+}
+
+export function normalizeAttendeeNotesResponse(response: Record<string, unknown>): AttendeeNotesResponse {
+	const notes = Array.isArray(response.notes) ? response.notes : [];
+	return {
+		notes: notes.map((note) => normalizeConversationNoteEntry(note as Record<string, unknown>)),
 	};
 }

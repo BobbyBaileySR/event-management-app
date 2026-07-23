@@ -24,7 +24,12 @@ describe('CapacityBar', () => {
 		expect(screen.getByText('Includes manual adjustment of 2')).toBeInTheDocument();
 	});
 
-	it('disables −1 at floor and +1 at ceiling', () => {
+	it('phrases a negative manual adjustment (live attendance corrected above checked-in) distinctly from the raw negative number', () => {
+		render(<CapacityBar variant="live" value={83} capacity={100} checkedInCount={80} manualAdjustmentCount={-3} />);
+		expect(screen.getByText('Includes manual adjustment of 3 above checked-in')).toBeInTheDocument();
+	});
+
+	it('disables −1 at floor; +1 (BE-CHECKIN-001) is never disabled by hitting the checked-in count', () => {
 		const onAdjust = vi.fn();
 		const { rerender } = render(
 			<CapacityBar variant="live" value={0} capacity={100} checkedInCount={5} onAdjust={onAdjust} />,
@@ -37,7 +42,9 @@ describe('CapacityBar', () => {
 			<CapacityBar variant="live" value={5} capacity={100} checkedInCount={5} onAdjust={onAdjust} />,
 		);
 
-		expect(screen.getByLabelText('Correct one departure')).toBeDisabled();
+		// Staff have full discretion to keep correcting up past the checked-in count too
+		// (e.g. a walk-in who checked in through a side channel) — no ceiling anymore.
+		expect(screen.getByLabelText('Correct one departure')).not.toBeDisabled();
 	});
 
 	it('calls onAdjust for live controls', () => {

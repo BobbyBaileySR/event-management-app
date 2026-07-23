@@ -9,7 +9,7 @@ import type {
 } from '../types';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { optionalNumberForPatch, optionalTextForPatch } from '../utils/catalogMetadata';
-import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
+import { walkInFormUrlError as computeWalkInFormUrlError } from '../utils/hubspotFormUrl';
 import { CalendarPicker } from './pickers/CalendarPicker';
 import { SelectPicker } from './pickers/SelectPicker';
 import { TimePicker } from './pickers/TimePicker';
@@ -79,26 +79,6 @@ function timeInputFromIso(iso: string | undefined): string {
 	return match?.[1] ?? '';
 }
 
-function walkInFormUrlFieldError(url: string): string | null {
-	const trimmed = url.trim();
-	if (!trimmed) {
-		return null;
-	}
-	if (isAllowedHubSpotFormUrl(trimmed)) {
-		return null;
-	}
-
-	try {
-		const parsed = new URL(trimmed);
-		if (parsed.protocol !== 'https:') {
-			return 'Walk-in form URL must use HTTPS';
-		}
-	} catch {
-		return 'Walk-in form URL must use HTTPS';
-	}
-
-	return 'Walk-in form URL must be a HubSpot form URL';
-}
 
 function emptyForm(defaultProgramId = NO_PROGRAM_VALUE): EventFormState {
 	return {
@@ -255,7 +235,7 @@ export function CatalogEventModal({
 			return;
 		}
 		setStartError(null);
-		const walkInUrlError = walkInFormUrlFieldError(form.walkInFormUrl);
+		const walkInUrlError = computeWalkInFormUrlError(form.walkInFormUrl);
 		if (walkInUrlError) {
 			setWalkInFormUrlError(walkInUrlError);
 			return;
@@ -341,7 +321,16 @@ export function CatalogEventModal({
 						</p>
 					)}
 					<label>
-						Event name
+						{/* One wrapping element so the label text and asterisk share a single flex
+						    item — `.form label` is a column flex container, so without this the
+						    asterisk span becomes its own item and drops to the next line. */}
+						<span>
+							Event name
+							<span className="required-mark" aria-hidden="true">
+								{' '}
+								*
+							</span>
+						</span>
 						<input
 							ref={nameInputRef}
 							value={form.name}
@@ -349,12 +338,14 @@ export function CatalogEventModal({
 								setForm((current) => ({ ...current, name: changeEvent.target.value }))
 							}
 							required
+							aria-required="true"
 						/>
 					</label>
 					<div className={styles.fieldRow}>
 						<CalendarPicker
 							id={startDateFieldId}
 							label="Start Date"
+							required
 							value={form.startDate}
 							onChange={(startDate) => {
 								setStartError(null);

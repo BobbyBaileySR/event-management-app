@@ -1,10 +1,14 @@
 # Catalog API Contract — Public Registration (006 delta)
 
-**Status**: Authoritative for **006-public-registration**. **Extends** [001 catalog-api](../../001-catalog-admin/contracts/catalog-api.md) and [002 delta](../../002-catalog-metadata-modal/contracts/catalog-api.md) — merge into [docs/api-contract.md](../../../docs/api-contract.md) in the same implementation change.
+> **Superseded design contract — re-plan before implementing.** Not authoritative for live handlers. Assumes Plan C catalog fields, Settings hub, and header-only `X-EMS-Route` transport. When re-planned, merge the delta into [docs/api-contract.md](../../../docs/api-contract.md) using the current **`route` query parameter** transport and event-first Programs & Events / Event Details surfaces. Retained as historical design reference only.
+>
+> **Historical status note:** Originally intended to extend [001 catalog-api](../../_shipped/001-catalog-admin/contracts/catalog-api.md) and [002 delta](../../_shipped/002-catalog-metadata-modal/contracts/catalog-api.md).
+>
+> **Historical transport:** Generic Sync HTTP; `X-EMS-Route` + `Authorization: Bearer <session>` (superseded by `route` query param).
+>
+> **Historical RBAC:** Catalog POST/PATCH **`admin` only**; registration panel via `GET catalog`.
 
-**Transport**: Unchanged — Generic Sync HTTP; `X-EMS-Route` + `Authorization: Bearer <session>`.
-
-**RBAC**: Unchanged from 001 — catalog POST/PATCH remains **`admin` only**. Registration panel reads via `GET catalog` (all roles that can read catalog tree).
+**Status**: Historical design only — **not** live.
 
 ---
 

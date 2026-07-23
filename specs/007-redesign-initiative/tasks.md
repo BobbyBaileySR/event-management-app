@@ -4,13 +4,15 @@ description: "Task list for Redesign Initiative (Slice 007)"
 
 # Tasks: Redesign Initiative (Slice 007)
 
+> **Status update 2026-07-17:** Phase A shipped; Phase B feasibility gates cleared and the event-first/custom-object core substantially shipped. Gate wording in completed task descriptions below is retained as historical execution context, not current status.
+
 **Input**: Design documents from `/specs/007-redesign-initiative/`
 
 **Prerequisites**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
 
 **Tests**: INCLUDED — the project's testing-discipline rule and spec FR-006 require tests to ship with behaviour (Vitest for views/dataService + XSS; Jest for backend routes with RBAC/validation/rate-limit guards).
 
-**Organization**: Grouped by user story. **Phase A (US1, US2, US3, US4) is deliverable now.** **Phase B (US5, US6) is ⛔ GATED**: HubSpot custom objects are **created in UAT** (Program `2-65757052`, Event `2-65757130`, Program→Event association `286` — gate #1/#3 ✔). Remaining before Phase B **writes**: gate #2 (workflow-association test), `X-REDESIGN-004` (attributes + Contact↔Event association/labels created + verified), Parameter setup (R-012), and two design-it-twice items. Design-it-twice, Parameter/schema-constant scaffolding, and read-only work can start now; do not ship writes until the gates clear. IDs come from ScriptRunner Connect Parameters — see [docs/hubspot-schema.md](../../docs/hubspot-schema.md).
+**Organization**: Grouped by user story. Phase A and the Phase B event-first/custom-object core are shipped. Remaining unchecked tasks represent follow-on polish/ops work; IDs come from ScriptRunner Connect Parameters — see [docs/hubspot-schema.md](../../docs/hubspot-schema.md).
 
 ## Format: `[ID] [P?] [Story] Description`
 

@@ -2,6 +2,7 @@ project-blueprint.md
 docs/
 node_modules/
 dist/
+coverage/
 CHANGELOG.md
 TODO.md
 

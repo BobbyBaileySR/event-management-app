@@ -2,7 +2,7 @@
 
 **Tranche**: User Story 3 only  
 **Date**: 2026-07-06  
-**Prerequisites**: [001-catalog-admin](../001-catalog-admin/spec.md), [002-catalog-metadata-modal](../002-catalog-metadata-modal/spec.md), US1 + US2 shipped
+**Prerequisites**: [001-catalog-admin](../_shipped/001-catalog-admin/spec.md), [002-catalog-metadata-modal](../_shipped/002-catalog-metadata-modal/spec.md), US1 + US2 shipped
 
 ---
 

@@ -46,9 +46,6 @@ export function LoginView() {
 	if (CONFIG.USE_MOCK_AUTH) {
 		mockModes.push('mock auth');
 	}
-	if (CONFIG.USE_MOCK_API) {
-		mockModes.push('sample data');
-	}
 	const mockLabel = mockModes.length > 0 ? `PoC shell (${mockModes.join(', ')}). ` : '';
 	const originHint = CONFIG.GOOGLE_CLIENT_ID
 		? ` Authorized JavaScript origin in Google Cloud Console: ${window.location.origin}`

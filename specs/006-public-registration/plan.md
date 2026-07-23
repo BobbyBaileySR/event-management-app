@@ -1,5 +1,7 @@
 # Implementation Plan: Public Registration (Slice 3)
 
+> **Superseded implementation plan — re-plan before building.** It assumes deleted `CatalogPickers`, `SettingsView`, `mockData.ts`, and Plan C catalog fields. The feature remains not started; rebuild the plan against the event-first HubSpot custom-object model and current Programs & Events / Event Details surfaces.
+
 **Branch**: `006-public-registration` | **Date**: 2026-07-07 | **Spec**: [spec.md](./spec.md)
 
 **Input**: `/speckit-plan` — HubSpot-hosted public registration links via Registration panel on Event Settings; Program URL + optional Event override; EMS publish state; admin-only.

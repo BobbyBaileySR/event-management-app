@@ -1,25 +1,64 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { CatalogEventModal } from '../components/CatalogEventModal';
 import { CatalogProgramModal } from '../components/CatalogProgramModal';
 import { LoadingState } from '../components/LoadingState';
+import { RefetchFailureBanner } from '../components/RefetchFailureBanner';
 import { StatusBadge } from '../components/StatusBadge';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { ViewErrorState } from '../components/ViewErrorState';
+import { useCapacitySummary } from '../data/hooks/useCapacity';
+import { useCatalog } from '../data/hooks/useCatalog';
+import { invalidateAfterCatalogChange } from '../data/invalidation';
+import { queryKeys } from '../data/queryKeys';
+import { describeQueryStatus } from '../data/queryStatus';
 import { useDataService } from '../hooks/useDataService';
 import { eventPath } from '../router/navigation';
 import type {
 	CatalogEventSummary,
 	CatalogProgram,
+	CatalogResponse,
 	CreateCatalogEventBody,
 	CreateCatalogProgramBody,
 	PatchCatalogEventBody,
 	PatchCatalogProgramBody,
 } from '../types';
 import { enrichPortfolioWithCapacity, type PortfolioEvent } from '../utils/catalogEventPresentation';
+import { getFillPercent } from '../utils/capacityTier';
 import { filterPortfolioByStatus, searchPortfolioEvents, type PortfolioStatusFilter } from '../utils/listFilters';
 import styles from './EventsView.module.css';
+
+/**
+ * HubSpot's list endpoint can briefly lag right after a create (T072/BUG-CATALOG-001), so the
+ * invalidate-and-refetch in `refreshCatalog()` can land before the new object is readable —
+ * the new row would then only appear on a later manual refresh. Writing the create response
+ * (already the real record) straight into the cache makes the row appear immediately,
+ * independent of that lag; the follow-up invalidate still reconciles order/capacity in the background.
+ */
+function upsertCatalogRecord(
+	queryClient: QueryClient,
+	patch: { program: CatalogProgram } | { event: CatalogEventSummary },
+) {
+	for (const includeArchived of [false, true]) {
+		queryClient.setQueryData<CatalogResponse>(queryKeys.catalog({ includeArchived }), (current) => {
+			if (!current) {
+				return current;
+			}
+			if ('program' in patch) {
+				if (current.programs.some((existing) => existing.id === patch.program.id)) {
+					return current;
+				}
+				return { ...current, programs: [...current.programs, patch.program] };
+			}
+			if (current.events.some((existing) => existing.id === patch.event.id)) {
+				return current;
+			}
+			return { ...current, events: [...current.events, patch.event] };
+		});
+	}
+}
 
 const STANDALONE_FILTER_ID = '__unassigned__';
 const EVENTS_PAGE_SIZE = 5;
@@ -44,23 +83,12 @@ function formatEventTime(iso: string): string {
 	return new Intl.DateTimeFormat(undefined, { timeStyle: 'short' }).format(parsed);
 }
 
-function occupancyPercent(registered: number, capacity: number): number {
-	if (capacity <= 0) {
-		return 0;
-	}
-	return Math.min(100, Math.round((registered / capacity) * 100));
-}
-
 export function EventsView() {
 	const navigate = useNavigate();
 	const data = useDataService();
+	const queryClient = useQueryClient();
 	const { showToast } = useToast();
 	const [lifecycleTab, setLifecycleTab] = useState<LifecycleTab>('active');
-	const [programs, setPrograms] = useState<CatalogProgram[]>([]);
-	const [portfolioEvents, setPortfolioEvents] = useState<PortfolioEvent[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [reloadKey, setReloadKey] = useState(0);
 
 	const [programFilter, setProgramFilter] = useState<string | null>(null);
 	const [statusFilter, setStatusFilter] = useState<PortfolioStatusFilter>('all');
@@ -74,32 +102,26 @@ export function EventsView() {
 
 	const isActiveTab = lifecycleTab === 'active';
 
-	const loadCatalog = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		try {
-			const response = await data.fetchCatalog({ includeArchived: lifecycleTab === 'archived' });
-			setPrograms(response.programs);
-			const enriched = await enrichPortfolioWithCapacity(response.events, response.programs, (eventId) =>
-				data.fetchEventCapacityStatus(eventId),
-			);
-			setPortfolioEvents(enriched);
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to load programs and events');
-		} finally {
-			setLoading(false);
-		}
-	}, [data, lifecycleTab]);
+	const catalogQuery = useCatalog({ includeArchived: lifecycleTab === 'archived' });
+	const capacitySummaryQuery = useCapacitySummary();
 
-	useEffect(() => {
-		void loadCatalog();
-	}, [loadCatalog, reloadKey]);
+	const programs: CatalogProgram[] = catalogQuery.data?.programs ?? [];
+	const portfolioEvents: PortfolioEvent[] = useMemo(
+		() =>
+			enrichPortfolioWithCapacity(catalogQuery.data?.events ?? [], programs, capacitySummaryQuery.data?.events),
+		[catalogQuery.data, programs, capacitySummaryQuery.data],
+	);
 
-	useEffect(() => {
+	async function refreshCatalog() {
+		await invalidateAfterCatalogChange(queryClient);
+	}
+
+	function handleTabChange(tab: LifecycleTab) {
+		setLifecycleTab(tab);
 		setProgramFilter(null);
 		setStatusFilter('all');
 		setEventsPage(1);
-	}, [lifecycleTab]);
+	}
 
 	const standaloneCount = useMemo(
 		() => portfolioEvents.filter((event) => !event.programId).length,
@@ -171,15 +193,23 @@ export function EventsView() {
 
 	async function handleProgramSave(body: CreateCatalogProgramBody | PatchCatalogProgramBody) {
 		try {
+			let createdProgram: CatalogProgram | null = null;
 			if (programModal?.mode === 'create') {
-				await data.createProgram(body as CreateCatalogProgramBody);
+				const { program } = await data.createProgram(body as CreateCatalogProgramBody);
+				createdProgram = program;
 				showToast('Program created', 'success');
 			} else if (programModal?.mode === 'edit') {
 				await data.updateProgram(programModal.program.id, body as PatchCatalogProgramBody);
 				showToast('Program updated', 'success');
 			}
 			setProgramModal(null);
-			await loadCatalog();
+			await refreshCatalog();
+			// Re-apply after the refetch settles — HubSpot's list read can briefly lag right
+			// after a create, so the refetch above may come back without the new object and
+			// would otherwise stomp this straight back out of the cache (see EventsView.test.tsx).
+			if (createdProgram) {
+				upsertCatalogRecord(queryClient, { program: createdProgram });
+			}
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to save Program', 'error');
 		}
@@ -197,7 +227,7 @@ export function EventsView() {
 			if (programFilter === program.id) {
 				setProgramFilter(null);
 			}
-			await loadCatalog();
+			await refreshCatalog();
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to update Program', 'error');
 		}
@@ -205,15 +235,21 @@ export function EventsView() {
 
 	async function handleEventSave(body: CreateCatalogEventBody | PatchCatalogEventBody) {
 		try {
+			let createdEvent: CatalogEventSummary | null = null;
 			if (eventModal?.mode === 'create') {
-				await data.createEvent(body as CreateCatalogEventBody);
+				const { event } = await data.createEvent(body as CreateCatalogEventBody);
+				createdEvent = event;
 				showToast('Event created', 'success');
 			} else if (eventModal?.mode === 'edit') {
 				await data.updateEvent(eventModal.event.id, body as PatchCatalogEventBody);
 				showToast('Event updated', 'success');
 			}
 			setEventModal(null);
-			await loadCatalog();
+			await refreshCatalog();
+			// Re-apply after the refetch settles — see the matching comment in handleProgramSave.
+			if (createdEvent) {
+				upsertCatalogRecord(queryClient, { event: createdEvent });
+			}
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to save Event', 'error');
 		}
@@ -223,32 +259,43 @@ export function EventsView() {
 		navigate(eventPath(event.id));
 	}
 
-	if (loading) {
+	const catalogStatus = describeQueryStatus(catalogQuery, 'Failed to load programs and events');
+
+	if (catalogStatus.kind === 'loading') {
 		return (
 			<section id="view-events" className={styles.view}>
 				<TopBar title="Programs & Events" meta="Loading…" />
-				<LoadingState message="Loading programs and events…" skeleton="cards" />
+				<LoadingState message="Loading programs and events…" />
 			</section>
 		);
 	}
 
-	if (error) {
+	if (catalogStatus.kind === 'error') {
 		return (
 			<ViewErrorState
 				viewId="view-events"
 				title="Programs & Events"
-				message={error}
-				onRetry={() => {
-					setError(null);
-					setReloadKey((current) => current + 1);
-				}}
+				message={catalogStatus.message}
+				onRetry={() => void catalogQuery.refetch()}
 			/>
 		);
 	}
 
+	// Capacity summary is enrichment, not a gate: its failure (first-load or background)
+	// never blanks the catalog — rows fall back to zero checked-in + catalog capacity
+	// (enrichPortfolioWithCapacity) behind a non-blocking retry affordance (research R6).
+	const showRefetchFailureBanner = catalogStatus.refetchFailed || capacitySummaryQuery.isError;
+
 	return (
 		<section id="view-events" className={styles.view}>
 			<TopBar title="Programs & Events" meta="Create, manage and archive your event lineup" />
+
+			{showRefetchFailureBanner ? (
+				<RefetchFailureBanner
+					message="Couldn't refresh capacity data — showing the last loaded values."
+					onRetry={() => void refreshCatalog()}
+				/>
+			) : null}
 
 			<div className={styles.tabs} role="tablist" aria-label="Catalog lifecycle">
 				<button
@@ -256,7 +303,7 @@ export function EventsView() {
 					role="tab"
 					aria-selected={isActiveTab}
 					className={isActiveTab ? styles.tabActive : styles.tab}
-					onClick={() => setLifecycleTab('active')}
+					onClick={() => handleTabChange('active')}
 				>
 					Active
 				</button>
@@ -265,7 +312,7 @@ export function EventsView() {
 					role="tab"
 					aria-selected={!isActiveTab}
 					className={!isActiveTab ? styles.tabActive : styles.tab}
-					onClick={() => setLifecycleTab('archived')}
+					onClick={() => handleTabChange('archived')}
 				>
 					Archived
 				</button>
@@ -446,7 +493,7 @@ export function EventsView() {
 								</tr>
 							) : (
 								pageEvents.map((event) => {
-									const pct = occupancyPercent(event.attendeeCount, event.capacity);
+									const pct = getFillPercent(event.attendeeCount, event.capacity);
 									const time = formatEventTime(event.dateIso);
 									return (
 										<tr

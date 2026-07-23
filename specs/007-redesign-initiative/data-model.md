@@ -2,7 +2,7 @@
 
 **Plan**: [plan.md](./plan.md) · **Research**: [research.md](./research.md) · **Date**: 2026-07-13
 
-> **HubSpot property names below are illustrative field intents, not verified schema.** No custom-object type, property, or association-label type ID is authoritative until verified in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) (`X-REDESIGN-004`, blocked on `X-REDESIGN-001`).
+> This artifact began as a design model. The custom-object schema is now implemented; [docs/hubspot-schema.md](../../docs/hubspot-schema.md) is authoritative for verified property and association IDs.
 
 ---
 
@@ -39,9 +39,9 @@ Per-user, cross-device stored choice. Backed by a Record Storage user-preference
 
 ---
 
-## Phase B — Event-first data model (gated on `X-REDESIGN-001`)
+## Phase B — Event-first data model (implemented)
 
-> **Gate status (updated 2026-07-13):** Program + Event custom objects **created in HubSpot UAT** (gate #1 ✔, gate #3 ✔ — slots free). Remaining before writes: gate #2 (workflow can set Contact↔Event association — **assumed**, needs a test) and gate #4/`X-REDESIGN-004` (attributes + Contact↔Event labels created and verified). Shapes below are the **target model** per ADR-007/008 and [CONTEXT.md](../../CONTEXT.md) § *Redesign transition — target model*. **Confirmed IDs, proposed property API names, and env Parameters live in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) § *Redesign custom objects* — the single source of truth. Object/association IDs are read at runtime from ScriptRunner Connect Parameters, never hardcoded.**
+> **Outcome (updated 2026-07-17):** feasibility gates passed and the model shipped. Confirmed IDs and environment Parameters live in [docs/hubspot-schema.md](../../docs/hubspot-schema.md) § *Redesign custom objects*; IDs are read from ScriptRunner Parameters, never hardcoded.
 
 ### Program (HubSpot custom object "Event Programs", type `2-65757052`) — optional grouping
 

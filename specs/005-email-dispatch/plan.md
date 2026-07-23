@@ -1,5 +1,7 @@
 # Implementation Plan: Email Dispatch (Slice 2)
 
+> Historical implementation plan. Runtime mock-data, catalog-picker, tabbed-UI, and Program-scoped route details were superseded by the mock-free event-first unified-list design; use the current spec/quickstart and authoritative docs for live behaviour.
+
 **Branch**: `005-email-dispatch` | **Date**: 2026-07-07 | **Spec**: [spec.md](./spec.md)
 
 **Input**: `/speckit-plan Slice 2` — HubSpot template dispatch for Program + Event; send now + schedule; dispatch log; admin-only.

@@ -53,7 +53,16 @@ describe('CatalogEventModal', () => {
 		const dialog = screen.getByRole('dialog');
 		expect(dialog).toHaveAttribute('aria-modal', 'true');
 		expect(screen.getByLabelText(/^Program/)).toBeInTheDocument();
-		expect(screen.getByLabelText('Event name')).toHaveFocus();
+		expect(screen.getByLabelText(/^Event name/)).toHaveFocus();
+	});
+
+	it('marks Event name and Start Date — its only two truly required fields — with a visible asterisk', () => {
+		const { container } = render(
+			<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />,
+		);
+
+		expect(container.querySelectorAll('.required-mark')).toHaveLength(2);
+		expect(screen.getByRole('button', { name: /Start Date:/i })).toHaveAttribute('aria-required', 'true');
 	});
 
 	it('renders a title, subtitle, and close button, and closes on click (design_handoff 2)', () => {
@@ -91,7 +100,7 @@ describe('CatalogEventModal', () => {
 
 		await user.click(screen.getByRole('button', { name: /^Program/ }));
 		await user.click(screen.getByRole('option', { name: 'Atlassian Event 2026' }));
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Owner'), 'Jane Doe');
 		await user.type(screen.getByLabelText('Capacity'), '500');
@@ -111,7 +120,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: /Start Time:/i }));
 		await user.click(screen.getByRole('option', { name: '2:30 PM' }));
@@ -128,7 +137,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: /End Date:/i }));
 		await user.keyboard('{Enter}');
@@ -163,7 +172,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Standalone');
+		await user.type(screen.getByLabelText(/^Event name/), 'Standalone');
 		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
@@ -280,7 +289,7 @@ describe('CatalogEventModal', () => {
 		expect(screen.getByRole('button', { name: /^Program/ })).toHaveTextContent('QA Program 2026');
 		expect(screen.queryByRole('listbox')).toBeNull();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
@@ -321,7 +330,7 @@ describe('CatalogEventModal', () => {
 		const user = userEvent.setup();
 		const walkInUrl = 'https://share.hsforms.com/1a2b3c4d-e5f6-7890-abcd-ef1234567890';
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), walkInUrl);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
@@ -337,7 +346,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
@@ -352,7 +361,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.type(screen.getByLabelText('Walk-in form URL (HubSpot)'), 'https://evil.example.com/form');
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
@@ -365,7 +374,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await pickRequiredStart(user);
 		await user.type(
 			screen.getByLabelText('Walk-in form URL (HubSpot)'),
@@ -403,7 +412,7 @@ describe('CatalogEventModal', () => {
 		render(<CatalogEventModal mode="create" open programs={programs} onCancel={onCancel} onSave={onSave} />);
 		const user = userEvent.setup();
 
-		await user.type(screen.getByLabelText('Event name'), 'Keynote');
+		await user.type(screen.getByLabelText(/^Event name/), 'Keynote');
 		await user.click(screen.getByRole('button', { name: 'Save Event' }));
 
 		expect(onSave).not.toHaveBeenCalled();

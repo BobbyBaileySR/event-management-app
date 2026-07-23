@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '../components/Toast';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import type { CatalogEventSummary, CatalogProgram, SliceAttendee } from '../types';
 import { EventHubView } from './EventHubView';
 
@@ -61,7 +62,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 
 function renderEventHub(eventId: string) {
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter initialEntries={[`/events/${eventId}`]}>
 			<ToastProvider>
 				<Routes>
@@ -125,10 +126,11 @@ describe('EventHubView (Event Details)', () => {
 	it('renders the page-level "Event Details" header alongside the event\'s own name (design_handoff 2)', async () => {
 		renderEventHub('evt-london-q3');
 
-		await waitFor(() => {
-			expect(screen.getByRole('heading', { level: 1, name: 'Event Details' })).toBeInTheDocument();
-		});
+		// The loading state renders the same "Event Details" h1 (different meta) — wait for the
+		// event's own (loaded-only) heading first so the assertions below don't race the fetches.
+		await screen.findByRole('heading', { level: 2, name: 'London Q3 Summit' });
 
+		expect(screen.getByRole('heading', { level: 1, name: 'Event Details' })).toBeInTheDocument();
 		expect(screen.getByText('Full record for the selected event')).toBeInTheDocument();
 		expect(screen.getByRole('heading', { level: 2, name: 'London Q3 Summit' })).toBeInTheDocument();
 	});

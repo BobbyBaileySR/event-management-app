@@ -186,6 +186,13 @@ td {
     color: var(--muted);
 }
 
+/* Shared "required field" marker — modals mark a required label with this rather than
+   inventing per-component styling (see CatalogEventModal, CalendarPicker, SelectPicker, TimePicker). */
+.required-mark {
+    color: var(--danger);
+    font-weight: 700;
+}
+
 .form-group input,
 .form-group select,
 .form-group textarea {

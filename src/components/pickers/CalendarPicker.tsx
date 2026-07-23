@@ -8,6 +8,8 @@ interface CalendarPickerProps {
 	value: string;
 	placeholder?: string;
 	disabled?: boolean;
+	/** Shows a red `*` next to the label — the field's own validation still enforces it. */
+	required?: boolean;
 	className?: string;
 	testId?: string;
 	onChange: (value: string) => void;
@@ -47,7 +49,17 @@ function buildMonthGrid(viewYear: number, viewMonth: number): Date[] {
  * arrow-key day navigation, Enter/Space to select, Escape to close and return focus to the
  * trigger, outside-click to dismiss.
  */
-export function CalendarPicker({ id, label, value, placeholder = 'Select date…', disabled = false, className, testId, onChange }: CalendarPickerProps) {
+export function CalendarPicker({
+	id,
+	label,
+	value,
+	placeholder = 'Select date…',
+	disabled = false,
+	required = false,
+	className,
+	testId,
+	onChange,
+}: CalendarPickerProps) {
 	const dialogId = useId();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
@@ -163,9 +175,21 @@ export function CalendarPicker({ id, label, value, placeholder = 'Select date…
 
 	return (
 		<div className={`${styles.field} ${className ?? ''}`.trim()} ref={containerRef}>
-			<label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel}>
-				{label}
-			</label>
+			{/* The marker is a sibling of <label>, not nested inside it — a consuming module
+			    may visually hide its own field label (e.g. EmailDispatchView's Template/HubSpot-list
+			    pickers, which show a section title above instead); nesting the marker there would
+			    make it invisible too. A wrapping inline element keeps both on one line either way. */}
+			<span className={styles.labelRow}>
+				<label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel}>
+					{label}
+				</label>
+				{required ? (
+					<span className="required-mark" aria-hidden="true">
+						{' '}
+						*
+					</span>
+				) : null}
+			</span>
 			<div className={styles.wrap}>
 				<button
 					ref={triggerRef}
@@ -175,6 +199,7 @@ export function CalendarPicker({ id, label, value, placeholder = 'Select date…
 					data-testid={testId}
 					aria-haspopup="dialog"
 					aria-expanded={open}
+					aria-required={required || undefined}
 					aria-label={`${label}: ${selectedDate ? formatISODate(selectedDate) : placeholder}`}
 					disabled={disabled}
 					onClick={() => (open ? closeCalendar(true) : openCalendar())}

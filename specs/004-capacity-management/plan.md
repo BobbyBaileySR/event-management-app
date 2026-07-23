@@ -1,5 +1,7 @@
 # Implementation Plan: Capacity Management (Slice 1)
 
+> Historical implementation plan. Runtime mock-data, CatalogPickers, and catalog-scoped route details were superseded by the mock-free event-first redesign; use the current quickstart and authoritative docs for live behaviour.
+
 **Branch**: `004-capacity-management` | **Date**: 2026-07-07 | **Spec**: [spec.md](./spec.md)
 
 **Input**: `/speckit-plan` — live attendance vs Event capacity on Check-in; 75%/90% visual tiers; server-persisted ±1 manual adjustment.

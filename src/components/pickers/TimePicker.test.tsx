@@ -19,7 +19,7 @@ describe('TimePicker', () => {
 		const trigger = screen.getByRole('button', { name: /Start time/i });
 
 		fireEvent.click(trigger);
-		fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+		fireEvent.keyDown(screen.getByRole('textbox', { name: /Search Start time/i }), { key: 'Escape' });
 
 		expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 		expect(trigger).toHaveFocus();
@@ -29,10 +29,10 @@ describe('TimePicker', () => {
 		const onChange = vi.fn();
 		render(<TimePicker id="start-time" label="Start time" value="" stepMinutes={30} onChange={onChange} />);
 		fireEvent.click(screen.getByRole('button', { name: /Start time/i }));
-		const listbox = screen.getByRole('listbox');
+		const search = screen.getByRole('textbox', { name: /Search Start time/i });
 
-		fireEvent.keyDown(listbox, { key: 'ArrowDown' });
-		fireEvent.keyDown(listbox, { key: 'Enter' });
+		fireEvent.keyDown(search, { key: 'ArrowDown' });
+		fireEvent.keyDown(search, { key: 'Enter' });
 
 		expect(onChange).toHaveBeenCalledWith('00:30');
 	});
@@ -43,6 +43,17 @@ describe('TimePicker', () => {
 
 		expect(screen.getByRole('option', { name: '12:00 AM' })).toBeInTheDocument();
 		expect(screen.getByRole('option', { name: '12:00 PM' })).toBeInTheDocument();
+	});
+
+	it('filters time options by typing (T035 typeahead)', () => {
+		render(<TimePicker id="start-time" label="Start time" value="" stepMinutes={30} onChange={vi.fn()} />);
+		fireEvent.click(screen.getByRole('button', { name: /Start time/i }));
+		const search = screen.getByRole('textbox', { name: /Search Start time/i });
+
+		fireEvent.change(search, { target: { value: '9:00 AM' } });
+
+		expect(screen.getAllByRole('option')).toHaveLength(1);
+		expect(screen.getByRole('option', { name: '9:00 AM' })).toBeInTheDocument();
 	});
 
 	it('does not open when disabled', () => {

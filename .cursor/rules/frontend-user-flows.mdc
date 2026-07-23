@@ -11,9 +11,9 @@ Before building or changing a screen, read the matching journey in [docs/product
 ## EMS flow map
 
 1. **Sign-in** → `LoginView` → Google → `/auth/exchange`
-2. **Catalog scope** → `CatalogPickers` (Program + Event) required for slice views
-3. **Operations** → Attendees / Check-in / Email under selected catalog scope
-4. **Admin** → Catalog admin, Audit log
+2. **Event selection** → Programs & Events, Overview, or Sidebar `WorkingEventPicker`
+3. **Operations** → Event Details / Registered Attendees / Check-in / Email under the URL Event
+4. **Admin** → Programs & Events, Audit log
 
 Email always lives under event/catalog context — never a standalone top-level app.
 
@@ -31,8 +31,8 @@ Every view that fetches data must implement:
 ## Standard flows (checklist)
 
 - **Check-in:** search / scan / walk-in → confirm → toast → list refresh
-- **Send email:** compose → preview recipients → send or schedule → toast → log tab
-- **Catalog CRUD:** modal form → validate → save → toast → tree refresh
+- **Send email:** **+ New campaign** modal → preview recipients → send or schedule → toast → dispatch list
+- **Catalog CRUD:** modal form → validate → save → toast → Programs & Events refresh
 - **Archive / cancel:** confirm dialog → API → toast
 
 Do not duplicate full journey prose here — update `product-flows.md` when product behaviour changes.

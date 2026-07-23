@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
 import { ToastProvider } from './Toast';
+import { renderWithQueryClient } from '../testing/renderWithQueryClient';
 import { SessionProvider, useSession } from '../state/appState';
 import type { Session } from '../types';
 
@@ -34,7 +35,7 @@ function SessionHarness({ session }: { session: Session }) {
 }
 
 function renderAppLayout(session: Session) {
-	return render(
+	return renderWithQueryClient(
 		<MemoryRouter initialEntries={['/events']}>
 			<SessionProvider>
 				<ToastProvider>
@@ -101,5 +102,54 @@ describe('AppLayout app-frame card (design_handoff 2)', () => {
 		// the actual bleed zone — and the shadow becomes invisible.
 		const shell = layoutCard.parentElement as HTMLElement;
 		expect(getComputedStyle(shell).overflow).not.toBe('hidden');
+	});
+});
+
+function setInnerWidth(width: number) {
+	Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+}
+
+describe('AppLayout 3-tier responsive chrome (design_handoff 2 § Breakpoints)', () => {
+	afterEach(() => {
+		setInnerWidth(1024);
+	});
+
+	it('shows the desktop Sidebar and no rail/tab-bar at >=1024px', () => {
+		setInnerWidth(1280);
+		renderAppLayout(adminSession);
+
+		expect(screen.getByLabelText('Sidebar')).toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument();
+	});
+
+	it('shows the tablet IconRail (not the desktop Sidebar) at 768-1023px', () => {
+		setInnerWidth(900);
+		renderAppLayout(adminSession);
+
+		expect(screen.getByRole('button', { name: 'Open navigation menu' })).toBeInTheDocument();
+		expect(screen.queryByLabelText('Sidebar')).not.toBeInTheDocument();
+	});
+
+	it('opens and closes the nav drawer from the tablet rail hamburger', () => {
+		setInnerWidth(900);
+		renderAppLayout(adminSession);
+
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+		expect(screen.getByRole('dialog')).toBeInTheDocument();
+		// The drawer's own Sidebar content is now reachable.
+		expect(within(screen.getByRole('dialog')).getByLabelText('Sidebar')).toBeInTheDocument();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Close navigation menu' }));
+		expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+	});
+
+	it('shows the phone MobileTabBar (not the desktop Sidebar or tablet rail) below 768px', () => {
+		setInnerWidth(500);
+		renderAppLayout(adminSession);
+
+		expect(screen.queryByLabelText('Sidebar')).not.toBeInTheDocument();
+		expect(screen.queryByRole('button', { name: 'Open navigation menu' })).not.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
 	});
 });

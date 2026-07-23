@@ -1,14 +1,16 @@
 # Data Model: Public Registration (Slice 3)
 
+> **Historical data-model draft — re-plan before implementing.** Assumes Plan C catalog selection and a Settings-hosted Registration panel. Revalidate field homes against the shipped HubSpot custom-object catalog ([docs/hubspot-schema.md](../../docs/hubspot-schema.md)) and resolve registration from the working Event / catalog APIs, not deleted pickers.
+
 **Feature**: 006-public-registration  
 **Date**: 2026-07-07  
-**Prerequisites**: [001-catalog-admin](../001-catalog-admin/spec.md), [002-catalog-metadata-modal](../002-catalog-metadata-modal/spec.md), [003-check-in](../003-check-in/spec.md) (walk-in URL — unchanged)
+**Prerequisites**: [001-catalog-admin](../_shipped/001-catalog-admin/spec.md), [002-catalog-metadata-modal](../_shipped/002-catalog-metadata-modal/spec.md), [003-check-in](../003-check-in/spec.md) (walk-in URL — unchanged)
 
 ---
 
 ## Overview
 
-Slice 3 adds **two optional catalog metadata fields** on Program and Event. **No new HubSpot properties.** Staff-facing **resolved registration** is computed in the Frontend from catalog selection + Program/Event nodes.
+Slice 3 adds **two optional catalog metadata fields** on Program and Event. **No new HubSpot properties.** Staff-facing **resolved registration** was planned as Frontend computation from catalog selection + Program/Event nodes *(re-plan: resolve from working Event / `GET catalog`)*.
 
 ```mermaid
 flowchart TB

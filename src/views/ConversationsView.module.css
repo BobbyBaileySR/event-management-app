@@ -1,0 +1,154 @@
+.view {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+}
+
+.view :global(.top-bar) {
+	flex-shrink: 0;
+}
+
+.layout {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+	gap: 24px;
+	flex: 1;
+	min-height: 0;
+	align-items: start;
+}
+
+.listCard {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	margin-bottom: 0;
+}
+
+.actionColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.actionColumn :global(.btn) {
+	width: 100%;
+	min-height: 44px;
+}
+
+.cardHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.cardHeader h3 {
+	margin: 0;
+}
+
+.countSummary {
+	margin: 0;
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.listError {
+	margin: 0 0 12px;
+	color: var(--danger);
+}
+
+.resultsScroll {
+	flex: 1;
+	min-height: 320px;
+	overflow: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.resultsScroll td {
+	padding: 18px;
+}
+
+.attendeeCell {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+}
+
+.attendeeAvatar {
+	flex-shrink: 0;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: var(--ice);
+	color: var(--text);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+.attendeeName {
+	margin: 0;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.attendeeMeta {
+	margin: 4px 0 0;
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+.listCard tbody tr {
+	cursor: pointer;
+}
+
+@media (min-width: 901px) {
+	.resultsScroll {
+		max-height: 520px;
+	}
+}
+
+@media (max-width: 900px) {
+	.layout {
+		grid-template-columns: 1fr;
+		/* Action row sized to its own content ("auto"); the attendee list takes the rest
+		   ("1fr") — without this, both rows default to auto and, since `.layout` itself is
+		   flex-stretched taller than their combined content height, the leftover space
+		   collects as dead space between them instead of growing the list. */
+		grid-template-rows: auto 1fr;
+		gap: 16px;
+		/* Overrides the unconditional `align-items: start` above (correct for desktop's
+		   side-by-side columns) so the list card actually stretches to fill its 1fr row
+		   instead of staying content-sized and top-aligned within it. */
+		align-items: stretch;
+	}
+
+	.actionColumn {
+		order: -1;
+	}
+
+	.resultsScroll {
+		/* No fixed cap here (unlike desktop's 520px) — the card now fills the 1fr row via
+		   `align-items: stretch` above, so flex:1 (base rule) sizes this to the actual space
+		   available rather than an arbitrary vh fraction. */
+		max-height: none;
+	}
+}
+
+.modal {
+	max-width: 480px;
+}
+
+.modalBody {
+	margin-bottom: 20px;
+}
+
+.modalBody :global(.shell-note) {
+	margin-top: 12px;
+}

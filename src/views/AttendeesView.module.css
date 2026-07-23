@@ -74,6 +74,14 @@
 	pointer-events: none;
 }
 
+.attendeeRow {
+	cursor: pointer;
+}
+
+.attendeeRow:hover {
+	background: var(--surface);
+}
+
 .tableLoadingOverlay {
 	position: absolute;
 	inset: 0;
@@ -197,8 +205,52 @@
 .colAccountManager,
 .colType,
 .colCompany,
-.colAction {
+.colAction,
+.colCheckbox {
 	/* visible by default */
+}
+
+.colCheckbox {
+	width: 44px;
+}
+
+.colCheckbox input[type='checkbox'] {
+	display: block;
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	cursor: pointer;
+}
+
+.bulkActionBar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	flex-wrap: wrap;
+	flex-shrink: 0;
+}
+
+.bulkSelectionCount {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.fullHistoryOption {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.85rem;
+	color: var(--muted);
+	cursor: pointer;
+}
+
+.fullHistoryOption input[type='checkbox'] {
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	cursor: pointer;
 }
 
 @media (max-width: 900px) {
@@ -219,10 +271,25 @@
 	}
 }
 
-.nameCell {
+.nameButton {
 	display: flex;
 	align-items: center;
 	gap: 10px;
+	width: 100%;
+	min-height: 44px;
+	padding: 0;
+	border: none;
+	background: none;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.nameButton:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
 }
 
 .avatar {

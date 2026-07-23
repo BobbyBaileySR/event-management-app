@@ -4,6 +4,8 @@
 **Date**: 2026-07-06  
 **Spec**: [spec.md](./spec.md) (Session 2026-07-06 clarifications)
 
+> Historical implementation research. Runtime mock-data and full-page Walk-in-mode assumptions were superseded by the mock-free event-first design and the shipped **+ Add walk-in** modal.
+
 ---
 
 ## R-001: Walk-in form rendering

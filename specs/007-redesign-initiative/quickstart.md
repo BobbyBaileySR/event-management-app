@@ -2,7 +2,7 @@
 
 **Plan**: [plan.md](./plan.md) · **Spec**: [spec.md](./spec.md) · **Date**: 2026-07-13
 
-Validation guide for the redesign. **Phase A is deliverable now**; **Phase B is gated on `X-REDESIGN-001`** — its checks are marked and filled when the gates pass. Prove the feature works via §A automated, §B manual, and §C operator security.
+Validation guide for the redesign. **Phase A shipped 2026-07-13; Phase B is substantially shipped after its feasibility gates cleared 2026-07-14.** Prove the feature works via §A automated, §B manual, and §C operator security.
 
 ---
 
@@ -17,22 +17,24 @@ Validation guide for the redesign. **Phase A is deliverable now**; **Phase B is 
 | Theme persistence mapping | `dataService.get/setThemePreference` map to `user/prefs` routes; stored `celebration` for non-allowlisted user resolves to Aurora |
 | Field pickers a11y | Calendar/time/select popovers: keyboard open/close/select, `role`/`aria-*`, focus return (completion gate) |
 | XSS guards | Hostile strings in any new surface render as text, not markup |
-| *(Phase B, when unblocked)* event-first + registration | Standalone Event flows; check-in/undo/remove mapping; blocked-while-checked-in |
+| Phase B event-first + registration | Standalone Event flows; check-in/undo/remove mapping; blocked-while-checked-in |
 
 **Backend (Jest)** — `npm test` in `Backend/`:
 
 | Area | What it proves |
 | :--- | :--- |
 | `user/prefs` routes | 401 unauth; 400 invalid enum; 405 wrong method; 429 rate limit; **Celebration re-validated server-side** (non-allowlisted → 403 on PUT, Aurora on GET) |
-| *(Phase B, when unblocked)* `CustomObjectAdapter` + check-in routes | 401/403/404/405/409/429; audited writes; no register-attendee write path |
+| Phase B `CustomObjectAdapter` + check-in routes | 401/403/404/405/409/429; audited writes; no register-attendee write path |
 
 Run `npm run lint` (both repos) and `npm audit --audit-level=high` before deploy.
 
 ### Baseline (T003, pre-implementation, 2026-07-13)
 
+> Historical suite snapshot at plan start — not current CI counts. `mockData.ts` unused-arg warnings are obsolete (`mockData.ts` removed 2026-07-15). For current coverage see `TODO.md` Testing / latest `CHANGELOG.md`.
+
 | Repo | `npm test` | `npm run lint` |
 | :--- | :--- | :--- |
-| Frontend | 34 test files, 215 tests passed | 0 errors, 4 pre-existing warnings (`mockData.ts` unused args) |
+| Frontend | 34 test files, 215 tests passed | 0 errors, 4 pre-existing warnings (`mockData.ts` unused args) *(historical)* |
 | Backend | 21 test suites, 236 tests passed | 0 errors, 3 pre-existing warnings (`apiRegistry.ts`, `Slice1Routes.test.ts` unused args) |
 
 ### After Phase 1 (Setup) + Phase 2 (Foundational) — T001–T011, 2026-07-13
@@ -50,7 +52,7 @@ Run `npm run lint` (both repos) and `npm audit --audit-level=high` before deploy
 
 ## B. Manual functional smoke (UAT)
 
-> **Data for visual QA:** redesigned views are visually QA'd against **live HubSpot data** (`USE_MOCK_API: false`), not mock data — this resolves the spec edge case on mock-vs-live QA. Mock mode may still be used for local dev, but sign-off screenshots/checks use live data.
+> **Data for visual QA:** redesigned views are visually QA'd against live HubSpot Staging through ScriptRunner. EMS has no mock-data mode.
 
 ### Phase A
 
@@ -97,9 +99,9 @@ No step required an IA (information-architecture) rebuild — the sidebar/nav st
 | Slice 006 (public registration) | Only spec artifacts exist (`specs/006-public-registration/`) — no view built yet in this checkout, so there is nothing for the redesign to conflict with |
 | Full regression | 39 files / 258 Vitest tests passing, clean `tsc --noEmit` / `eslint` / `vite build` — no slice needed a functional test rewrite, only the T023 `data-theme` assertions and the T032 picker-swap accessible-name updates already logged above |
 
-**Conclusion**: Phase A shipped foundation-first with zero IA rework and zero forced pause on Slices 004/005/006 — satisfying US3's acceptance criteria. Phase A is independently shippable now; Phase B can be scheduled separately whenever `X-REDESIGN-001` clears.
+**Conclusion (historical Phase A checkpoint):** Phase A shipped foundation-first with zero forced pause on Slices 004/005/006. Phase B's gates subsequently cleared and its event-first/custom-object work shipped.
 
-### Phase B *(fill and run when `X-REDESIGN-001` clears)*
+### Phase B
 
 1. Land on **Events overview** (not a Program drill-down); open a **standalone Event** (no Program) and confirm Attendees/Check-in/Capacity/Campaign work.
 2. Filter Events by a **Program**; confirm it groups, and is not required to reach an Event.
@@ -113,7 +115,7 @@ No step required an IA (information-architecture) rebuild — the sidebar/nav st
 **Audience:** Product owner / operator who does **not** read source code.
 **Purpose:** Prove the slice is safe to run against real HubSpot data **before** Live sign-off.
 
-> **When to run:** After §A passes in CI and before Live sign-off. **Phase A** is validated now; **Phase B** subsections (C7.2+) are filled and run when `X-REDESIGN-001` clears.
+> **When to run:** After §A passes in CI and before Live sign-off. Run both Phase A and applicable Phase B checks.
 > **Rule:** If any **Failure signal** occurs, **stop**, note the step ID, and do not deploy until fixed and re-run.
 
 ### C0. What you are proving (read once)
@@ -137,7 +139,7 @@ No step required an IA (information-architecture) rebuild — the sidebar/nav st
 | 3 | **Non-admin test account** | `@adaptavist.com`: `__________` | Listed as `viewer`/`operator`. Use a separate browser/profile. |
 | 4 | **Allowlisted Celebration email** | `__________` | One of the entries in the **list-type** Parameter **`CELEBRATION_THEME_EMAIL`** (any email in the list gets access — pick any one). |
 | 5 | **Non-allowlisted email** | `__________` | Any staff email that is **not** in the `CELEBRATION_THEME_EMAIL` list. |
-| 6 | **Frontend config** | `USE_MOCK_API: false` | Live/UAT QA must hit real ScriptRunner. |
+| 6 | **Frontend data path** | ☐ UAT ScriptRunner confirmed | EMS has no mock-data mode; confirm requests reach the intended environment. |
 | 7 | **Backend deployed** | ☐ Yes | Phase A adds routes — confirm latest `Backend/scripts/` uploaded via SFTP after merge. Handlers: `OnGetUserPrefs.ts`, `OnPutUserPrefs.ts` *(Phase B adds check-in/undo/remove handlers)*. |
 
 **Browser setup:** one normal window (admin) + one incognito/profile (non-admin). Keep a notes doc for failing step IDs.
@@ -147,7 +149,7 @@ No step required an IA (information-architecture) rebuild — the sidebar/nav st
 | Step | Action | Expected result | Failure signal — stop |
 | :---: | :--- | :--- | :--- |
 | C2.1 | Open the EMS URL. | App shell/login loads; no blank screen. | 404, wrong site, or CORS errors in console. |
-| C2.2 | DevTools → **Network**; sign in as admin; load any data screen and switch theme. | Data + theme-pref requests go to **ScriptRunner** (`X-EMS-Route: user/prefs…`), **not** `api.hubapi.com`. Fonts/icons load from **same origin**. | Any direct request to HubSpot, or fonts/icons from `fonts.googleapis.com` / a CDN. |
+| C2.2 | DevTools → **Network**; sign in as admin; load any data screen and switch theme. | Data + theme-pref requests go to **ScriptRunner** (`?route=user/prefs…`), **not** `api.hubapi.com`. Fonts/icons load from **same origin**. | Any direct request to HubSpot, or fonts/icons from `fonts.googleapis.com` / a CDN. |
 | C2.3 | DevTools → **Application** → Local/Session Storage; search `hubspot`, `token`, `api_key`. | No HubSpot private tokens. Theme id may be cached; that is OK. | HubSpot API key / private app token in storage. |
 | C2.4 | View production build source; search `.map`. | No `.js.map` in `assets/`. | Public source maps — report. |
 
@@ -155,7 +157,7 @@ No step required an IA (information-architecture) rebuild — the sidebar/nav st
 
 | Step | Action | Expected result | Failure signal — stop |
 | :---: | :--- | :--- | :--- |
-| C3.1 | Sign out. Open a deep link (e.g. `#/overview` or `#/events/attendees`). | Redirect to login / empty state; **no** PII. | Data visible without login. |
+| C3.1 | Sign out. Open a deep link (e.g. `#/overview` or `#/events/{eventId}/attendees`). | Redirect to login / empty state; **no** PII. | Data visible without login. |
 | C3.2 | Sign in with **admin** Google account. | Lands in app; TopBar shows signed-in. | Error loop or access denied for a mapped admin. |
 | C3.3 | Sign out via app control. | Back to login; protected screens no longer load. | Still able to load protected screens after logout. |
 | C3.4 | (If available) sign in with a **non-Adaptavist** Google account. | Access denied / no session. | Non-staff account gets a working session. |

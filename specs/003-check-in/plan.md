@@ -1,5 +1,7 @@
 # Implementation Plan: US3 Walk-in (003-check-in tranche)
 
+> Historical implementation plan. Runtime mock-data, catalog-picker, Program-scoped route, and full-page mode-switch details were superseded by the mock-free event-first redesign and the shipped scanner/walk-in modals.
+
 **Branch**: `003-check-in` | **Date**: 2026-07-06 | **Spec**: [spec.md](./spec.md) (US3)
 
 **Scope**: **User Story 3 only** — HubSpot iframe walk-in on Check-in. US1 + US2 are shipped; this tranche does not change attendee read or check-in write paths.

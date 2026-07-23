@@ -4,6 +4,8 @@ description: "Task list for Attendees & Check-in (003-check-in) — US3 walk-in 
 
 # Tasks: Attendees & Check-in (Slice 1)
 
+> Historical implementation task record. Completed mock-data, catalog-picker, Program-scoped-route, and mode-switch tasks describe the architecture at implementation time; use the current spec/quickstart and authoritative docs for live behaviour.
+
 **Input**: Design documents from `/specs/003-check-in/`
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [contracts/check-in-api.md](./contracts/check-in-api.md) · **001-catalog-admin** + **002-catalog-metadata-modal** complete on `uat`

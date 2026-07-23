@@ -1,23 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CapacityBar } from '../components/CapacityBar';
 import { CatalogEventModal } from '../components/CatalogEventModal';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { RefetchFailureBanner } from '../components/RefetchFailureBanner';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { TopBar } from '../components/TopBar';
 import { ViewErrorState } from '../components/ViewErrorState';
+import { useAttendees } from '../data/hooks/useAttendees';
+import { useEventCapacity } from '../data/hooks/useCapacity';
+import { useCatalog } from '../data/hooks/useCatalog';
 import { useDataService } from '../hooks/useDataService';
 import { eventPath, useActiveRoute } from '../router/navigation';
-import type {
-	CatalogEventSummary,
-	CatalogProgram,
-	CreateCatalogEventBody,
-	PatchCatalogEventBody,
-	SliceAttendee,
-} from '../types';
-import { catalogEventToPortfolio, type PortfolioEvent } from '../utils/catalogEventPresentation';
+import type { CreateCatalogEventBody, PatchCatalogEventBody, SliceAttendee } from '../types';
+import { initialsFromName } from '../utils/attendeePresentation';
+import { catalogEventToPortfolio } from '../utils/catalogEventPresentation';
 import styles from './EventHubView.module.css';
 
 const ATTENDEE_PREVIEW_LIMIT = 5;
@@ -28,16 +27,6 @@ interface AttendeePreview {
 	company: string;
 	ticketType: string;
 	status: 'Checked In' | 'Registered';
-}
-
-function initialsFromName(name: string): string {
-	const parts = name.trim().split(/\s+/).filter(Boolean);
-	if (parts.length === 0) {
-		return '?';
-	}
-	const first = parts[0]?.charAt(0) ?? '';
-	const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0) ?? '') : '';
-	return `${first}${last}`.toUpperCase() || '?';
 }
 
 function toAttendeePreview(attendee: SliceAttendee): AttendeePreview {
@@ -55,66 +44,19 @@ export function EventHubView() {
 	const { eventId } = useActiveRoute();
 	const data = useDataService();
 	const { showToast } = useToast();
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [event, setEvent] = useState<PortfolioEvent | null>(null);
-	const [catalogEvent, setCatalogEvent] = useState<CatalogEventSummary | null>(null);
-	const [programs, setPrograms] = useState<CatalogProgram[]>([]);
-	const [checkedInCount, setCheckedInCount] = useState(0);
-	const [capacityValue, setCapacityValue] = useState(0);
-	const [registeredTotal, setRegisteredTotal] = useState(0);
-	const [preview, setPreview] = useState<AttendeePreview[]>([]);
-	const [reloadKey, setReloadKey] = useState(0);
 	const [editOpen, setEditOpen] = useState(false);
 
-	useEffect(() => {
-		if (!eventId) {
-			setLoading(false);
-			return;
-		}
+	const catalogQuery = useCatalog({ includeArchived: true });
+	const capacityQuery = useEventCapacity(eventId ?? '', { enabled: Boolean(eventId) });
+	const attendeesQuery = useAttendees(
+		eventId ?? '',
+		{ page: 1, pageSize: ATTENDEE_PREVIEW_LIMIT },
+		{ enabled: Boolean(eventId) },
+	);
 
-		let cancelled = false;
-		setLoading(true);
-		setError(null);
-
-		Promise.all([
-			data.fetchCatalog({ includeArchived: true }),
-			data.fetchEventCapacityStatus(eventId),
-			data.fetchEventAttendees(eventId, { page: 1, pageSize: ATTENDEE_PREVIEW_LIMIT }),
-		])
-			.then(([catalogResult, capacityResult, attendeesResult]) => {
-				if (cancelled) {
-					return;
-				}
-				setPrograms(catalogResult.programs);
-				const found = catalogResult.events.find((candidate) => candidate.id === eventId);
-				if (!found) {
-					setEvent(null);
-					setCatalogEvent(null);
-					return;
-				}
-				setCatalogEvent(found);
-				setEvent(catalogEventToPortfolio(found, catalogResult.programs));
-				setCheckedInCount(capacityResult.checkedInCount);
-				setCapacityValue(capacityResult.capacity ?? found.capacity ?? 0);
-				setRegisteredTotal(attendeesResult.total);
-				setPreview(attendeesResult.attendees.map(toAttendeePreview));
-			})
-			.catch((err: unknown) => {
-				if (!cancelled) {
-					setError(err instanceof Error ? err.message : 'Failed to load event');
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data, eventId, reloadKey]);
+	function refreshEvent() {
+		return Promise.all([catalogQuery.refetch(), capacityQuery.refetch(), attendeesQuery.refetch()]);
+	}
 
 	async function handleEventSave(body: CreateCatalogEventBody | PatchCatalogEventBody) {
 		if (!catalogEvent) {
@@ -124,7 +66,7 @@ export function EventHubView() {
 			await data.updateEvent(catalogEvent.id, body as PatchCatalogEventBody);
 			showToast('Event updated', 'success');
 			setEditOpen(false);
-			setReloadKey((current) => current + 1);
+			await refreshEvent();
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to save Event', 'error');
 		}
@@ -138,7 +80,7 @@ export function EventHubView() {
 			await data.updateEvent(catalogEvent.id, { archived: !catalogEvent.archived });
 			showToast(catalogEvent.archived ? 'Event unarchived' : 'Event archived', 'success');
 			setEditOpen(false);
-			setReloadKey((current) => current + 1);
+			await refreshEvent();
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Failed to update Event', 'error');
 		}
@@ -154,30 +96,35 @@ export function EventHubView() {
 		);
 	}
 
-	if (loading) {
+	const blockingQueries = [catalogQuery, capacityQuery, attendeesQuery];
+	const isLoading = blockingQueries.some((query) => query.data === undefined && !query.isError);
+	const loadErrorQuery = blockingQueries.find((query) => query.data === undefined && query.isError);
+
+	if (isLoading) {
 		return (
 			<section id="view-event-hub" className={styles.view}>
 				<TopBar title="Event Details" meta="Loading event overview…" />
-				<LoadingState message="Loading event…" skeleton="cards" />
+				<LoadingState message="Loading event…" />
 			</section>
 		);
 	}
 
-	if (error) {
+	if (loadErrorQuery) {
+		const message = loadErrorQuery.error instanceof Error ? loadErrorQuery.error.message : 'Failed to load event';
 		return (
 			<ViewErrorState
 				viewId="view-event-hub"
 				title="Event Details"
-				message={error}
-				onRetry={() => {
-					setError(null);
-					setReloadKey((current) => current + 1);
-				}}
+				message={message}
+				onRetry={() => void refreshEvent()}
 			/>
 		);
 	}
 
-	if (!event || !catalogEvent) {
+	const programs = catalogQuery.data?.programs ?? [];
+	const catalogEvent = catalogQuery.data?.events.find((candidate) => candidate.id === eventId) ?? null;
+
+	if (!catalogEvent) {
 		return (
 			<EmptyState
 				viewId="view-event-hub"
@@ -186,6 +133,14 @@ export function EventHubView() {
 			/>
 		);
 	}
+
+	const event = catalogEventToPortfolio(catalogEvent, programs);
+	const checkedInCount = capacityQuery.data?.checkedInCount ?? 0;
+	const capacityValue = capacityQuery.data?.capacity ?? catalogEvent.capacity ?? 0;
+	const registeredTotal = attendeesQuery.data?.total ?? 0;
+	const preview = (attendeesQuery.data?.attendees ?? []).map(toAttendeePreview);
+
+	const showRefetchFailureBanner = blockingQueries.some((query) => query.isError);
 
 	const pctFilled = capacityValue > 0 ? Math.round((registeredTotal / capacityValue) * 100) : 0;
 	const detailFields: [string, string][] = [
@@ -204,6 +159,13 @@ export function EventHubView() {
 	return (
 		<section id="view-event-hub" className={styles.view}>
 			<TopBar title="Event Details" meta="Full record for the selected event" />
+
+			{showRefetchFailureBanner ? (
+				<RefetchFailureBanner
+					message="Couldn't refresh event data — showing the last loaded values."
+					onRetry={() => void refreshEvent()}
+				/>
+			) : null}
 
 			<div className="card card--accent">
 				<div className={styles.badgeRow}>

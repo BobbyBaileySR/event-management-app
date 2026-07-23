@@ -4,6 +4,8 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 
 # Tasks: Capacity Management (Slice 1)
 
+> Historical implementation task record. Completed mock-data/CatalogPickers tasks describe the architecture at implementation time; the runtime mock path and picker dock were removed later. Use the current quickstart and authoritative docs for QA.
+
 **Input**: Design documents from `/specs/004-capacity-management/`
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [data-model.md](./data-model.md) · [contracts/capacity-api.md](./contracts/capacity-api.md) · **003-check-in** US1+US2 shipped · **001/002** Event `capacity` metadata
@@ -142,7 +144,7 @@ description: "Task list for Capacity Management (004-capacity-management) — li
 - [X] T041 [P] Park multi-day Event capacity reset policy in `Frontend/TODO.md` if not implemented (plan R-008)
 - [X] T042 Run `Backend/npm test` + `npm run lint:fix` and `Frontend/npm run check:quick`
 - [ ] T043 Execute manual QA in `specs/004-capacity-management/quickstart.md` §3–§10 — sign-off checklist — **blocked:** **FE-CAP-001** / **X-009** (HubSpot UAT access; avoid Live data)
-- [ ] T044 SFTP deploy capacity handlers (`OnGetCapacityStatus`, `OnAdjustCapacity`, `CapacityStore`, router) + live smoke with `USE_MOCK_API: false` — **blocked:** **BE-CAP-001** / **X-009**
+- [ ] T044 SFTP deploy capacity handlers (`OnGetCapacityStatus`, `OnAdjustCapacity`, `CapacityStore`, router) + live UAT smoke through ScriptRunner — **blocked:** **BE-CAP-001** / **X-009**
 
 ---
 

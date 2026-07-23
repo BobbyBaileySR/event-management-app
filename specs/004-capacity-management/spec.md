@@ -4,11 +4,11 @@
 
 **Created**: 2026-07-07
 
-**Status**: Tasks generated (ready for implement)
+**Status**: Implemented and tested — T001–T042 code-complete (`CapacityBar.tsx`, `capacityTier.ts`, wired into `CheckInView.tsx`/`EventHubView.tsx`, live routes documented in `api-contract.md`). Manual QA/live deploy blocked pending HubSpot UAT data readiness (`X-009` / `FE-CAP-001` / `BE-CAP-001`), not on implementation. *(Verified 2026-07-17.)*
 
 **Input**: User description: "Slice 1 capacity monitoring on Check-in — compare checked-in attendees against Event capacity (catalog field); visual indicators at 75% and 90%; extends staff EMS; admin-only."
 
-**Depends on**: [003-check-in](../003-check-in/spec.md) — Program + Event catalog context, admin RBAC, attendee/check-in data for the selected Event, and Event `capacity` metadata from the catalog modal.
+**Depends on**: [003-check-in](../003-check-in/spec.md) — working-Event context (Program optional), admin RBAC, attendee/check-in data for the selected Event, and Event `capacity` metadata from Programs & Events / Event Details **Edit event**.
 
 **Product context**: [CONTEXT.md](../../CONTEXT.md) · [003-check-in](../003-check-in/spec.md)
 
@@ -19,7 +19,7 @@
 ### Session 2026-07-07
 
 - Q: How should staff handle anonymous departures (people leave without identifying themselves)? → A: **Manual live-attendance decrement** — staff can decrease the displayed on-site count on Check-in when people leave; departures are not attributed to individuals and do not require knowing who left. HubSpot checked-in records remain unchanged (check-in still only increases via confirm flow).
-- Q: Where are departure adjustments persisted? → A: **Server-persisted per Event** — manual departure adjustments are stored on the backend for the selected Program + Event; all admins on Check-in for that Event see the same live attendance.
+- Q: Where are departure adjustments persisted? → A: **Server-persisted per Event** — manual departure adjustments are stored on the backend for the selected Event; all admins on Check-in for that Event see the same live attendance.
 - Q: How should staff correct a mistaken departure tap? → A: **Paired +1 / −1 controls** — staff can manually adjust live attendance up or down by one via paired controls on the capacity indicator; neither direction identifies individuals or writes HubSpot.
 
 ---
@@ -28,7 +28,7 @@
 
 ### User Story 1 — Monitor live attendance against capacity on the desk (Priority: P1) 🎯 MVP
 
-An **admin** opens **Check-in** for a selected Program + Event that has **capacity** configured in the catalog. They see a persistent **capacity indicator** showing **live attendance** compared to the Event capacity (e.g. “42 / 100 on site · 42%”). **Live attendance** reflects confirmed check-ins minus any **manual attendance adjustments** staff have recorded. The indicator updates when staff confirm a check-in, use the manual ±1 controls, or when underlying attendee data refreshes.
+An **admin** opens **Check-in** for a working Event that has **capacity** configured in the catalog. They see a persistent **capacity indicator** showing **live attendance** compared to the Event capacity (e.g. “42 / 100 on site · 42%”). **Live attendance** reflects confirmed check-ins minus any **manual attendance adjustments** staff have recorded. The indicator updates when staff confirm a check-in, use the manual ±1 controls, or when underlying attendee data refreshes.
 
 **Why this priority**: On-the-day staff need at-a-glance room fill before queues build; capacity is already captured on the Event form — this slice surfaces live occupancy where check-in happens.
 
@@ -36,11 +36,11 @@ An **admin** opens **Check-in** for a selected Program + Event that has **capaci
 
 **Acceptance Scenarios**:
 
-1. **Given** an admin with Program + Event selected and the Event has a positive **capacity** value, **When** they open Check-in, **Then** a capacity indicator shows **live attendance**, **capacity**, and **percentage full** for that Event only.
+1. **Given** an admin with a working Event that has a positive **capacity** value, **When** they open Check-in, **Then** a capacity indicator shows **live attendance**, **capacity**, and **percentage full** for that Event only.
 2. **Given** the capacity indicator is visible, **When** staff successfully confirm a check-in, **Then** live attendance and percentage update without a full page reload.
-3. **Given** the capacity indicator is visible, **When** staff refresh attendee data (e.g. after returning from Walk-in mode or re-opening Check-in), **Then** the indicator reflects the latest checked-in count from the server combined with any persisted manual adjustments.
+3. **Given** the capacity indicator is visible, **When** staff refresh attendee data (e.g. after closing the walk-in modal or re-opening Check-in), **Then** the indicator reflects the latest checked-in count from the server combined with any persisted manual adjustments.
 4. **Given** a non-admin user, **When** they attempt Check-in, **Then** they are redirected away and do not see capacity or attendee PII.
-5. **Given** no Program or Event selected, **When** an admin opens Check-in, **Then** they see existing catalog-context guidance and no capacity indicator.
+5. **Given** no working Event selected, **When** an admin opens Check-in, **Then** they see existing event-context guidance and no capacity indicator.
 
 ---
 
@@ -84,10 +84,10 @@ An **admin** at the check-in desk uses **paired +1 / −1 controls** on the capa
 
 ### Edge Cases
 
-- Event **capacity unset or zero** → do not show percentage thresholds; show live attendance only with guidance to set capacity in catalog (prefer count + setup hint over a misleading 0% bar).
-- **Catalog context change** (different Program/Event) → indicator resets to the newly selected Event’s capacity, checked-in count, and manual adjustments for that Event.
-- **Mock vs live API** → live attendance uses the same checked-in source as the Check-in attendee list plus manual adjustments (mock honours both per plan).
-- **Walk-in mode** (003 US3) → capacity indicator and ±1 controls remain visible above the mode switch; walk-in HubSpot submits do not auto-update live count until attendee data is refreshed (consistent with existing walk-in hint).
+- Event **capacity unset or zero** → do not show percentage thresholds; show live attendance only with guidance to set capacity via Programs & Events / Edit event (prefer count + setup hint over a misleading 0% bar).
+- **Working Event change** → indicator resets to the newly selected Event’s capacity, checked-in count, and manual adjustments for that Event.
+- **Live attendance source** → uses the same checked-in source as the Check-in attendee list plus manual adjustments (test-local mocks in Vitest; live ScriptRunner in UAT).
+- **Walk-in modal** (003 US3) → capacity indicator and ±1 controls remain visible on the main Check-in view while the walk-in modal is open; walk-in HubSpot submits do not auto-update live count until attendee data is refreshed (consistent with existing walk-in hint).
 - **Concurrent desks** → manual adjustments are server-persisted per Event; all desks share one live attendance count (brief staleness until next fetch or action is acceptable for Slice 1).
 - **Fractional capacity** (catalog allows decimals) → percentage calculated from numeric capacity; display rounds sensibly for staff (whole numbers for count; percentage to nearest whole percent unless otherwise specified in plan).
 - **Manual adjustments exceed checked-in count** → live attendance floors at 0 on display; if checked-in count drops on refresh below net departures recorded, live attendance floors at 0 until staff use +1 or new check-ins restore alignment.

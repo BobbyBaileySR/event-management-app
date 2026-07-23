@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDataService } from '../hooks/useDataService';
+import { useCatalog } from '../data/hooks/useCatalog';
 import { eventPath } from '../router/navigation';
 import { catalogEventToPortfolio, type PortfolioEvent } from '../utils/catalogEventPresentation';
 import styles from './WorkingEventPicker.module.css';
@@ -10,40 +10,26 @@ interface WorkingEventPickerProps {
 	currentEventName?: string | null;
 }
 
-/** Sidebar control (007 redesign T046) for jumping straight into any event's Event Details. */
+/**
+ * Sidebar control (007 redesign T046) for jumping straight into any event's Event Details.
+ * Shares the cached catalog query (`useCatalog`) with `AppLayout`'s own event-name lookup and
+ * the session-lifecycle prefetch, instead of firing its own independent raw fetch — previously
+ * every sign-in triggered up to three separate uncached `/catalog` calls at once.
+ */
 export function WorkingEventPicker({ currentEventName }: WorkingEventPickerProps) {
 	const navigate = useNavigate();
-	const data = useDataService();
+	const { data: catalog, isLoading } = useCatalog();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const searchRef = useRef<HTMLInputElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState('');
-	const [events, setEvents] = useState<PortfolioEvent[]>([]);
-	const [loaded, setLoaded] = useState(false);
 
-	useEffect(() => {
-		let cancelled = false;
-		data
-			.fetchCatalog()
-			.then(({ events: loadedEvents, programs }) => {
-				if (!cancelled) {
-					// Capacity fan-out is skipped here for speed — the picker only needs names.
-					setEvents(loadedEvents.map((event) => catalogEventToPortfolio(event, programs)));
-				}
-			})
-			.catch(() => {
-				// Picker degrades to "no events found" — the trigger and rest of the shell stay usable.
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoaded(true);
-				}
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+	// Capacity fan-out is skipped here for speed — the picker only needs names. Failed/absent
+	// fetch degrades to an empty list ("No events found.") rather than throwing.
+	const events: PortfolioEvent[] = catalog
+		? catalog.events.map((event) => catalogEventToPortfolio(event, catalog.programs))
+		: [];
 
 	function closeMenu(returnFocus: boolean) {
 		setOpen(false);
@@ -89,12 +75,14 @@ export function WorkingEventPicker({ currentEventName }: WorkingEventPickerProps
 					className={styles.trigger}
 					aria-haspopup="true"
 					aria-expanded={open}
+					aria-busy={isLoading}
 					aria-labelledby="working-event-picker-label working-event-picker-value"
 					onClick={() => (open ? closeMenu(true) : setOpen(true))}
 				>
 					<span id="working-event-picker-value" className={styles.triggerLabel}>
 						{currentEventName ?? 'Select an event'}
 					</span>
+					{isLoading ? <span className={styles.spinner} aria-hidden="true" /> : null}
 					<span className={styles.chevron} aria-hidden="true">
 						▾
 					</span>
@@ -118,7 +106,7 @@ export function WorkingEventPicker({ currentEventName }: WorkingEventPickerProps
 							}}
 						/>
 						<ul className={styles.matches}>
-							{!loaded ? (
+							{isLoading ? (
 								<li className={styles.empty}>Loading events…</li>
 							) : matches.length === 0 ? (
 								<li className={styles.empty}>No events found.</li>

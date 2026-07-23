@@ -2,7 +2,6 @@ import type { EmsRole } from '../types';
 
 /**
  * Single source of truth for event-scoped module navigation (Sidebar's working-event section).
- * Ported from js/config/eventModules.js.
  *
  * `minRoles` (FR-013): every module is admin-only for now. Declaring it per-module (rather
  * than a single hardcoded `role === 'admin'` check at each call site) means a future
@@ -25,8 +24,16 @@ export interface EventModule {
 export const EVENT_MODULES: EventModule[] = [
 	{ id: 'event-hub', label: 'Event Details', icon: '📋', minRoles: ['admin'] },
 	{ id: 'attendees', label: 'Registered Attendees', icon: '👥', description: 'List, search, segments, export', hubModule: true, minRoles: ['admin'] },
-	{ id: 'check-in', label: 'Check-in', icon: '✓', description: 'On-site arrival desk and QR scan', hubModule: true, minRoles: ['admin'] },
+	{ id: 'check-in', label: 'Check-in', icon: '✅', description: 'On-site arrival desk and QR scan', hubModule: true, minRoles: ['admin'] },
 	{ id: 'email', label: 'Email', icon: '✉️', description: 'Templates, sends, and scheduling', hubModule: true, minRoles: ['admin'] },
+	{
+		id: 'conversations',
+		label: 'Conversations',
+		icon: '💬',
+		description: 'Find a checked-in attendee to talk to',
+		hubModule: true,
+		minRoles: ['admin'],
+	},
 ];
 
 /** Sidebar shows every event module. */

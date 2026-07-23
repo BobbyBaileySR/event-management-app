@@ -1,5 +1,75 @@
 .view {
-	/* inherits global view spacing from layout.css */
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	gap: 20px;
+}
+
+/* design_handoff 2 Overview: 4-stat grid, 14px gap; 2 cols ≤900px, 1 col ≤480px. */
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 14px;
+}
+
+.statTile {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-card);
+	background: var(--panel);
+	box-shadow: var(--shadow-card);
+	padding: 18px;
+	text-align: left;
+}
+
+.statAccent {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	border-radius: 3px;
+	background: var(--accent);
+}
+
+.statValue {
+	margin: 14px 0 0;
+	font-size: 24px;
+	font-weight: 800;
+	color: var(--text);
+	line-height: 1.1;
+}
+
+.statLabel {
+	margin: 2px 0 0;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.statDelta {
+	margin: 2px 0 0;
+	font-size: 11.5px;
+	color: var(--muted);
+}
+
+/* design_handoff 2: layout.split3 → 2fr 1fr on desktop. */
+.split {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+	gap: 20px;
+	align-items: start;
+}
+
+.upcomingCard,
+.activityCard {
+	border: 1px solid var(--border);
+	border-radius: var(--radius-card);
+	background: var(--panel);
+	box-shadow: var(--shadow-card);
+	padding: 22px;
+}
+
+.upcomingCard {
+	border-top: 3px solid var(--accent);
 }
 
 .cardHeaderRow {
@@ -7,28 +77,43 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
+	margin-bottom: 14px;
 }
 
-.cardHeaderRow h2 {
+.cardTitle {
 	margin: 0;
-	font-size: 1rem;
+	font-size: 14.5px;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.activityCard .cardTitle {
+	margin-bottom: 14px;
 }
 
 .linkButton {
 	border: none;
 	background: none;
 	color: var(--accent);
-	font-size: 0.85rem;
+	font-size: 13px;
 	font-weight: 700;
 	cursor: pointer;
 	padding: 6px 4px;
 	min-height: 44px;
 }
 
+.emptyNote {
+	margin: 0;
+	font-size: 0.9rem;
+	color: var(--muted);
+}
+
 .eventList {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+	display: flex;
+	flex-direction: column;
 }
 
 .eventRow {
@@ -39,10 +124,11 @@
 	border-bottom: none;
 }
 
+/* design_handoff 2: 44px 1fr 120px 96px */
 .eventRowButton {
 	width: 100%;
 	display: grid;
-	grid-template-columns: 44px 1fr auto auto;
+	grid-template-columns: 44px 1fr 120px 96px;
 	align-items: center;
 	gap: 14px;
 	padding: 11px 0;
@@ -55,11 +141,32 @@
 	min-height: 44px;
 }
 
-.eventDate {
-	font-size: 0.75rem;
+.dateBadge {
+	width: 44px;
+	height: 44px;
+	flex-shrink: 0;
+	border-radius: 10px;
+	background: var(--ice);
+	color: var(--color-denim);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.dateBadgeMonth {
+	font-size: 9px;
 	font-weight: 700;
-	color: var(--muted);
-	white-space: nowrap;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	line-height: 1;
+}
+
+.dateBadgeDay {
+	font-size: 14px;
+	font-weight: 800;
+	line-height: 1;
+	margin-top: 2px;
 }
 
 .eventInfo {
@@ -69,7 +176,7 @@
 }
 
 .eventName {
-	font-size: 0.9rem;
+	font-size: 13.5px;
 	font-weight: 600;
 	white-space: nowrap;
 	overflow: hidden;
@@ -77,7 +184,7 @@
 }
 
 .eventLocation {
-	font-size: 0.78rem;
+	font-size: 11.5px;
 	color: var(--muted);
 	white-space: nowrap;
 	overflow: hidden;
@@ -85,16 +192,21 @@
 }
 
 .eventCapacity {
-	width: 110px;
+	width: 120px;
 	flex-shrink: 0;
 }
 
 .eventCapacityLabel {
-	display: block;
-	font-size: 0.72rem;
+	display: flex;
+	justify-content: space-between;
+	font-size: 11px;
 	color: var(--muted);
 	margin-bottom: 3px;
 	white-space: nowrap;
+}
+
+.eventCapacityPct {
+	font-weight: 700;
 }
 
 .miniBarTrack {
@@ -116,6 +228,19 @@
 	background: var(--warning);
 }
 
+.eventStatus {
+	justify-self: end;
+}
+
+.activityList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
 .activityRow {
 	display: flex;
 	gap: 10px;
@@ -127,15 +252,57 @@
 	margin-top: 6px;
 	flex-shrink: 0;
 	border-radius: 50%;
-	background: var(--accent);
+	background: var(--color-cobalt);
 }
 
-@media (max-width: 600px) {
-	.eventCapacity {
+.activityBody {
+	min-width: 0;
+}
+
+.activityText {
+	margin: 0;
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--muted);
+}
+
+.activityText strong {
+	color: var(--text);
+	font-weight: 700;
+}
+
+.activityMeta {
+	margin: 1px 0 0;
+	font-size: 11px;
+	color: var(--muted);
+}
+
+@media (max-width: 900px) {
+	.statsGrid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+
+	.split {
+		grid-template-columns: 1fr;
+	}
+
+	.eventCapacity,
+	.eventStatus {
 		display: none;
 	}
 
 	.eventRowButton {
-		grid-template-columns: 40px 1fr auto;
+		grid-template-columns: 44px 1fr;
 	}
+}
+
+@media (max-width: 480px) {
+	.statsGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Dark Aurora: denim badge text is too dark on ice; use theme text. */
+:global([data-theme='dark-aurora']) .dateBadge {
+	color: var(--text);
 }

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import type { ConfirmOptions } from '../components/ConfirmModal';
 import { CONFIG } from '../config';
+import { invalidateAfterCampaignChange } from '../data/invalidation';
+import { useDebouncedValue } from './useDebouncedValue';
 import type { DataService } from '../services/dataService';
 import type {
 	DispatchAudienceRequest,
@@ -14,6 +17,7 @@ import type {
 } from '../types';
 import {
 	SCHEDULE_MINUTE_OPTIONS,
+	assertScheduleFields,
 	buildScheduledAtUtc,
 	buildTimeSlot,
 	defaultScheduleSlot,
@@ -69,6 +73,8 @@ export interface EmailDispatchWorkflowDeps {
 	confirm: (options: ConfirmOptions) => Promise<boolean>;
 	showToast: (message: string, type?: 'success' | 'error', durationMs?: number) => void;
 	eventId: string | null;
+	/** Invalidates `['dispatches', eventId]` + the scheduled-summary tile after a campaign mutation (data-model.md §3). */
+	queryClient: QueryClient;
 }
 
 export function buildAudienceRequest(
@@ -117,7 +123,7 @@ export function isRegisteredContactSelected(
  * calls the returned actions; all data access stays on the injected service.
  */
 export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
-	const { data, confirm, showToast, eventId } = deps;
+	const { data, confirm, showToast, eventId, queryClient } = deps;
 
 	const [activeTab, setActiveTab] = useState<EmailTab>('compose');
 	const [sendMode, setSendMode] = useState<SendMode>('now');
@@ -141,7 +147,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	const [pickerAttendees, setPickerAttendees] = useState<SliceAttendee[]>([]);
 	const [pickerTotal, setPickerTotal] = useState(0);
 	const [pickerSearch, setPickerSearch] = useState('');
-	const [debouncedPickerSearch, setDebouncedPickerSearch] = useState('');
+	const debouncedPickerSearch = useDebouncedValue(pickerSearch);
 	const [pickerLoading, setPickerLoading] = useState(false);
 	const [selectedDispatchId, setSelectedDispatchId] = useState<string | null>(null);
 	const [detailRecipients, setDetailRecipients] = useState<DispatchRecipientRow[]>([]);
@@ -161,7 +167,13 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	const [editScheduleHour, setEditScheduleHour] = useState(() => defaultScheduleSlot().hour);
 	const [editScheduleMinute, setEditScheduleMinute] = useState<ScheduleMinute>(() => defaultScheduleSlot().minute);
 	const [editScheduleTimezone, setEditScheduleTimezone] = useState(resolveDefaultTimezone);
-	const [error, setError] = useState<string | null>(null);
+	/**
+	 * Loaded independently (not one Promise.all) so one field's failure — e.g. HubSpot Templates
+	 * 403ing on a scope gap — doesn't blank out the other two, which may have loaded fine.
+	 */
+	const [limitsError, setLimitsError] = useState<string | null>(null);
+	const [templatesError, setTemplatesError] = useState<string | null>(null);
+	const [segmentsError, setSegmentsError] = useState<string | null>(null);
 
 	const manualSelectionRef = useRef(new Set<string>());
 
@@ -176,12 +188,6 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		setSelectedDispatchId(null);
 	}, [eventId]);
 
-	useEffect(() => {
-		const handle = window.setTimeout(() => {
-			setDebouncedPickerSearch(pickerSearch);
-		}, 300);
-		return () => window.clearTimeout(handle);
-	}, [pickerSearch]);
 
 	const audienceRequest = useMemo(
 		() => buildAudienceRequest(audienceSource, audienceMode, manualContactIds, segmentId),
@@ -194,23 +200,43 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		}
 
 		setLoading(true);
-		setError(null);
-		try {
-			const [limitsResult, templatesResult, segmentsResult] = await Promise.all([
-				data.fetchEmailLimits(eventId),
-				data.fetchEmailTemplates(eventId),
-				data.fetchEmailSegments(eventId),
-			]);
-			setLimits(limitsResult);
-			setTemplates(templatesResult.templates);
-			setTemplateId((current) => current || templatesResult.templates[0]?.id || '');
-			setSegments(segmentsResult.segments);
-			setSegmentId((current) => current || segmentsResult.segments[0]?.id || '');
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : 'Failed to load email compose data');
-		} finally {
-			setLoading(false);
+		setLimitsError(null);
+		setTemplatesError(null);
+		setSegmentsError(null);
+
+		const [limitsResult, templatesResult, segmentsResult] = await Promise.allSettled([
+			data.fetchEmailLimits(eventId),
+			data.fetchEmailTemplates(eventId),
+			data.fetchEmailSegments(eventId),
+		]);
+
+		if (limitsResult.status === 'fulfilled') {
+			setLimits(limitsResult.value);
+		} else {
+			setLimitsError(
+				limitsResult.reason instanceof Error ? limitsResult.reason.message : 'Failed to load send limits',
+			);
 		}
+
+		if (templatesResult.status === 'fulfilled') {
+			setTemplates(templatesResult.value.templates);
+			setTemplateId((current) => current || templatesResult.value.templates[0]?.id || '');
+		} else {
+			setTemplatesError(
+				templatesResult.reason instanceof Error ? templatesResult.reason.message : 'Failed to load templates',
+			);
+		}
+
+		if (segmentsResult.status === 'fulfilled') {
+			setSegments(segmentsResult.value.segments);
+			setSegmentId((current) => current || segmentsResult.value.segments[0]?.id || '');
+		} else {
+			setSegmentsError(
+				segmentsResult.reason instanceof Error ? segmentsResult.reason.message : 'Failed to load HubSpot lists',
+			);
+		}
+
+		setLoading(false);
 	}, [data, eventId]);
 
 	const loadRecipientPreview = useCallback(async () => {
@@ -452,6 +478,14 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 			return false;
 		}
 
+		const patchBody = buildPatchBody();
+		try {
+			assertScheduleFields(patchBody.scheduledAtUtc!, patchBody.timezone!);
+		} catch (err: unknown) {
+			showToast(err instanceof Error ? err.message : 'Invalid schedule time', 'error');
+			return false;
+		}
+
 		setSending(true);
 		try {
 			const preview = await data.previewEmailDispatch(eventId, {
@@ -476,7 +510,6 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 				}
 			}
 
-			const patchBody = buildPatchBody();
 			await data.createEmailDispatch(eventId, {
 				...patchBody,
 				idempotencyKey: crypto.randomUUID(),
@@ -485,6 +518,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 
 			showToast('Dispatch scheduled.');
 			void loadScheduledDispatches();
+			void invalidateAfterCampaignChange(queryClient, eventId);
 			setActiveTab('scheduled');
 			return true;
 		} catch (err: unknown) {
@@ -498,6 +532,15 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 	async function handleSaveEdit() {
 		if (!eventId || !editingDispatch || !editDispatchName.trim() || !editTemplateId) {
 			showToast('Enter a dispatch name and select a template.', 'error');
+			return;
+		}
+
+		const editTimeSlot = buildTimeSlot(editScheduleHour, editScheduleMinute);
+		const editScheduledAtUtc = buildScheduledAtUtc(editScheduleDate, editTimeSlot, editScheduleTimezone);
+		try {
+			assertScheduleFields(editScheduledAtUtc, editScheduleTimezone);
+		} catch (err: unknown) {
+			showToast(err instanceof Error ? err.message : 'Invalid schedule time', 'error');
 			return;
 		}
 
@@ -525,12 +568,11 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 				}
 			}
 
-			const timeSlot = buildTimeSlot(editScheduleHour, editScheduleMinute);
 			const body: PatchEmailDispatchBody = {
 				dispatchName: editDispatchName.trim(),
 				templateId: editTemplateId,
 				audience: editingDispatch.audience ?? audienceRequest,
-				scheduledAtUtc: buildScheduledAtUtc(editScheduleDate, timeSlot, editScheduleTimezone),
+				scheduledAtUtc: editScheduledAtUtc,
 				timezone: editScheduleTimezone,
 				...(preview.recipientCount >= threshold ? { largeSendConfirmed: true as const } : {}),
 			};
@@ -539,6 +581,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 			showToast('Scheduled dispatch updated.');
 			closeEditModal();
 			void loadScheduledDispatches();
+			void invalidateAfterCampaignChange(queryClient, eventId);
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : 'Update failed';
 			showToast(message.includes('dispatch_locked') ? 'Dispatch is locked and cannot be edited.' : message, 'error');
@@ -566,6 +609,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 			await data.cancelEmailDispatch(eventId, dispatch.dispatchId);
 			showToast('Scheduled dispatch cancelled.');
 			void loadScheduledDispatches();
+			void invalidateAfterCampaignChange(queryClient, eventId);
 		} catch (err: unknown) {
 			const message = err instanceof Error ? err.message : 'Cancel failed';
 			showToast(message.includes('dispatch_locked') ? 'Dispatch is locked and cannot be cancelled.' : message, 'error');
@@ -621,6 +665,7 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 
 			showToast('Dispatch accepted — processing in the background.');
 			void loadLogDispatches();
+			void invalidateAfterCampaignChange(queryClient, eventId);
 			return true;
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Send failed', 'error');
@@ -733,7 +778,9 @@ export function useEmailDispatchWorkflow(deps: EmailDispatchWorkflowDeps) {
 		sending,
 		savingEdit,
 		cancellingId,
-		error,
+		limitsError,
+		templatesError,
+		segmentsError,
 		// Scheduled lock warnings
 		scheduledLockWarnings,
 		// Edit modal

@@ -1,184 +1,128 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
-import { CatalogPickerSelect } from '../components/CatalogPickerSelect';
+import { SelectPicker } from '../components/pickers/SelectPicker';
+import { AttendeeDetailModal } from '../components/AttendeeDetailModal';
 import { useConfirm } from '../components/ConfirmModal';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { RefetchFailureBanner } from '../components/RefetchFailureBanner';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
 import { ViewErrorState } from '../components/ViewErrorState';
+import { useAttendees } from '../data/hooks/useAttendees';
+import { useEventCapacity } from '../data/hooks/useCapacity';
+import { useDispatches } from '../data/hooks/useDispatches';
+import { invalidateAfterAttendeeMutation } from '../data/invalidation';
+import { describeQueryStatus } from '../data/queryStatus';
 import { useDataService } from '../hooks/useDataService';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useUndoCheckIn } from '../hooks/useUndoCheckIn';
+import { useWorkingEventMeta } from '../hooks/useWorkingEventMeta';
 import { useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
-import type { EmailDispatchListItem, SliceAttendee } from '../types';
+import { CONFIG } from '../config';
+import type { GenerateLeadBatchResultEntry, SliceAttendee } from '../types';
+import { attendeeMutationErrorMessage } from '../utils/attendeeMutationErrors';
+import { attendeeInitials, attendeeName } from '../utils/attendeePresentation';
 import styles from './AttendeesView.module.css';
+
+function summarizeLeadBatchResults(results: GenerateLeadBatchResultEntry[]): { message: string; description?: string } {
+	const counts = { created: 0, updated: 0, created_separate: 0, failed: 0 };
+	for (const result of results) {
+		counts[result.outcome] += 1;
+	}
+	const parts: string[] = [];
+	if (counts.created) parts.push(`${counts.created} created`);
+	if (counts.updated) parts.push(`${counts.updated} updated`);
+	if (counts.created_separate) parts.push(`${counts.created_separate} new (existing Lead left untouched)`);
+	if (counts.failed) parts.push(`${counts.failed} failed`);
+	const message = `Leads generated: ${parts.join(', ') || 'no attendees processed'}`;
+	if (counts.failed > 0) {
+		const failedIds = results
+			.filter((result) => result.outcome === 'failed')
+			.map((result) => result.contactId)
+			.join(', ');
+		return { message, description: `Failed for: ${failedIds}` };
+	}
+	return { message };
+}
 
 type CheckedInFilter = 'all' | 'checked-in' | 'not-checked-in';
 type AttendeeTypeFilter = 'all' | 'customer' | 'partner';
 type DispatchOutcomeFilter = 'received' | 'not_received';
-
-function attendeeInitials(firstName: string, lastName: string): string {
-	return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
-}
 
 const DEFAULT_PAGE_SIZE = 50;
 
 export function AttendeesView() {
 	const { session } = useSession();
 	const data = useDataService();
+	const queryClient = useQueryClient();
 	const { showToast } = useToast();
 	const { confirm } = useConfirm();
 	const { eventId } = useActiveRoute();
-	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
+	const { eventName } = useWorkingEventMeta(eventId);
 	const [searchQuery, setSearchQuery] = useState('');
-	const [debouncedSearch, setDebouncedSearch] = useState('');
+	const debouncedSearch = useDebouncedValue(searchQuery);
 	const [checkedInFilter, setCheckedInFilter] = useState<CheckedInFilter>('all');
 	const [attendeeTypeFilter, setAttendeeTypeFilter] = useState<AttendeeTypeFilter>('all');
-	const [dispatchOptions, setDispatchOptions] = useState<EmailDispatchListItem[]>([]);
 	const [selectedDispatchId, setSelectedDispatchId] = useState('');
 	const [dispatchOutcomeFilter, setDispatchOutcomeFilter] = useState<DispatchOutcomeFilter>('received');
 	const [page, setPage] = useState(1);
-	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-	const [total, setTotal] = useState(0);
-	const [registeredTotal, setRegisteredTotal] = useState(0);
-	const [checkedInCount, setCheckedInCount] = useState(0);
-	const [loading, setLoading] = useState(true);
-	const [refreshing, setRefreshing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [reloadKey, setReloadKey] = useState(0);
 	const [removingId, setRemovingId] = useState<string | null>(null);
-	const [undoingId, setUndoingId] = useState<string | null>(null);
-	const awaitingInitialLoadRef = useRef(true);
+	const { undoingId, runUndoCheckIn } = useUndoCheckIn(eventId ?? null);
+	const [detailContactId, setDetailContactId] = useState<string | null>(null);
+	const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+	const [generatingLeads, setGeneratingLeads] = useState(false);
+	const [includeFullHistoryBatch, setIncludeFullHistoryBatch] = useState(false);
 
 	useEffect(() => {
 		setSearchQuery('');
-		setDebouncedSearch('');
 		setCheckedInFilter('all');
 		setAttendeeTypeFilter('all');
 		setSelectedDispatchId('');
 		setDispatchOutcomeFilter('received');
 		setPage(1);
-		awaitingInitialLoadRef.current = true;
+		setSelectedContactIds(new Set());
 	}, [eventId]);
 
 	useEffect(() => {
-		if (!eventId) {
-			setDispatchOptions([]);
-			return;
-		}
+		setSelectedContactIds(new Set());
+	}, [page]);
 
-		let cancelled = false;
-		void data
-			.fetchEmailDispatches(eventId, { view: 'log' })
-			.then((result) => {
-				if (!cancelled) {
-					setDispatchOptions(result.dispatches);
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setDispatchOptions([]);
-				}
-			});
+	const hasEventId = Boolean(eventId);
+	const checkedIn = checkedInFilter === 'checked-in' ? true : checkedInFilter === 'not-checked-in' ? false : undefined;
+	const dispatchFilter =
+		selectedDispatchId && dispatchOutcomeFilter
+			? { dispatchId: selectedDispatchId, dispatchFilter: dispatchOutcomeFilter }
+			: {};
 
-		return () => {
-			cancelled = true;
-		};
-	}, [data, eventId]);
+	const attendeesQuery = useAttendees(
+		eventId ?? '',
+		{
+			q: debouncedSearch || undefined,
+			checkedIn,
+			page,
+			pageSize: DEFAULT_PAGE_SIZE,
+			...dispatchFilter,
+		},
+		{ enabled: hasEventId },
+	);
+	/** Stat tiles reflect the whole event, independent of the filters applied to the table below. */
+	const totalsQuery = useAttendees(eventId ?? '', { page: 1, pageSize: 1 }, { enabled: hasEventId });
+	const capacityQuery = useEventCapacity(eventId ?? '', { enabled: hasEventId });
+	const dispatchQuery = useDispatches(eventId ?? '', { view: 'log' }, { enabled: hasEventId });
 
-	/** Stat tiles reflect the whole event, independent of the filters applied below. */
-	useEffect(() => {
-		if (!eventId) {
-			setRegisteredTotal(0);
-			setCheckedInCount(0);
-			return;
-		}
+	const attendees: SliceAttendee[] = attendeesQuery.data?.attendees ?? [];
+	const total = attendeesQuery.data?.total ?? 0;
+	const pageSize = attendeesQuery.data?.pageSize ?? DEFAULT_PAGE_SIZE;
+	const registeredTotal = totalsQuery.data?.total ?? 0;
+	const checkedInCount = capacityQuery.data?.checkedInCount ?? 0;
+	const dispatchOptions = dispatchQuery.data?.dispatches ?? [];
 
-		let cancelled = false;
-		void Promise.all([
-			data.fetchEventAttendees(eventId, { page: 1, pageSize: 1 }),
-			data.fetchEventCapacityStatus(eventId),
-		])
-			.then(([attendeesResult, capacityResult]) => {
-				if (!cancelled) {
-					setRegisteredTotal(attendeesResult.total);
-					setCheckedInCount(capacityResult.checkedInCount);
-				}
-			})
-			.catch(() => {
-				if (!cancelled) {
-					setRegisteredTotal(0);
-					setCheckedInCount(0);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data, eventId, reloadKey]);
-
-	useEffect(() => {
-		const handle = window.setTimeout(() => {
-			setDebouncedSearch(searchQuery);
-		}, 300);
-
-		return () => window.clearTimeout(handle);
-	}, [searchQuery]);
-
-	useEffect(() => {
-		if (!eventId) {
-			setLoading(false);
-			return;
-		}
-
-		let cancelled = false;
-		if (awaitingInitialLoadRef.current) {
-			setLoading(true);
-		} else {
-			setRefreshing(true);
-		}
-		setError(null);
-
-		const checkedIn =
-			checkedInFilter === 'checked-in' ? true : checkedInFilter === 'not-checked-in' ? false : undefined;
-		const dispatchFilter =
-			selectedDispatchId && dispatchOutcomeFilter
-				? { dispatchId: selectedDispatchId, dispatchFilter: dispatchOutcomeFilter }
-				: {};
-
-		void data
-			.fetchEventAttendees(eventId, {
-				q: debouncedSearch || undefined,
-				checkedIn,
-				page,
-				pageSize: DEFAULT_PAGE_SIZE,
-				...dispatchFilter,
-			})
-			.then((result) => {
-				if (!cancelled) {
-					setAttendees(result.attendees);
-					setPage(result.page);
-					setPageSize(result.pageSize);
-					setTotal(result.total);
-				}
-			})
-			.catch((err: unknown) => {
-				if (!cancelled) {
-					setError(err instanceof Error ? err.message : 'Failed to load attendees');
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLoading(false);
-					setRefreshing(false);
-					awaitingInitialLoadRef.current = false;
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [data, eventId, debouncedSearch, checkedInFilter, selectedDispatchId, dispatchOutcomeFilter, page, reloadKey]);
+	async function refreshAfterMutation() {
+		await invalidateAfterAttendeeMutation(queryClient, eventId ?? '');
+	}
 
 	const sortedAttendees = useMemo(
 		() => [...attendees].sort((left, right) => left.lastName.localeCompare(right.lastName)),
@@ -211,7 +155,7 @@ export function AttendeesView() {
 		if (!eventId) {
 			return;
 		}
-		const name = `${person.firstName} ${person.lastName}`.trim() || 'This attendee';
+		const name = attendeeName(person) || 'This attendee';
 		const confirmed = await confirm({
 			title: 'Remove attendee?',
 			message: `${name} will be removed from the registered attendee list for this event. This cannot be undone.`,
@@ -225,15 +169,9 @@ export function AttendeesView() {
 		try {
 			await data.removeAttendee(eventId, person.contactId);
 			showToast('Attendee removed', 'success');
-			setReloadKey((current) => current + 1);
+			await refreshAfterMutation();
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error && err.message === 'attendee_checked_in'
-					? 'This attendee is checked in — undo check-in before removing.'
-					: err instanceof Error && err.message === 'contact_not_registered'
-						? 'This attendee is no longer registered.'
-						: 'Failed to remove attendee';
-			showToast(message, 'error');
+			showToast(attendeeMutationErrorMessage(err, 'Failed to remove attendee'), 'error');
 		} finally {
 			setRemovingId(null);
 		}
@@ -243,7 +181,7 @@ export function AttendeesView() {
 		if (!eventId) {
 			return;
 		}
-		const name = `${person.firstName} ${person.lastName}`.trim() || 'This attendee';
+		const name = attendeeName(person) || 'This attendee';
 		const confirmed = await confirm({
 			title: 'Undo check-in?',
 			message: `${name} will return to Registered for this event. Capacity will update.`,
@@ -253,19 +191,57 @@ export function AttendeesView() {
 		if (!confirmed) {
 			return;
 		}
-		setUndoingId(person.contactId);
+		await runUndoCheckIn(person);
+	}
+
+	function toggleContactSelected(contactId: string, checked: boolean) {
+		setSelectedContactIds((current) => {
+			const next = new Set(current);
+			if (checked) {
+				next.add(contactId);
+			} else {
+				next.delete(contactId);
+			}
+			return next;
+		});
+	}
+
+	function toggleSelectAllVisible(checked: boolean) {
+		setSelectedContactIds(checked ? new Set(visibleAttendees.map((person) => person.contactId)) : new Set());
+	}
+
+	async function handleGenerateLeadsBatch() {
+		if (!eventId || selectedContactIds.size === 0 || generatingLeads) {
+			return;
+		}
+		const contactIds = Array.from(selectedContactIds);
+		const threshold = CONFIG.LEAD_BATCH_CONFIRM_THRESHOLD;
+		const atOrAboveThreshold = contactIds.length >= threshold;
+		if (atOrAboveThreshold) {
+			const confirmed = await confirm({
+				title: 'Generate Leads for a large selection?',
+				message: `You are about to generate HubSpot Leads for ${contactIds.length} attendees. Proceed?`,
+				confirmLabel: 'Generate Leads',
+				cancelLabel: 'Cancel',
+			});
+			if (!confirmed) {
+				return;
+			}
+		}
+		setGeneratingLeads(true);
 		try {
-			await data.undoCheckIn(eventId, person.contactId);
-			showToast('Check-in undone', 'success');
-			setReloadKey((current) => current + 1);
+			const response = await data.generateAttendeeLeadsBatch(eventId, {
+				contactIds,
+				includeFullHistory: includeFullHistoryBatch,
+				...(atOrAboveThreshold ? { batchConfirmed: true as const } : {}),
+			});
+			const { message, description } = summarizeLeadBatchResults(response.results);
+			showToast(message, response.results.some((r) => r.outcome === 'failed') ? 'error' : 'success', 3500, description);
+			setSelectedContactIds(new Set());
 		} catch (err: unknown) {
-			const message =
-				err instanceof Error && err.message === 'contact_not_registered'
-					? 'This attendee is no longer registered.'
-					: 'Failed to undo check-in';
-			showToast(message, 'error');
+			showToast(err instanceof Error ? err.message : 'Failed to generate Leads', 'error');
 		} finally {
-			setUndoingId(null);
+			setGeneratingLeads(false);
 		}
 	}
 
@@ -283,41 +259,43 @@ export function AttendeesView() {
 		);
 	}
 
-	if (loading) {
+	const attendeesStatus = describeQueryStatus(attendeesQuery, 'Failed to load attendees');
+
+	if (attendeesStatus.kind === 'loading') {
 		return (
 			<section id="view-attendees" className={styles.view}>
-				<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" />
-				<div className={`card ${styles.card}`}>
-					<LoadingState
-						message="Loading attendees…"
-						variant="panel"
-						skeleton="table"
-						skeletonRows={8}
-					/>
-				</div>
+				<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" workingEvent={eventName} />
+				<LoadingState message="Loading attendees…" />
 			</section>
 		);
 	}
 
-	if (error) {
+	if (attendeesStatus.kind === 'error') {
 		return (
 			<ViewErrorState
 				viewId="view-attendees"
 				title="Registered Attendees"
 				meta="Full attendee roster for the working event"
-				message={error}
-				onRetry={() => {
-					setError(null);
-					awaitingInitialLoadRef.current = true;
-					setReloadKey((current) => current + 1);
-				}}
+				workingEvent={eventName}
+				message={attendeesStatus.message}
+				onRetry={() => void attendeesQuery.refetch()}
 			/>
 		);
 	}
 
+	const refreshing = attendeesQuery.isFetching;
+	const showRefetchFailureBanner = attendeesStatus.refetchFailed || totalsQuery.isError || capacityQuery.isError;
+
 	return (
 		<section id="view-attendees" className={styles.view}>
-			<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" />
+			<TopBar title="Registered Attendees" meta="Full attendee roster for the working event" workingEvent={eventName} />
+
+			{showRefetchFailureBanner ? (
+				<RefetchFailureBanner
+					message="Couldn't refresh attendee data — showing the last loaded values."
+					onRetry={() => void refreshAfterMutation()}
+				/>
+			) : null}
 
 			<div className={styles.statsGrid}>
 				<div className={styles.statTile}>
@@ -387,7 +365,7 @@ export function AttendeesView() {
 				</div>
 
 				<div className={styles.dispatchFilterRow}>
-					<CatalogPickerSelect
+					<SelectPicker
 						id="attendees-dispatch-select"
 						className={styles.dispatchSelect}
 						label="Email dispatch"
@@ -424,6 +402,39 @@ export function AttendeesView() {
 					) : null}
 				</div>
 
+				{selectedContactIds.size > 0 ? (
+					<div className={`toolbar ${styles.bulkActionBar}`} role="toolbar" aria-label="Bulk attendee actions">
+						<span className={styles.bulkSelectionCount}>{selectedContactIds.size} selected</span>
+						<label className={styles.fullHistoryOption}>
+							<input
+								type="checkbox"
+								checked={includeFullHistoryBatch}
+								onChange={(changeEvent) => setIncludeFullHistoryBatch(changeEvent.target.checked)}
+							/>
+							Include full cross-event history
+						</label>
+						<div className="filter-row">
+							<button
+								type="button"
+								className="btn btn-outline btn-sm"
+								onClick={() => setSelectedContactIds(new Set())}
+								disabled={generatingLeads}
+							>
+								Clear selection
+							</button>
+							<button
+								type="button"
+								className="btn btn-primary btn-sm"
+								onClick={() => void handleGenerateLeadsBatch()}
+								disabled={generatingLeads}
+								aria-busy={generatingLeads}
+							>
+								{generatingLeads ? 'Generating…' : 'Generate Leads'}
+							</button>
+						</div>
+					</div>
+				) : null}
+
 				<div className={styles.tableWrap}>
 					<div
 						className={`table-scroll ${styles.tableScroll}${refreshing ? ` ${styles.tableScrollLoading}` : ''}`}
@@ -432,6 +443,15 @@ export function AttendeesView() {
 						<table>
 							<thead>
 								<tr>
+									<th scope="col" className={styles.colCheckbox}>
+										<input
+											type="checkbox"
+											aria-label="Select all visible attendees"
+											checked={visibleAttendees.length > 0 && selectedContactIds.size === visibleAttendees.length}
+											onChange={(changeEvent) => toggleSelectAllVisible(changeEvent.target.checked)}
+											disabled={visibleAttendees.length === 0}
+										/>
+									</th>
 									<th scope="col">Name</th>
 									<th scope="col" className={styles.colCompany}>Company</th>
 									<th scope="col" className={styles.colAccountManager}>Account manager</th>
@@ -445,21 +465,40 @@ export function AttendeesView() {
 							<tbody>
 								{visibleAttendees.length === 0 ? (
 									<tr>
-										<td colSpan={6}>No registered attendees match this view.</td>
+										<td colSpan={7}>No registered attendees match this view.</td>
 									</tr>
 								) : (
 									visibleAttendees.map((person) => (
-										<tr key={person.contactId}>
+										<tr
+											key={person.contactId}
+											className={styles.attendeeRow}
+											onClick={() => setDetailContactId(person.contactId)}
+										>
+											<td className={styles.colCheckbox} onClick={(clickEvent) => clickEvent.stopPropagation()}>
+												<input
+													type="checkbox"
+													aria-label={`Select ${attendeeName(person)}`}
+													checked={selectedContactIds.has(person.contactId)}
+													onChange={(changeEvent) => toggleContactSelected(person.contactId, changeEvent.target.checked)}
+												/>
+											</td>
 											<td>
-												<div className={styles.nameCell}>
+												<button
+													type="button"
+													className={styles.nameButton}
+													onClick={(clickEvent) => {
+														clickEvent.stopPropagation();
+														setDetailContactId(person.contactId);
+													}}
+												>
 													<span className={styles.avatar} aria-hidden="true">
-														{attendeeInitials(person.firstName, person.lastName)}
+														{attendeeInitials(person)}
 													</span>
 													<span className={styles.nameInfo}>
-														<span>{`${person.firstName} ${person.lastName}`.trim()}</span>
+														<span>{attendeeName(person)}</span>
 														<span className={styles.nameEmail}>{person.email}</span>
 													</span>
-												</div>
+												</button>
 											</td>
 											<td className={styles.colCompany}>{person.company}</td>
 											<td className={styles.colAccountManager}>{person.accountManager}</td>
@@ -473,7 +512,7 @@ export function AttendeesView() {
 													{person.checkedIn ? 'Checked in' : 'Registered'}
 												</span>
 											</td>
-											<td className={styles.colAction}>
+											<td className={styles.colAction} onClick={(clickEvent) => clickEvent.stopPropagation()}>
 												{person.checkedIn ? (
 													<button
 														type="button"
@@ -533,6 +572,14 @@ export function AttendeesView() {
 					</nav>
 				) : null}
 			</div>
+
+			<AttendeeDetailModal
+				open={detailContactId !== null}
+				eventId={eventId}
+				contactId={detailContactId}
+				onClose={() => setDetailContactId(null)}
+				variant="registered"
+			/>
 		</section>
 	);
 }

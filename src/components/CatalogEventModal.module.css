@@ -20,7 +20,10 @@
 	margin: 0;
 }
 
-.subtitle {
+/* `.modal` prefix (not just `.subtitle`) beats the global `.modal p { margin-bottom: 20px }`
+   rule (components.css) on specificity — otherwise that 20px wins and the header reads as
+   needlessly tall. */
+.modal .subtitle {
 	margin: 2px 0 0;
 	font-size: 0.75rem;
 	color: var(--muted);
@@ -59,7 +62,12 @@
 	gap: 12px;
 }
 
-.form label {
+/* Direct-child selector, not a descendant one — this must only style the modal's own
+   plain labels (Event name/Owner/Location/…), never a nested picker's internal <label>
+   (CalendarPicker/SelectPicker/TimePicker render their own via `.fieldLabel`); the plain
+   `label` element selector isn't hash-scoped by CSS Modules, so a descendant selector here
+   would leak into and reflow those, which broke `required`'s asterisk layout (T-required-marker). */
+.form > label {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;

@@ -1,6 +1,9 @@
-# Master QA — Slice 1.5 Tier A + Slice 2 (Email dispatch)
+# Master QA — Slice 1.5 Tier A + Slice 2 (Email dispatch) — superseded
 
-**Purpose:** One operator/engineering runbook for everything still outstanding: **Slice 1.5 Tier A manual sign-off**, **Slice 2 automated + manual QA**, and **T002 HubSpot spike** (gate for live email cutover).
+> **Superseded 2026-07-17:** Do not use this combined runbook for current QA. It preserves the pre-cutover workflow, including references to the deleted `USE_MOCK_API` path, the former tabbed email UI, and retired routes. The frontend has no mock-data path: all EMS data calls go through the live ScriptRunner API, while automated tests use test-local mocks. Use the maintained slice runbooks instead:
+>
+> - [Slice 1.5 Tier A sign-off checklist](./slice-1.5-tier-a/signoff-checklist.md)
+> - [Slice 2 email-dispatch quickstart](./005-email-dispatch/quickstart.md)
 
 **Audience:** Product owner / operator (click-through) and engineering (automated tests, T002, deploy).
 
@@ -12,7 +15,7 @@
 - [docs/slice-operator-security-qa-template.md](../docs/slice-operator-security-qa-template.md)
 - [docs/environments.md](../docs/environments.md)
 
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-17
 
 ---
 
@@ -314,7 +317,7 @@ Add one bullet to `Backend/CHANGELOG.md`.
 | :---: | :--- | :--- | :--- |
 | 1.5-C7.2.1 | On Attendees, refresh or re-select Event **rapidly ~12+ times within 60 seconds** (same admin session). | Eventually **429** or “rate limit” / “too many requests” message; app recovers after ~1 minute. | Unlimited refreshes with no throttling. |
 
-**Note:** Backend default is **10 requests per 60 seconds** per admin email for bucket `attendees-list`.
+**Note:** Backend default is **120 requests per 60 seconds** per admin email for bucket `attendees-list`.
 
 ### Catalog PATCH audit (A5)
 

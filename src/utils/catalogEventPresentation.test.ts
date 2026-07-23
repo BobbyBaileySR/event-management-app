@@ -87,38 +87,65 @@ describe('catalogEventToPortfolio', () => {
 });
 
 describe('enrichPortfolioWithCapacity', () => {
-	it('merges checkedInCount into attendeeCount and overrides capacity when positive', async () => {
-		const [portfolio] = await enrichPortfolioWithCapacity(
+	it('merges registeredCount ("Event Capacity") into attendeeCount and overrides capacity when the summary row is positive', () => {
+		const [portfolio] = enrichPortfolioWithCapacity(
 			[makeEvent()],
 			programs,
-			async () => ({ checkedInCount: 150, capacity: 180 }),
+			[
+				{
+					eventId: 'evt-london-q3',
+					programId: 'prog-emea',
+					registeredCount: 160,
+					checkedInCount: 150,
+					capacity: 180,
+				},
+			],
 			NOW,
 		);
 
-		expect(portfolio!.attendeeCount).toBe(150);
+		expect(portfolio!.attendeeCount).toBe(160);
 		expect(portfolio!.capacity).toBe(180);
 	});
 
-	it('falls back to the catalog capacity when the capacity fan-out has no positive value', async () => {
-		const [portfolio] = await enrichPortfolioWithCapacity(
+	it('uses registeredCount, not checkedInCount, when a registrant has not checked in yet (regression: Programs & Events previously showed 0/capacity for a registered-only event)', () => {
+		const [portfolio] = enrichPortfolioWithCapacity(
+			[makeEvent()],
+			programs,
+			[
+				{
+					eventId: 'evt-london-q3',
+					programId: 'prog-emea',
+					registeredCount: 1,
+					checkedInCount: 0,
+					capacity: 100,
+				},
+			],
+			NOW,
+		);
+
+		expect(portfolio!.attendeeCount).toBe(1);
+	});
+
+	it('falls back to the catalog capacity when the summary row has no positive capacity', () => {
+		const [portfolio] = enrichPortfolioWithCapacity(
 			[makeEvent({ capacity: 200 })],
 			programs,
-			async () => ({ checkedInCount: 0, capacity: null }),
+			[{ eventId: 'evt-london-q3', programId: 'prog-emea', registeredCount: 0, checkedInCount: 0, capacity: null }],
 			NOW,
 		);
 
 		expect(portfolio!.capacity).toBe(200);
 	});
 
-	it('soft-fails a broken capacity fetch back to zero attendees for that event', async () => {
-		const [portfolio] = await enrichPortfolioWithCapacity(
-			[makeEvent({ capacity: 200 })],
-			programs,
-			async () => {
-				throw new Error('capacity request failed');
-			},
-			NOW,
-		);
+	it('soft-fails to zero attendees + catalog capacity when the event has no matching summary row', () => {
+		const [portfolio] = enrichPortfolioWithCapacity([makeEvent({ capacity: 200 })], programs, [], NOW);
+
+		expect(portfolio!.attendeeCount).toBe(0);
+		expect(portfolio!.capacity).toBe(200);
+	});
+
+	it('soft-fails the same way when the summary rows are undefined (summary fetch failed)', () => {
+		const [portfolio] = enrichPortfolioWithCapacity([makeEvent({ capacity: 200 })], programs, undefined, NOW);
 
 		expect(portfolio!.attendeeCount).toBe(0);
 		expect(portfolio!.capacity).toBe(200);

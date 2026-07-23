@@ -157,16 +157,22 @@ export function formatScheduledDisplay(isoInstant: string, timeZone: string): st
 	return `${formatter.format(new Date(isoInstant))} (${timeZone})`;
 }
 
+/**
+ * Guards the two properties a scheduled send must have before it's submitted: the
+ * instant is in the future, and it lands on a 15-minute mark (ScriptRunner's cron only
+ * fires on `:00`/`:15`/`:30`/`:45`). Pickers already steer the operator toward valid
+ * values — this is the last check before the network call, not the only one.
+ */
 export function assertScheduleFields(scheduledAtUtc: string, timezone: string): void {
 	const scheduledMs = Date.parse(scheduledAtUtc);
 	if (!Number.isFinite(scheduledMs) || scheduledMs <= Date.now()) {
-		throw new Error('validation_error');
+		throw new Error('Choose a time in the future.');
 	}
 
 	const parts = readZonedParts(scheduledAtUtc, timezone);
 	const minute = Number(parts.minute);
 	const second = Number(parts.second ?? 0);
 	if (second !== 0 || minute % 15 !== 0) {
-		throw new Error('validation_error');
+		throw new Error('Schedule time must be on a 15-minute mark (e.g. 9:00, 9:15, 9:30, 9:45).');
 	}
 }

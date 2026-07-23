@@ -4,6 +4,8 @@
 **Date**: 2026-07-07  
 **Spec**: [spec.md](./spec.md)
 
+> Historical implementation research. Runtime mock-data and CatalogPickers decisions were superseded by the 2026-07-15 mock removal and the event-first redesign; use `docs/api-contract.md`, `docs/ui-routes.md`, and the current quickstart for live behaviour.
+
 ---
 
 ## R-001: Live attendance formula
@@ -92,9 +94,9 @@
 
 ---
 
-## R-007: Mock API parity
+## R-007: Mock API parity *(superseded 2026-07-15)*
 
-**Decision**: `mockData.ts` holds `Map<string, number>` departure counts; mock GET/POST capacity routes mirror live bounds and return same JSON shape. `USE_MOCK_API` gates both routes like other slice endpoints.
+**Historical decision**: `mockData.ts` held in-memory departure counts. The runtime mock path was later removed; Vitest now uses test-local mocks and operator QA uses HubSpot Staging.
 
 **Rationale**: FR/mock edge case in spec; local QA without SFTP.
 

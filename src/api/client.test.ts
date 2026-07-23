@@ -3,7 +3,6 @@ import { apiRequest, splitApiPath } from './client';
 
 vi.mock('../config', () => ({
 	CONFIG: {
-		USE_MOCK_API: false,
 		API_BASE_URL: 'https://event.scriptrunnerconnect.com/listener',
 	},
 }));

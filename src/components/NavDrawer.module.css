@@ -1,0 +1,71 @@
+/* Only mounted while tablet-open (`AppLayout`'s `drawerOpen` state); `AppLayout` also closes
+   the drawer via `useViewportTier` if a resize carries the viewport out of the tablet tier
+   while it's open, so no CSS-side tier gating is needed here. */
+.backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 10, 39, 0.55);
+	display: flex;
+	z-index: 900;
+}
+
+.panel {
+	position: relative;
+	width: min(300px, 85vw);
+	height: 100%;
+	background: var(--panel);
+	box-shadow: var(--shadow-frame);
+	animation: emsDrawerSlideIn 0.18s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.panel {
+		animation: none;
+	}
+}
+
+@keyframes emsDrawerSlideIn {
+	from {
+		transform: translateX(-16px);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+.panelBody {
+	height: 100%;
+	overflow-y: auto;
+}
+
+.close {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	z-index: 1;
+	width: 44px;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: var(--panel);
+	color: var(--text);
+	font-size: 1.25rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.close:hover,
+.close:focus-visible {
+	background: var(--ice);
+	outline: none;
+}
+
+.close:focus-visible {
+	outline: 2px solid var(--color-cobalt);
+	outline-offset: -2px;
+}

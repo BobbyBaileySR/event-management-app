@@ -29,6 +29,7 @@
     "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.62.1",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^4.1.9",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
@@ -39,6 +40,7 @@
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",
     "@fontsource/material-symbols-outlined": "^5.2.45",
+    "@tanstack/react-query": "^5.101.2",
     "html5-qrcode": "^2.3.8",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

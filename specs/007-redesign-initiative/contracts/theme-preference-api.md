@@ -4,7 +4,7 @@
 
 Per-user, cross-device theme preference. Small, non-PII, write-gated. On merge, fold these rows into [docs/api-contract.md](../../../docs/api-contract.md) + [docs/rbac.md](../../../docs/rbac.md) and add the matching rule to `Backend/scripts/Utils/RouteGuard.ts` (secure default: deny if missing).
 
-**Conventions**: logical route via header `X-EMS-Route`; `Authorization: Bearer <sessionToken>`; JSON errors `{ "message": string, "code"?: string }`. See api-contract.md § Conventions.
+**Conventions**: logical route via the `route` query parameter (legacy `X-EMS-Route` fallback); `Authorization: Bearer <sessionToken>`; JSON errors `{ "message": string, "code"?: string }`. See api-contract.md § Conventions.
 
 ---
 
@@ -80,4 +80,4 @@ Persist the user's chosen theme.
 
 - `dataService.getThemePreference()` → `GET user/prefs`
 - `dataService.setThemePreference(theme)` → `PUT user/prefs/theme`
-- Mock parity in `data/mockData.ts`; mapping test in `dataService.test.ts`.
+- Mapping coverage in `dataService.test.ts`; the former runtime mock-data parity path was removed 2026-07-15.

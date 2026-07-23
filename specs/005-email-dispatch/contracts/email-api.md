@@ -1,10 +1,10 @@
 # Email Dispatch API Contract (005)
 
-**Status**: Provisional — merge into `Frontend/docs/api-contract.md` and `Frontend/docs/rbac.md` when implementing.
+**Status**: Superseded — historical Slice 2 design contract. The live event-scoped contract is in [`Frontend/docs/api-contract.md`](../../../docs/api-contract.md); do not implement the Program-scoped paths below.
 
 **RBAC**: All routes **`admin`** only (Slice 2 defers `communications` role).
 
-**Base path**: `/api/ems` (same origin; `X-EMS-Route` header in production)
+**Historical transport/path**: the body below predates the `route` query parameter and event-first routing.
 
 **Prefix**: `programs/{programId}/events/{eventId}/email/…`
 

@@ -1,16 +1,11 @@
-import { useNavigate } from 'react-router-dom';
 import { CONFIG } from '../config';
-import { SIDEBAR_EVENT_MODULES, type EventModule } from '../config/eventModules';
-import { hasRequiredRole } from '../config/shellAccess';
-import { auditPath, eventPath, overviewPath, useActiveRoute } from '../router/navigation';
+import { useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
+import { useSidebarNavItems, type SidebarNavItem } from '../hooks/useSidebarNavItems';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { WorkingEventPicker } from './WorkingEventPicker';
 import type { ThemeId } from '../theme/themeTokens';
 import styles from './Sidebar.module.css';
-
-/** Overview / Programs & Events / Audit log are admin-only for now (FR-013). */
-const TOP_LEVEL_MIN_ROLES = ['admin'] as const;
 
 interface SidebarProps {
 	onLogout: () => void;
@@ -19,15 +14,31 @@ interface SidebarProps {
 	theme: ThemeId;
 	celebrationAllowed: boolean;
 	onThemeChange: (theme: ThemeId) => void;
+	/**
+	 * 'shell' (default): desktop's fixed-width bordered column (≥1024px).
+	 * 'drawer': same content, embedded in the tablet slide-out `NavDrawer` — full width,
+	 * no side border (the drawer panel owns its own edge/shadow).
+	 */
+	variant?: 'shell' | 'drawer';
 }
 
-export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationAllowed, onThemeChange }: SidebarProps) {
-	const navigate = useNavigate();
+export function Sidebar({
+	onLogout,
+	eventName: hubEventName,
+	theme,
+	celebrationAllowed,
+	onThemeChange,
+	variant = 'shell',
+}: SidebarProps) {
 	const { session } = useSession();
-	const { name: activeRoute, eventId } = useActiveRoute();
+	const { eventId } = useActiveRoute();
+	const { visible, topLevel, eventModules, admin } = useSidebarNavItems();
 
 	return (
-		<aside className={styles.sidebar} aria-label="Sidebar">
+		<aside
+			className={`${styles.sidebar} ${variant === 'drawer' ? styles.sidebarInDrawer : ''}`.trim()}
+			aria-label="Sidebar"
+		>
 			<div className={styles.header}>
 				<span className={styles.logo} aria-hidden="true">
 					{CONFIG.APP_SHORT_NAME.charAt(0)}
@@ -39,53 +50,26 @@ export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationA
 			</div>
 
 			<nav className={styles.nav} aria-label="Main navigation">
-				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
+				{visible ? (
 					<>
-						<NavButton
-							label="Overview"
-							icon="📊"
-							active={activeRoute === 'overview'}
-							onClick={() => navigate(overviewPath())}
-						/>
-						<NavButton
-							label="Programs & Events"
-							icon="🏢"
-							active={activeRoute === 'events'}
-							onClick={() => navigate('/events')}
-						/>
+						{topLevel.map((item) => (
+							<NavButton key={item.id} {...item} />
+						))}
+
+						<WorkingEventPicker currentEventName={eventId ? hubEventName : null} />
+
+						<div className={styles.workingEventModules}>
+							{eventModules.map((item) => (
+								<NavButton key={item.id} {...item} />
+							))}
+						</div>
+
+						<div className={`${styles.section} ${styles.adminSection}`}>
+							{admin.map((item) => (
+								<NavButton key={item.id} {...item} />
+							))}
+						</div>
 					</>
-				) : null}
-
-				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
-					<WorkingEventPicker currentEventName={eventId ? hubEventName : null} />
-				) : null}
-
-				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
-					<div className={styles.workingEventModules}>
-						{SIDEBAR_EVENT_MODULES.filter((item: EventModule) => hasRequiredRole(session?.role, item.minRoles)).map(
-							(item: EventModule) => (
-								<NavButton
-									key={item.id}
-									label={item.label}
-									icon={item.icon}
-									active={activeRoute === item.id}
-									disabled={!eventId}
-									onClick={eventId ? () => navigate(eventPath(eventId, item.id)) : undefined}
-								/>
-							),
-						)}
-					</div>
-				) : null}
-
-				{hasRequiredRole(session?.role, [...TOP_LEVEL_MIN_ROLES]) ? (
-					<div className={`${styles.section} ${styles.adminSection}`}>
-						<NavButton
-							label="Audit log"
-							icon="📋"
-							active={activeRoute === 'audit'}
-							onClick={() => navigate(auditPath())}
-						/>
-					</div>
 				) : null}
 			</nav>
 
@@ -101,15 +85,7 @@ export function Sidebar({ onLogout, eventName: hubEventName, theme, celebrationA
 	);
 }
 
-interface NavButtonProps {
-	label: string;
-	icon: string;
-	active: boolean;
-	disabled?: boolean;
-	onClick?: () => void;
-}
-
-function NavButton({ label, icon, active, disabled, onClick }: NavButtonProps) {
+function NavButton({ label, icon, active, disabled, onClick }: SidebarNavItem) {
 	return (
 		<button
 			type="button"

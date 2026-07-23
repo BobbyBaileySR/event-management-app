@@ -96,13 +96,13 @@ export function LoadingState({
 			aria-live="polite"
 			aria-busy="true"
 		>
-			<div className={styles.spinner} aria-hidden="true" />
 			{didYouKnow ? (
 				<div className={styles.didYouKnowBox}>
 					<p className={styles.didYouKnowLabel}>Did you know?</p>
 					<p className={styles.didYouKnow}>{didYouKnow}</p>
 				</div>
 			) : null}
+			<div className={styles.spinner} aria-hidden="true" />
 			<p className={styles.message}>{message}</p>
 			{skeletonContent}
 		</div>

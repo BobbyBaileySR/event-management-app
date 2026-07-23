@@ -1,14 +1,16 @@
 # Feature Specification: Public Registration (Slice 3)
 
+> **Design-only / re-plan before building.** Spec still describes a Registration panel on **Event Settings** (`SettingsView`) and Program-first catalog pickers — those surfaces were retired in the event-first redesign. Re-home the panel onto Programs & Events / Event Details (or another current surface) before implementation. Plan and tasks are already marked do-not-execute.
+
 **Feature Branch**: `006-public-registration`
 
 **Created**: 2026-07-07
 
-**Status**: Tasks generated (ready for implement)
+**Status**: Not started — all 39 tasks in `tasks.md` remain unchecked; no `RegistrationPanel.tsx` and no `SettingsView.tsx` in `Frontend/src`. Some catalog fields (`publishState`, `walkInFormUrl`, `registrationFormUrl`, `registrationSlug`) shipped via other work, but the Registration panel UI, Settings hub, and HubSpot-editor deep link described here are unbuilt. *(Verified 2026-07-17.)*
 
-**Input**: User description: "Slice 3 — public registration: staff link EMS to HubSpot-hosted landing pages via a Registration panel on Event Settings; Program default URL with optional Event override; EMS registration publish state (draft/published); copy link and Open in HubSpot admin editor; catalog modals stay in sync; distinct from walk-in form URL; admin-only."
+**Input**: User description: "Slice 3 — public registration: staff link EMS to HubSpot-hosted landing pages via a Registration panel on Event Settings; Program default URL with optional Event override; EMS registration publish state (draft/published); copy link and Open in HubSpot admin editor; catalog modals stay in sync; distinct from walk-in form URL; admin-only." *(Settings hub retired — re-plan UI home.)*
 
-**Depends on**: [001-catalog-admin](../001-catalog-admin/spec.md), [002-catalog-metadata-modal](../002-catalog-metadata-modal/spec.md), and [003-check-in](../003-check-in/spec.md) — Program + Event catalog context, Program `hubspotFormIds`, Event `walkInFormUrl`, admin RBAC, and Slice 1 navigation patterns remain in force.
+**Depends on**: [001-catalog-admin](../_shipped/001-catalog-admin/spec.md), [002-catalog-metadata-modal](../_shipped/002-catalog-metadata-modal/spec.md), and [003-check-in](../003-check-in/spec.md) — catalog + check-in foundations remain; navigation is now event-first (WorkingEventPicker / Programs & Events), not Settings + catalog pickers.
 
 **Product context**: [CONTEXT.md](../../CONTEXT.md) (Slice 3, Public registration page URL, Registration publish state, Registration panel, Walk-in form URL)
 
@@ -167,7 +169,7 @@ An **admin** uses **Open in HubSpot** from the Registration panel to jump to the
 
 ## Assumptions
 
-- **Slice 1** catalog navigation, Settings hub module, Program `hubspotFormIds`, Event `walkInFormUrl`, and admin RBAC are shipped and stable.
+- **Slice 1** catalog navigation, Program `hubspotFormIds`, Event `walkInFormUrl`, and admin RBAC are shipped and stable. **Correction (2026-07-17):** the "Settings hub module" this assumption originally also claimed as shipped **does not exist** in `Frontend/src` — there is no `SettingsView.tsx` or equivalent today. Foundational work for this slice must build (or confirm a home for) that Settings surface before `RegistrationPanel.tsx` has anywhere to live.
 - **HubSpot landing pages** are created and published in HubSpot admin (or Breeze) before or after EMS linking — EMS links to URLs staff provide. Custom domains on HubSpot landing pages are accepted when staff paste the published HTTPS URL.
 - **HubSpot admin editor URL** can often be derived from the public landing-page URL; if not, implementation documents a fallback in research/plan (no separate admin URL field in Slice 3).
 - **Registration publish state** is operational intent in EMS (share link or not) — not a live mirror of HubSpot’s internal publish APIs. **Default on first URL save:** `draft`.

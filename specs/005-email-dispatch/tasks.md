@@ -4,6 +4,8 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 
 # Tasks: Email Dispatch (Slice 2)
 
+> Historical implementation task record. Completed mock-data, tabbed-UI, catalog-picker, and Program-scoped-route tasks describe the architecture at implementation time; those surfaces were later replaced by the mock-free event-first unified-list design. Use the current quickstart and `docs/api-contract.md` for live behaviour.
+
 **Input**: Design documents from `/specs/005-email-dispatch/`
 
 **Prerequisites**: [plan.md](./plan.md) · [spec.md](./spec.md) · [data-model.md](./data-model.md) · [contracts/email-api.md](./contracts/email-api.md) · **003-check-in** shipped (catalog context, attendees, admin RBAC)
@@ -29,9 +31,9 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 **Purpose**: Confirm prerequisites and HubSpot spike before live send
 
 - [ ] T001 Confirm **003-check-in** catalog pickers + `GET …/attendees` working per `specs/005-email-dispatch/quickstart.md` §Prerequisites
-- [ ] T002 Execute HubSpot API spike (template list, segment list, single test send) and document outcome in `specs/005-email-dispatch/research.md` §R-003 + `Backend/CHANGELOG.md`
+- [~] T002 Execute HubSpot API spike (template list, segment list, single test send) and document outcome in `specs/005-email-dispatch/research.md` §R-003 + `Backend/CHANGELOG.md` — **2026-07-16 partial:** T002.3 (segment list) **passes live** — `crm.lists.read` scope confirmed working, adapter fixed and verified against real data. T002.2 (template list) **code-fixed but blocked live** — `GET /marketing/v3/emails` 403s on UAT; the granted `marketing-email` scope isn't sufficient, the endpoint needs `content` scope (gated behind CMS/Marketing Hub Pro+ tier). Tracked as `HS-009`. T002.4 (live test send) — **2026-07-16: `BE-EMAIL-SEND-001` shipped the real `HubSpotSingleSendAdapter`** (no longer mocked by default), gated end-to-end by `EMAIL_SEND_ENABLED`; the actual live test send against real HubSpot is still an outstanding human action before that Parameter is set `true` anywhere real — see `Backend/TODO-DONE.md`.
 - [ ] T003 [P] Review design artifacts in `specs/005-email-dispatch/` (spec, plan, research, data-model, contract, quickstart)
-- [ ] T004 Park unresolved spike blockers in `Backend/TODO.md` (e.g. `BE-EMAIL-SPIKE-001`) if live HubSpot send not proven
+- [X] T004 Park unresolved spike blockers in `Backend/TODO.md` (e.g. `BE-EMAIL-SPIKE-001`) if live HubSpot send not proven — **2026-07-16:** parked as `HS-009` (HubSpot-side scope/tier gap, not an EMS code blocker) instead of `BE-EMAIL-SPIKE-001`, since the code itself is correct against HubSpot's real API — see `Frontend/docs/hubspot-ops-todo.md`.
 
 ---
 
@@ -183,9 +185,9 @@ description: "Task list for Email Dispatch (005-email-dispatch) — Slice 2"
 - [ ] T066 [P] Add XSS guard tests for dispatch/template/segment names in `Frontend/src/views/EmailDispatchView.test.tsx`
 - [ ] T067 [P] Verify non-admin cannot access Email module (RBAC) in `Frontend/src/views/EmailDispatchView.test.tsx` or router tests
 - [ ] T068 Run automated suites per `specs/005-email-dispatch/quickstart.md` §A (`Backend/npm test`, `Frontend/npm test`)
-- [ ] T069 Execute manual UAT checklist `specs/005-email-dispatch/quickstart.md` §B with `USE_MOCK_API: false` after SFTP deploy
+- [ ] T069 Execute manual UAT checklist `specs/005-email-dispatch/quickstart.md` §B through the live ScriptRunner data path after SFTP deploy
 - [ ] T070 [P] Update `Frontend/CHANGELOG.md` and `Backend/CHANGELOG.md` for Slice 2 email dispatch
-- [ ] T071 Remove dead legacy email mock paths from `Frontend/src/services/dataService.ts` and `Frontend/src/data/mockData.ts` if superseded
+- [X] T071 Remove dead legacy email mock paths — completed as part of the full runtime mock-data removal on 2026-07-15 (`mockData.ts` deleted)
 - [ ] T072 Mark spec status ready for implement in `specs/005-email-dispatch/spec.md` after §B sign-off
 
 ---

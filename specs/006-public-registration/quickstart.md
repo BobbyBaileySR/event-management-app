@@ -1,10 +1,12 @@
 # Quickstart: Public Registration (Slice 3)
 
-Manual and automated validation for **006-public-registration** — view/copy link (US1), Program configure (US2), Event override (US3), Open in HubSpot (US4).
+> **Do not execute this quickstart as written.** Slice 3 is not started. Steps below target deleted surfaces (`SettingsView`, catalog pickers, mock catalog path). After re-planning against Programs & Events / Event Details / `WorkingEventPicker` and the live ScriptRunner API (no mock-data path), rewrite this runbook before any QA.
+
+Manual and automated validation for **006-public-registration** — view/copy link (US1), Program configure (US2), Event override (US3), Open in HubSpot (US4). *(Historical draft below.)*
 
 **Related**: [spec.md](./spec.md) · [plan.md](./plan.md) · [contracts/catalog-registration.md](./contracts/catalog-registration.md) · [data-model.md](./data-model.md)
 
-Builds on [003 quickstart](../003-check-in/quickstart.md) (catalog context, admin RBAC).
+Builds on [003 quickstart](../003-check-in/quickstart.md) (event context, admin RBAC).
 
 ---
 

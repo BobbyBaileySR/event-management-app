@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultScheduleSlot, formatScheduleSlotLabel } from './emailSchedule';
+import { assertScheduleFields, defaultScheduleSlot, formatScheduleSlotLabel } from './emailSchedule';
 
 /**
  * `now` is built with the local-time Date constructor and `defaultScheduleSlot` reads
@@ -83,5 +83,30 @@ describe('formatScheduleSlotLabel', () => {
 
 	it('returns an empty string for an invalid date', () => {
 		expect(formatScheduleSlotLabel('not-a-date', 9, 0)).toBe('');
+	});
+});
+
+describe('assertScheduleFields', () => {
+	it('throws when the instant is in the past', () => {
+		expect(() => assertScheduleFields('2000-01-01T00:00:00.000Z', 'UTC')).toThrow('Choose a time in the future.');
+	});
+
+	it('throws when the instant does not land on a 15-minute mark', () => {
+		expect(() => assertScheduleFields('2999-01-01T10:07:00.000Z', 'UTC')).toThrow(
+			'Schedule time must be on a 15-minute mark (e.g. 9:00, 9:15, 9:30, 9:45).',
+		);
+	});
+
+	it('does not throw for a future, 15-minute-aligned instant', () => {
+		expect(() => assertScheduleFields('2999-01-01T10:15:00.000Z', 'UTC')).not.toThrow();
+	});
+
+	it('checks alignment in the given timezone, not UTC', () => {
+		// 2999-01-01T10:07:00Z is 05:07 in America/New_York (UTC-5) — still misaligned there too,
+		// but this proves the check reads the requested zone rather than always UTC.
+		expect(() => assertScheduleFields('2999-01-01T10:00:00.000Z', 'America/New_York')).not.toThrow();
+		expect(() => assertScheduleFields('2999-01-01T10:07:00.000Z', 'America/New_York')).toThrow(
+			'Schedule time must be on a 15-minute mark (e.g. 9:00, 9:15, 9:30, 9:45).',
+		);
 	});
 });

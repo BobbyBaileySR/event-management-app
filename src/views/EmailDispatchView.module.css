@@ -472,6 +472,10 @@
 	font-weight: 600;
 }
 
+.ticketsBadge {
+	margin-left: 8px;
+}
+
 .rowActions {
 	display: flex;
 	flex-wrap: wrap;

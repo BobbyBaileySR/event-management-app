@@ -35,13 +35,15 @@ describe('LoadingState', () => {
 		expect(screen.queryByText('Did you know?')).not.toBeInTheDocument();
 	});
 
-	it('renders Did you know below the spinner for page variant', () => {
+	it('renders Did you know above the spinner for page variant', () => {
 		mockGetRandomLoadingTip.mockReturnValueOnce('A fun fact.');
 
-		render(<LoadingState message="Loading compose options…" />);
+		const { container } = render(<LoadingState message="Loading compose options…" />);
 
 		expect(screen.getByText('Did you know?')).toBeInTheDocument();
 		expect(screen.getByText(/A fun fact\./)).toBeInTheDocument();
+		const status = container.querySelector('[role="status"]');
+		expect(status?.firstElementChild?.textContent).toContain('Did you know?');
 	});
 
 	it('renders Did you know for panel variant without a skeleton', () => {

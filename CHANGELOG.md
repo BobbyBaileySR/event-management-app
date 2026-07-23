@@ -6,7 +6,651 @@ Format: entries grouped by date (newest first). One bullet per logical change.
 
 ---
 
+## 2026-07-23
+
+### Feature: unlocked the Check-in "+" live-attendance correction (also affects Backend, `BE-CHECKIN-001`)
+
+- **Why**: event staff wanted full control to correct live attendance up as well as down "where and when they see fit" — the "+" button was capped at `checkedInCount`, so staff couldn't correct the live count above it (e.g. a walk-in checked in through a side channel that hasn't landed in `checkedInCount` yet, but is physically on site).
+- **Change**: [CapacityBar.tsx](src/components/CapacityBar.tsx) — `disableUp` no longer checks `value >= checkedInCount`; the "+" ("Correct one departure") control is now only disabled while a request is in flight, matching the corresponding Backend change (`Utils/Capacity.ts`/`CapacityStore.ts` — see `../Backend/CHANGELOG.md`) that dropped the matching `422 capacity_at_ceiling` server-side bound. Also reworded the manual-adjustment note for the new negative case — `manualAdjustmentCount` (from the API's now-signed `departureCount`) below zero now reads "Includes manual adjustment of 3 above checked-in" instead of a bare "-3".
+- Tests: `CapacityBar.test.tsx`'s ceiling-disable case replaced with one asserting "+" stays enabled at/above `checkedInCount`; new case for the negative-adjustment copy. Full suite green (68 files / 603 tests), `tsc`/`eslint` clean.
+
+### Fix: required modal fields had no visible marker
+
+- **Why**: E2E testing found several required fields across modals gave no visual cue they were required until submit was blocked — only [CatalogProgramModal.tsx](src/components/CatalogProgramModal.tsx)'s "Program name" had a red `*` (`.requiredMark`, local to that module).
+- **Change**: promoted the marker to a shared global class — `.required-mark` in [css/components.css](css/components.css) (same `--danger` color/weight) — and switched `CatalogProgramModal` to it, deleting its local duplicate. Added an optional `required?: boolean` prop to the shared pickers ([CalendarPicker.tsx](src/components/pickers/CalendarPicker.tsx), [SelectPicker.tsx](src/components/pickers/SelectPicker.tsx), [TimePicker.tsx](src/components/pickers/TimePicker.tsx)) that renders the same marker next to the picker's own label plus `aria-required` on the trigger button, since their `label` is a plain string prop (no way for a call site to inject a marker itself). Applied the marker to every field that's actually enforced as required (HTML `required`, an inline "X is required" validation error, or blocks the submit button when empty):
+  - [CatalogEventModal.tsx](src/components/CatalogEventModal.tsx): Event name, Start Date.
+  - [EmailDispatchView.tsx](src/views/EmailDispatchView.tsx): Template (compose + edit), HubSpot list (when that audience source is chosen), Schedule Date/Time, and the edit modal's Dispatch name (a plain input previously missing `required`/`aria-required` entirely — `docs/api-contract.md` already documents it as "Required non-empty string"). Left every genuinely optional field alone (Description, Owner, Location, Capacity, Walk-in form URL, Status, Publish state, the disabled Program-owner picker, etc.) — none of those block a save.
+- Tests: `CatalogProgramModal.test.tsx`'s existing assertion now checks the shared `.required-mark` class instead of the deleted local one; `CatalogEventModal.test.tsx`'s `getByLabelText('Event name')` calls became `/^Event name/` (the label's accessible text now includes the marker, matching the convention `CatalogProgramModal.test.tsx` already used for "Program name") and a new case asserts exactly two markers (Event name, Start Date) render; new `EmailDispatchView.test.tsx` case asserts the compose modal's Template field carries the marker and `aria-required`.
+- **Follow-up same day — two bugs the above introduced, both caught before merge:**
+  1. **Broken alignment**: adding the marker to CalendarPicker's Start Date label visibly broke — the `*` dropped to its own line, pushing the date field lower than the paired Start Time field. Root cause: `CatalogEventModal.module.css`'s `.form label` rule is a *descendant* selector — CSS Modules only hashes the `.form` class, not the bare `label` type, so it was unintentionally reaching into and reflowing CalendarPicker/SelectPicker/TimePicker's own internal `<label>` too (`display: flex; flex-direction: column` split the label's two children, text and marker, onto separate lines) — invisible before because those pickers' labels only ever had one child (their own text). Reproduced with an isolated static HTML/CSS repro in-browser before touching source, confirmed the fix the same way. Changed to `.form > label` (direct-child) in both `CatalogEventModal.module.css` and `CatalogProgramModal.module.css` (same latent bug there, not yet triggered since its pickers don't use `required` today) — scopes the rule to the modals' own plain labels (Event name, Owner, Location, …) without reaching into a nested picker's internals.
+  2. **Invisible marker**: `EmailDispatchView.module.css` visually hides `.templatePicker`/`.segmentListPicker`'s built-in `<label>` entirely (`position: absolute; width: 1px; height: 1px; overflow: hidden`) in favor of a visible section title above — so the marker I'd nested *inside* that `<label>` was hidden along with it, on Template and HubSpot list specifically. Fixed generally rather than special-casing those two fields: `CalendarPicker.tsx`/`SelectPicker.tsx` now render the marker as a **sibling** of `<label>` (both wrapped in a plain inline `.labelRow` span, new in `Pickers.module.css`) instead of a child, so no consuming module's `label`-targeting CSS can hide it. Confirmed both call sites (visible-label and hidden-label) render correctly via the same repro before applying to source.
+- Full suite green (68 files / 602 tests), `tsc`/`eslint` clean.
+
+### Fix: newly created Program/Event needed a manual page refresh to appear in Programs & Events
+
+- **Why**: E2E testing found that creating a Program or Event from the modal wrote it to HubSpot correctly, but the row didn't appear until the browser was manually refreshed. Root cause: `handleProgramSave`/`handleEventSave` in [EventsView.tsx](src/views/EventsView.tsx) already called `invalidateAfterCatalogChange` (invalidate + forced refetch of the active `catalog` query) right after create — but that refetch hits HubSpot's list-read endpoint, which can briefly lag right after a brand-new object is created, so the refetch would come back without the just-created row. A later manual refresh worked only because enough time had passed for HubSpot's list read to catch up.
+- **Change**: `createProgram`/`createEvent` already return the created record in their response — `handleProgramSave`/`handleEventSave` now write that record straight into the `catalog` query cache (`upsertCatalogRecord`, new helper) immediately after `refreshCatalog()` resolves, so the just-created row is guaranteed to be present regardless of HubSpot's list-read timing. Applied after the refetch (not before) so the refetch can't stomp the optimistic entry with its own lagging response.
+- Tests: new case in `EventsView.test.tsx` — "shows a newly created Program immediately, even if the follow-up catalog refetch has not caught up yet" — mocks `fetchCatalog` to keep returning the pre-create dataset on every call (simulating the HubSpot lag) and asserts the new Program still renders. Full suite green (68 files / 600 tests).
+
+### Fix: tablet rail's working-event control was an unlabeled icon with no context
+
+- **Why**: the icon rail's working-event affordance was a plain 🗓️ icon button — unclear what it did, and gave no indication of *which* event (if any) was currently selected once the nav was collapsed to the rail.
+- **First attempt (superseded same day, see below)**: widened the rail from 64px to 124px and turned that one row into a chip showing the truncated event name. User feedback: the widened rail itself was the problem — "made the sidebar way too [w]ide" for only ~9 characters of payoff.
+- **Options presented for the redo**: (a) revert to 64px icon-only and surface the working-event name in `TopBar` instead (visible on every breakpoint, not just tablet), (b) 64px icon-only + a plain selected/unselected status dot (no name shown anywhere), (c) 64px icon-only + a tap-to-preview flyout popover, (d) (a)+(b) combined. **User chose (a).**
+- **Change**:
+  - [IconRail.tsx](src/components/IconRail.tsx)/[.module.css](src/components/IconRail.module.css) reverted to the original 64px icon-only rail — the working-event button is a plain 44px icon again (`eventName` still feeds its accessible name/tooltip for screen-reader/hover users, just not shown visually).
+  - `TopBar` ([TopBar.tsx](src/components/TopBar.tsx)/[.module.css](src/components/TopBar.module.css)) gained an optional `workingEvent` pill ("Working on: **Meeting Room**") rendered under the title/meta — visible at every chrome tier (desktop/tablet/phone), not just where the picker happens to collapse.
+  - Wired `workingEvent={eventName}` (via the existing `useWorkingEventMeta` hook) into the three event-scoped views whose own title/meta said nothing about which event they were scoped to: [AttendeesView.tsx](src/views/AttendeesView.tsx), [CheckInView.tsx](src/views/CheckInView.tsx), [ConversationsView.tsx](src/views/ConversationsView.tsx) (including their loading/error states via `ViewErrorState`'s new `workingEvent` prop). `EventHubView` and `EmailDispatchView` were deliberately left alone — both already show the event name prominently in their own body/title, so an extra pill there would just duplicate it.
+- Tests: `IconRail.test.tsx` reverted to icon-only expectations; new `TopBar.test.tsx` cases (renders/omits the pill, XSS guard); new "shows the working event in the TopBar pill" case added to `AttendeesView.test.tsx`/`CheckInView.test.tsx`/`ConversationsView.test.tsx` (the latter two needed a `fetchCatalog` mock added to their data-service fixture, since neither previously exercised `useWorkingEventMeta`). Full suite green (68 files / 599 tests). Verified in-browser at 900px: rail back to 64px, icon-only.
+
+### Fix: tablet-portrait polish pass (theme dot, Check-in icon, Check-in/Conversations layout)
+
+- **Theme switcher dot** — Dark Aurora's swatch dot (`--theme-swatch-dark-aurora`, `css/tokens.css`) was identical to Aurora's (`#FF6633`), because Dark Aurora's real `--accent` genuinely is the same brand orange (`theme-dark-aurora.css`) — not a copy-paste error, but it made the two dots indistinguishable in the switcher. Changed the swatch (display-only; the real `--accent` role token is untouched) to Dark Aurora's `--surface` tone (`#0B0E1A`) so the dot itself reads as "the dark theme."
+- **Check-in rail/tab-bar icon** — `Check-in`'s icon (`src/config/eventModules.ts`) was the bare glyph `✓`, which renders at a different size/weight than the pictograph emoji used everywhere else (📊🏢📋👥✉️💬), reading as misaligned in `IconRail`/`MobileTabBar`. Changed to `✅` to match.
+- **Check-in "Start scanner"/"+ Add walk-in" button misalignment** — the two action cards can hold a different amount of description text, so their buttons landed at different heights even though the cards themselves were equal height (flex row's default `align-items: stretch`). [CheckInView.module.css](src/views/CheckInView.module.css): `.actionColumn > .card` is now a column flex container with its button pinned to the bottom (`margin-top: auto`), so both buttons sit level regardless of description length.
+- **Large dead gap above the Attendees/Conversations list at tablet width** — [CheckInView.module.css](src/views/CheckInView.module.css) and [ConversationsView.module.css](src/views/ConversationsView.module.css)'s `≤900px` layout stacks the action card(s) above the list but never sized the two rows — both defaulted to `auto`, and since `.layout` itself is flex-stretched to fill available height, the leftover space collected as dead space between them instead of growing the list. Added `grid-template-rows: auto 1fr` (action row content-sized, list row takes the rest) and `align-items: stretch` (overriding the unconditional `align-items: start` that's correct for desktop's side-by-side columns) so the list card fills its row. Also removed the `max-height: min(50vh, 420px)` cap on `.resultsScroll` at this breakpoint — the card's own height (from the 1fr row) now bounds it instead of an arbitrary viewport fraction.
+- Verified with a CSS-only repro (isolated, real selectors) at 810×1080: buttons align, gap gone, no regression at ≥901px (desktop keeps its unbounded-except-520px-cap column layout, untouched). No test changes — CSS/config only; full suite still green (68 files / 591 tests).
+
+### Feature: 3-tier responsive shell chrome — icon rail + drawer (tablet), top tab bar (phone)
+
+- **Why**: the sidebar tablet fix earlier today (below) patched a real visual bug, but the user flagged that it didn't match the actually-agreed design. `Frontend/design_handoff 2/README.md`/`DESIGN-CONTEXT.md` — the authoritative visual source of truth per the [007-redesign spec](specs/007-redesign-initiative/spec.md) — has always specified: desktop ≥1024px full sidebar, **tablet 768–1023px a 64px icon rail + hamburger-triggered slide-out drawer**, **phone <768px a top horizontal tab bar** replacing the sidebar/rail entirely. The shipped shell instead had one 900px breakpoint that just stacked the full labeled nav on top for both tablet and phone — never tracked as an intentional simplification, just missed. Confirmed against the interactive prototype (`design_handoff 2/Event Management System.dc.html`) and its screenshots.
+- **Change**:
+  - New `useSidebarNavItems` hook (`src/hooks/useSidebarNavItems.ts`) — single source of truth for nav items/role-gating/active/disabled state, shared by `Sidebar`, `IconRail`, and `MobileTabBar` so the three chrome variants can't drift apart.
+  - New `IconRail` (tablet icon-only rail + hamburger), `NavDrawer` (slide-out overlay — `role="dialog"`, focus trap via the existing `useModalFocusTrap`, Escape/backdrop-click/× to close, wraps `Sidebar variant="drawer"`), and `MobileTabBar` (phone horizontal scrollable tab row + inline `WorkingEventPicker` row + theme row) components.
+  - `ThemeSwitcher` gained a `variant` prop (`list` default / `row` phone tab bar / `compact` icon-dot-only tablet rail, `sr-only` label kept for screen readers) — replaces the narrower interim `@media` hack from the superseded fix below.
+  - New `useViewportTier` hook (`src/hooks/useViewportTier.ts`) drives which of the three `AppLayout` mounts — deliberately JS (`window.innerWidth` + resize listener), not CSS `@media`: this project's jsdom/vitest environment does not evaluate `@media` conditions at all (verified empirically — computed style always reflects a rule's unconditional base, never a media-gated override), so a CSS-only tier switch would render all three chrome variants simultaneously under test and can't be asserted on. `AppLayout` also auto-closes the drawer if a resize carries the viewport out of the tablet tier while it's open.
+  - `Sidebar` unchanged at the desktop tier (same DOM/classes — all 29 pre-existing tests pass unmodified); gained a `variant="shell" | "drawer"` prop for the drawer-embedded case.
+  - Removed the now-superseded `@media (max-width: 900px)` stacking block from `Sidebar.module.css`/`ThemeSwitcher.module.css`. Shell-level breakpoints in `AppLayout.module.css`/`TopBar.module.css` moved from the old single 900px cutover to 1024px (matching the new tier boundary) for the visual padding tweaks that still apply there; per-view content breakpoints (`AttendeesView`, `CheckInView`, etc.) are untouched — separate concern, not part of the shell.
+- **Deferred/pragmatic calls** (see `TODO.md`): the phone tier has no pixel reference in the design handoff (its own README says so) — its layout (tab row, working-event row, theme row) follows the README's textual spec, not a screenshot. Dead legacy `#app-layout`/`.nav-items` selectors in `css/layout.css` (pre-React, unused) were left alone — out of scope for this change.
+- Tests: new `useSidebarNavItems.test.tsx`, `useViewportTier.test.ts`, `IconRail.test.tsx`, `NavDrawer.test.tsx`, `MobileTabBar.test.tsx`, plus an `AppLayout` "3-tier responsive chrome" describe block (tier switching, drawer open/close). Full suite green (68 files / 591 tests), `tsc --noEmit` clean, lint clean. Manually verified all three tiers (1280/900/390px) plus drawer open/Escape-close/focus-return in a live browser session against a temporary auth-bypassed preview harness (deleted after verification — real Google/HubSpot auth isn't reachable in this sandboxed environment).
+
+### Fix: Attendee Detail modal had two buttons both accessibly named "Close"
+
+- **Why**: found incidentally while running the full Frontend suite for the sidebar tablet fix (unrelated). `AttendeeDetailModal.test.tsx` tolerated it via `getAllByRole`, but `AttendeesView.test.tsx`'s "opens the Attendee Detail modal when a row is clicked outside the action-button cell" test used `getByRole('button', { name: 'Close' })` (singular), which failed once the 2026-07-22 redesign added a footer Close button alongside the existing header icon "×" button (`aria-label="Close"`).
+- **Change**: header icon button's `aria-label` in [AttendeeDetailModal.tsx](src/components/AttendeeDetailModal.tsx) changed to `"Close attendee detail"` so the footer "Close" button is the sole element named "Close". No visual change.
+- Verified: full Frontend suite green (68 test files / 591 tests).
+
+### Fix: sidebar Theme switcher broken at tablet widths (≤900px) — superseded same day
+
+- **Superseded** by the 3-tier responsive shell rebuild above, later the same day — that replaced the single 900px stacking breakpoint entirely, so this fix's `@media (max-width: 900px)` blocks no longer exist. Left here for the record of what was tried first and why.
+- **Why**: reported app-wide tablet bug — reproduced with a standalone harness rendering the actual `Sidebar`/`ThemeSwitcher` CSS at 810×1080. Root cause was two-fold: (1) `.footer p { flex: 1 1 160px }` (specificity 0,1,1) was beating the bare `.sectionLabel` mobile rule (0,1,0) that should have put "Theme" on its own full-width row like `WORKING EVENT` does, so the label stayed inline; (2) `ThemeSwitcher` had no responsive styles at all, so its 3 options stayed a narrow fixed-width vertical column stranded mid-row in the now-horizontal footer, with large empty gaps either side.
+- **Change**: added `.footer .sectionLabel { flex: 1 0 100%; }` in [Sidebar.module.css](src/components/Sidebar.module.css) to win on specificity and give "Theme" its own row. Added a `@media (max-width: 900px)` block to [ThemeSwitcher.module.css](src/components/ThemeSwitcher.module.css) turning the vertical option list into a wrapping horizontal pill row (matching the existing nav-item mobile treatment).
+- Verified in-browser at 810×1080 (fixed) and 1280×900 (desktop layout unchanged, no regression). No test changes — this is CSS-only; existing `Sidebar`/`ThemeSwitcher` Vitest suites still pass (24/24).
+
+## 2026-07-22
+
+### Docs — HubSpot + EMS travel form story for Events walkthrough
+
+- Added [story/hubspot-plus-ems-travel-form.md](../story/hubspot-plus-ems-travel-form.md): draft hybrid story (HubSpot registration stays default; EMS travel form for EMS-only fields), how Events would enable the form, public URL patterns, phased MVP sketch, and open questions for Events/Travel. Not a build spec.
+
+### Attendee Detail modal — tighter header + taller default height
+
+- Fixed the large gap under the header subtitle: global `.modal p { margin-bottom: 20px }` was beating the module `.subtitle` rule (same bug CatalogEventModal already documented). Selector is now `.modal .subtitle`.
+- Raised max-height from a 720px cap to `calc(100vh - 32px)` so typical Registered/Conversations content does not force an immediate scrollbar.
+
+### Attendee Detail modal — context-specific sections + Create lead footer
+
+- **Why**: the same modal was used on Registered Attendees and Conversations, so Conversations incorrectly showed HubSpot Lead, Attendee Journey, and Registration History, while Registered showed a mid-body "Generate Lead" block instead of the designed footer action.
+- **Change**: `AttendeeDetailModal` takes a required `variant` (`registered` | `conversations`). Registered keeps Basic Information, Attendee Journey, notes **history only**, Registration History, and a footer **Create lead** (primary) + Close with the cross-event history checkbox. Conversations keeps Basic Information, notes input + history, and a Close footer only.
+- `ConversationNotesPanel` gains `mode="compose" | "history"` — history hides add/edit/delete; compose keeps capture (Save note).
+- "Show all communications" restyled as an accent text link to match the Registered design.
+- Tests cover both variants' section visibility plus history-only notes on Registered.
+
+### Refactor: one shared `useUndoCheckIn` hook instead of two drifted copies
+
+- **Why**: architecture review found `CheckInView` and `AttendeesView` each hand-rolled the same undo-check-in sequence (call, toast, invalidate) with copy that had drifted — `CheckInView`'s toast named the attendee, `AttendeesView`'s didn't.
+- **Change**: new `hooks/useUndoCheckIn.ts` owns the call → toast → `invalidateAfterAttendeeMutation` sequence and the `undoingId` in-flight flag. Each view still owns its own confirm-dialog copy (`CheckInView` legitimately skips it when undoing from its already-open "Already checked in" modal) and its own reaction to success (`CheckInView`'s optimistic local roster patch + modal close).
+- **Copy change** (disclosed, not silent): standardized the toast on the more informative name-included form (`"Ada Lovelace: check-in undone."`, matching `confirmCheckIn`'s existing pattern) — `AttendeesView` previously showed a generic `"Check-in undone"` with no name.
+- Tests: new `useUndoCheckIn.test.tsx` adds the failure-path coverage (a rejected `undoCheckIn` call) neither view's own tests had before. Full suite: 558/558 green, `tsc --noEmit` clean, lint clean.
+- **Scoped down deliberately**: left `CheckInView`'s local-`useState` roster fetch as-is rather than migrating it onto the shared `useAttendees` cache hook in this same pass — that's a real-time desk workflow where a data-fetching architecture change carries real regression risk, and it was already flagged in `TODO.md` (`FE-ARCH-004`) as design-sensitive, pending a `/grilling` pass first.
+
+### Refactor: collapsed dataService's tripled route surface
+
+- **Why**: architecture review found every route declared three times — the free function, `createDataService`'s factory wrapper (re-typing the same parameter list just to bind the token), and, for the attendees query, a third hand-typed copy in `queryKeys.ts`.
+- **Change**: new generic `bindOptions(fn, options)` helper replaces ~28 of 34 factory wrapper one-liners that were pure "forward args, append options" passthroughs — TS infers each method's exact types from the underlying free function, so `DataService`'s shape is unchanged. The 3 methods that genuinely merge extra per-call fields into `options` (`fetchAuditLog`, `fetchCatalog`, `fetchAttendeeNotes`) stay hand-written since that's real behaviour, not boilerplate.
+- Deleted the two dead `@deprecated` forwarders `fetchSliceAttendees`/`fetchCapacityStatus` — zero callers and zero test coverage anywhere.
+- `updateEmailDispatch` no longer wraps its PATCH response in a fake list envelope just to reuse the list normalizer — exported the normalizer's existing per-item helper and calls it directly.
+- `fetchEventAttendees`'s query type is now exported (`EventAttendeesQuery`) and is the single source `queryKeys.ts`'s `AttendeesQueryParams` re-exports, instead of an independent third copy.
+- Verified: `tsc --noEmit` clean, lint clean, full suite 553/553 green **unchanged** — no test needed updating, confirming this was pure internal restructuring.
+
+### Fixed: three tested functions weren't actually used on the render/send path they were written to guard
+
+- **Why**: architecture review found `assertScheduleFields`, `isRegisteredContactSelected`, and `getFillPercent` each had unit-test coverage, but the real UI either bypassed them with a hand-copied duplicate or never called them at all — meaning the tests could pass while the real screen was wrong.
+- **`assertScheduleFields`** (`utils/emailSchedule.ts`) had zero callers anywhere. Wired into `useEmailDispatchWorkflow.ts`'s `handleScheduleForLater` and `handleSaveEdit`, both now validating the built schedule instant (future + 15-minute-aligned) before the network round-trip. Its error messages were also bare `'validation_error'` strings that would have rendered raw in a toast — changed to plain language ("Choose a time in the future.", "Schedule time must be on a 15-minute mark (e.g. 9:00, 9:15, 9:30, 9:45).").
+- **`isRegisteredContactSelected`** (exported from the hook, tested) was bypassed by `EmailDispatchView.tsx`'s own hand-copied `isContactSelected`, which re-implemented the same switch. The view now delegates to the tested predicate.
+- **`getFillPercent`** (`utils/capacityTier.ts`, tested, already used by `CapacityBar`/`OverviewView`) was bypassed by a byte-for-byte-identical private `occupancyPercent` in `EventsView.tsx` — deleted in favour of the shared, tested function.
+- Tests: 4 new `assertScheduleFields` cases in `emailSchedule.test.ts` (past instant, misaligned minute, valid case, non-UTC timezone alignment) and a new `useEmailDispatchWorkflow.test.ts` case proving a past schedule date is rejected before `previewEmailDispatch`/`createEmailDispatch` are ever called. Full suite: 553/553 green, `tsc --noEmit` clean, lint clean.
+
+---
+
+## 2026-07-21
+
+### Fixed: Programs & Events showed "Live Capacity" (checked-in) instead of "Event Capacity" (registered)
+
+- **Bug report**: an event with 1 registrant (not yet checked in) showed `1/100` on Event Details but `0/100` on Programs & Events. There are two distinct capacity numbers in this product — **Event Capacity** (total registered vs. capacity, shown on Event Details and now correctly on Programs & Events/Overview) and **Live Capacity** (on-site/checked-in count, shown on the Check-in page) — and Programs & Events was silently displaying the latter under a field named `attendeeCount`.
+- **Root cause**: `enrichPortfolioWithCapacity` (`catalogEventPresentation.ts`) fed the summary route's `checkedInCount` into `PortfolioEvent.attendeeCount`. `OverviewView.tsx:71` even names its own local variable `totalRegistered` while summing this same field — the intent was always "registered," the data source just didn't match.
+- **Fix**: backend `events/capacity-summary` now returns a separate `registeredCount` field (total registered, checked-in or not) — see `../Backend/CHANGELOG.md`. `enrichPortfolioWithCapacity` now reads `registeredCount` instead of `checkedInCount` for `attendeeCount`. No UI/markup changes — Programs & Events and Overview both consume `PortfolioEvent.attendeeCount` already, so fixing the one shared merge function fixes both screens.
+- Tests: `catalogEventPresentation.test.ts` — new regression case (registered-only, not checked-in, still counts toward `attendeeCount`) plus updated existing cases to include `registeredCount`. Updated fixtures in `normalizeApi.test.ts`, `dataService.test.ts`, `OverviewView.test.tsx`, `EventsView.test.tsx` for the new required field. Full suite: 548/548 green, `tsc --noEmit` clean, `vite build` clean, lint clean.
+- Docs: `docs/api-contract.md`'s `events/capacity-summary` section documents both fields and the bug, so the distinction doesn't get re-conflated later.
+
+### Working Event picker delay — shared the catalog cache instead of three independent raw fetches
+
+- **Root cause**: `WorkingEventPicker`, `AppLayout`'s own event-name lookup, and `useWorkingEventMeta` each called `dataService.fetchCatalog()` directly in their own `useEffect`, bypassing TanStack Query entirely — so the catalog prefetch `sessionLifecycle.ts` already warms right after sign-in (`prefetchCatalog`, keyed `queryKeys.catalog()`) never actually helped: all three fired their own independent, uncached network round-trip on every mount, up to three concurrent requests per login. The closed picker also gave no visible loading feedback (just sat on "Select an event" with no spinner/busy state), so the delay looked like nothing was happening.
+- **Fix**: `WorkingEventPicker` and `AppLayout` now use the existing `useCatalog()` hook (default `includeArchived: false`) — same query key as the sign-in prefetch, so both get the already-warm cache instead of a fresh fetch. `useWorkingEventMeta` now uses `useCatalog({ includeArchived: true, enabled: Boolean(eventId) })` — a deliberately separate cache entry (archived events still need to resolve here), but now cached/deduped via TanStack Query rather than a raw fetch on every mount, and skips the fetch entirely when there's no active event (new `enabled` option added to `useCatalog`).
+- Added a purely visual (`aria-hidden`, `aria-busy` on the trigger) spinner to `WorkingEventPicker`'s closed state while the first fetch is in flight — deliberately doesn't change the trigger's label text (`currentEventName ?? 'Select an event'`), so the existing accessible-name-based test assertions and the picker's instant-clickability are unaffected.
+- Also investigated as part of the same session: a session-timeout report where the URL sticks to the last-viewed event route and lands back there after re-login. Confirmed intentional-by-omission (no redirect/URL-clearing logic exists in the session-expiry or login path) and safe — `sessionLifecycle.ts` clears the query cache on every session-token change, and views like `AttendeesView` re-check the *current* session's role on every render, so a different/lower-privileged user landing on the same URL after re-login gets access-denied against their own real role, never a replay of the prior session's data. No code change made for this half.
+- Tests: `WorkingEventPicker.test.tsx`, `AppLayout.test.tsx`, and `Sidebar.test.tsx` (which renders `WorkingEventPicker`) now wrap renders in a `QueryClientProvider` via the existing `renderWithQueryClient` test util; `useWorkingEventMeta.test.tsx` (renamed from `.ts` — now contains JSX for its wrapper) does the same via `renderHook`'s `wrapper` option. All existing assertions (loading row, "No events found.", XSS guard, filter/navigate) pass unchanged. Full suite: 547/547 green, `tsc --noEmit` clean, `vite build` clean, lint clean.
+- Not verified live in-browser: reaching the authenticated shell needs a real Google Identity Services sign-in (mock auth only stubs the server-side token exchange, not the Google button itself), which isn't reachable from this sandbox — verified instead via the Vitest coverage above.
+
+### HubSpot Lead-generation feasibility gates — UAT values confirmed (`HS-015`/`HS-016`/`HS-017` progress, `HS-018` reclassified)
+
+- Live UAT checks against the portal resolved most of the Lead-generation feasibility gates blocking `014-lead-generation`: `HS-015` (`crm.objects.leads.read`/`write` scopes) confirmed granted; `HS-016` (Contact↔Lead `associationTypeId`) confirmed as `578` ("Lead to primary contact," the Lead→Contact direction — not the `579`/`609` pair from the reverse Contact→Lead direction initially queried) and the Note↔Lead `associationTypeId` confirmed as `855`.
+- `HS-017` (`hs_lead_type`/`hs_lead_label` values) — confirmed 2026-07-21: "Marketing / Event" / "WARM", internal `value` strings verified to match the display labels. **Every Lead-generation feasibility gate is now closed except `HS-018`.**
+- `HS-018` reclassified from "grant a scope" to "confirm portal tier" — `crm.objects.notes.read`/`write` doesn't appear in this portal's private-app scope picker, matching a recurring HubSpot-Community-documented pattern where Notes/engagement API access is gated by subscription tier rather than a permissions bug. Blocks the interest-summary Note (ADR-018) and conversation-notes sync (ADR-019) at the account level until confirmed with the HubSpot account rep.
+- Docs updated: `docs/hubspot-ops-todo.md` (`HS-015`/`HS-016` moved to Done archive, new `HS-016b` archived for the Note association ID, `HS-017`/`HS-018` reworded), `docs/hubspot-schema.md` (Lead-generation section — confirmed values recorded in the Parameters table and feasibility gates list). No code changes.
+
+### Live event conversation notes — Phases 4/5/7 implemented (`FE-NOTES-001` done, `015-conversation-notes`)
+
+- **Phases 4/5/7 (US2/US3/US5) of `specs/015-conversation-notes/tasks.md`** — the Attendee Detail modal's third "Notes" section. US1 (Conversations screen, QR lookup) was already shipped in an earlier session; Backend's `015` Phase 2/4/5/6/7 counterpart shipped the same session — see `../Backend/CHANGELOG.md`.
+- New `components/ConversationNotesPanel.tsx` + `.module.css` — a flat, non-tabbed `<section>` matching the modal's existing Basic Information/Attendee Journey/Registration history pattern (decomposed as its own component, mirroring `RegistrationHistoryPanel.tsx`'s precedent). List of captured notes (author + timestamp + "Edited" tag when `editHistory` is non-empty) + an add-note form + inline edit/delete controls per note + a "Show notes from all events" checkbox (`allEvents`, US5) that tags cross-event entries with an "Other event" badge. Wired into `AttendeeDetailModal.tsx` between the Attendee Journey section and `RegistrationHistoryPanel`.
+- **Edit/Delete controls are deliberately not gated to the note's own `authorEmail` client-side** (ADR-019 decision #5, tasks.md T033) — every note shows both controls to whichever admin is viewing the modal, matching the server's any-admin policy; the component has no "current user" concept to check against at all.
+- `types.ts` gains `ConversationNoteEntry`/`AttendeeNotesResponse`; `normalizeApi.ts` gains `normalizeConversationNoteEntry`/`normalizeAttendeeNotesResponse`; `dataService.ts` gains `fetchAttendeeNotes(eventId, contactId, {allEvents?})`, `createAttendeeNote`, `updateAttendeeNote`, `deleteAttendeeNote` — all wired into `createDataService`'s `useDataService()` binding, matching the existing CRUD-method conventions (`fetchAttendeeDetail`/`generateAttendeeLead` etc.).
+- Delete uses the existing `useConfirm()` promise-based confirmation dialog (same pattern as `AttendeesView.tsx`'s remove/undo-check-in flows) before calling `deleteAttendeeNote` — idempotent on the backend, so a double-click never errors.
+- **Dedicated adversarial test for the no-author-lock property** (explicit per the user's ask, T035): a new `AttendeeDetailModal.test.tsx` case renders a note authored by `author-admin@adaptavist.com` and completes a full edit-then-delete flow through the UI as a different notional viewer, asserting both `updateAttendeeNote`/`deleteAttendeeNote` are called and the UI updates — proving the controls are never gated by authorship, not just asserting "an admin can."
+- Also extended: `AttendeeDetailModal.test.tsx` (Notes fetched/rendered, empty state, add-note flow + failure toast, hostile-string-renders-as-text guard on note content, `allEvents` toggle refetch + cross-event tagging — 8 new cases). Two other suites that render `AttendeeDetailModal` (`AttendeesView.test.tsx`, `ConversationsView.test.tsx`) needed `fetchAttendeeNotes` added to their `dataService` mocks and (for `ConversationsView.test.tsx`) a `ConfirmProvider` ancestor added to their render helper, since the modal now unconditionally mounts the Notes panel.
+- Tests: 8 new cases in `AttendeeDetailModal.test.tsx` (26 total in that file). Full suite green: 547/547 tests, 62 files; `tsc --noEmit` clean; `npm run lint:fix` clean.
+- Docs updated: `docs/api-contract.md` (four new routes under the Lead-generation section), `docs/rbac.md` (RBAC matrix rows, three new audited actions, UI-gating row), `docs/ui-routes.md` (`ConversationsView.tsx` entry updated — Notes section is no longer "future"). `TODO.md`: `FE-NOTES-001` → `done-pending-QA`, `X-NOTES-001` → `done-pending-QA`. Not done by this change: quickstart.md §C operator security sign-off on UAT and `HS-018` for a real end-to-end Lead-sync test; live-browser verification (no live HubSpot-backed API or Google OAuth reachable in this sandbox) — verified instead via Vitest component tests (real DOM rendering + user-event interactions) plus a clean `tsc --noEmit`.
+
+### Live event conversation notes — US1 implemented (`FE-NOTES-001` partial, `015-conversation-notes`)
+
+- **Only Phase 1 (Setup) and Phase 3 (User Story 1) of `specs/015-conversation-notes/tasks.md`** — the checked-in attendee lookup and the new Conversations screen. `ConversationNoteStore`, the Notes section, and everything else note-related is explicitly out of scope for this change (separate session).
+- New `ConversationsView.tsx` (`#/events/{id}/conversations`, new "Conversations" Sidebar module via `eventModules.ts`, wired through `ViewRouter.tsx`'s `ConversationsRouteGate`) — a checked-in-only roster reusing the existing `fetchEventAttendees` with `checkedIn: true` (no new list route, per research.md R-003) and `CheckInQrPanel.tsx` unmodified for scanning. Selecting a row or completing a scan opens the existing `AttendeeDetailModal` (010) with that attendee's `contactId` — the same reused component, not a new one.
+- QR scan calls a new, dedicated `dataService.lookupAttendeeByQr(eventId, jwt)` → `POST events/{evId}/attendees/lookup`, **not** `checkInScan` — this is deliberate: scanning a checked-in attendee to find them for a conversation must never write or audit a check-in event (spec FR-003). `types.ts` gains `AttendeeLookupResponse`; `normalizeApi.ts` gains `normalizeAttendeeLookupResponse` (reuses the existing `normalizeCheckInContact` mapper).
+- Tests: new `ConversationsView.test.tsx` (7 cases — checked-in-only filtering against a mixed fixture, row-click and QR-scan both opening the Attendee Detail modal, an explicit assertion that `checkInScan` is never called during a Conversations-screen scan, empty/non-admin states, XSS guard). Full suite green: 540/540 tests, 62 files; `tsc --noEmit` + `vite build` clean.
+- Backend counterpart (`BE-NOTES-002` partial) shipped the same session — see `../Backend/CHANGELOG.md`. Docs updated: `docs/api-contract.md`, `docs/rbac.md`, `docs/ui-routes.md`. `TODO.md`: `FE-NOTES-001` → **in progress** (not done — the Attendee Detail "Notes" section itself, US2–US5, and the Lead-sync extension are unbuilt, tracked as a separate session). Not done by this change: quickstart.md §B2–§B5/§C (those exercise notes capture, which doesn't exist yet) and live-browser verification (no live HubSpot-backed API or Google OAuth reachable in this sandbox) — verified instead via Vitest component tests plus a clean `tsc`/`vite build`.
+
+### HubSpot Lead generation — implemented (`FE-LEAD-001`/`002`, `014-lead-generation`)
+
+- **US1 (single-attendee):** new "Generate Lead" action in `AttendeeDetailModal.tsx` — a dedicated "HubSpot Lead" section (admin-only, inheriting the modal's existing gate) with a button calling the new `dataService.generateAttendeeLead(eventId, contactId, { includeFullHistory })`; a success toast distinguishes all three outcomes (`created`/`updated`/`created_separate`, the last one explicitly noting the existing HubSpot Lead was left untouched) and shows the returned `leadId`; a failure toast surfaces the backend's plain-language error message.
+- **US3 (bulk):** `AttendeesView.tsx` gained its **first multi-select surface** — a checkbox column, a select-all-visible header checkbox, and a bulk action bar (shown only once at least one attendee is selected) with "Clear selection" and "Generate Leads." Selection is cleared on event/page change. At/above `CONFIG.LEAD_BATCH_CONFIRM_THRESHOLD` (client default 50, mirrors the Backend's own default), a `useConfirm()` dialog gates the call (same pattern as email dispatch's large-send confirmation) before passing `batchConfirmed: true`. Calls the new `dataService.generateAttendeeLeadsBatch(eventId, { contactIds, includeFullHistory, batchConfirmed? })`; result is summarized in one toast (counts per outcome + failed `contactId`s), not a separate results table.
+- **US4 (opt-in cross-event history):** an "Include full cross-event history" / "Include this attendee's full cross-event history" checkbox added to both the single and bulk UI, threaded through to both `dataService` methods as `includeFullHistory`.
+- `types.ts` gains `LeadGenerationOutcome`/`LeadGenerationBatchOutcome`/`GenerateLeadRequestBody`/`GenerateLeadResponse`/`GenerateLeadBatchRequestBody`/`GenerateLeadBatchResponse`/`GenerateLeadBatchResultEntry`; `normalizeApi.ts` gains `normalizeGenerateLeadResponse`/`normalizeGenerateLeadBatchResponse` (an unrecognized batch-entry outcome defaults to `'failed'`, never silently dropped). `config.ts` gains `LEAD_BATCH_CONFIRM_THRESHOLD` (default 50), a separate constant from `EMAIL_SEND_CONFIRM_THRESHOLD` per this feature's own risk-profile reasoning (research.md R-002).
+- Tests: extended `AttendeeDetailModal.test.tsx` (+5, including a `ToastProvider`-wrapped render helper since the modal now calls `useToast()`) and `dataService.test.ts` (+3 mapping tests); extended `AttendeesView.test.tsx` (+9, covering selection, the bulk API call shape, the per-outcome/failed-contactId summary toast, the confirmation-dialog gate at threshold, and selection clearing on page change). Full suite green: 533/533 tests, 61 files; `tsc --noEmit` + `vite build` clean.
+- Backend counterpart (`BE-LEAD-001`/`002`) shipped the same day — see `../Backend/CHANGELOG.md` (including a real audit-key-collision bug found and fixed while building the route tests). Not done by this change: quickstart.md §C operator security sign-off on UAT, and the HubSpot ops confirmations (`HS-015`/`016`/`017`/`018`) every user story depends on for a real end-to-end test. Live-browser verification of this feature specifically was not possible in this session's sandbox (no live HubSpot-backed API reachable, no Google OAuth available) — verified instead via Vitest component tests exercising the real rendered DOM with simulated user interaction, plus a clean `tsc`/`vite build`. `TODO.md`: `FE-LEAD-001`/`002` → `done-pending-QA`; `X-LEAD-001` → `done-pending-QA`.
+
+### Registration form bridge — "Registration history" panel implemented (`FE-REGFORM-001`, `013-registration-form-bridge`)
+
+- New `RegistrationHistoryPanel.tsx` mounted in the existing `AttendeeDetailModal.tsx`, right after Attendee Journey — renders every retained registration-answer-history entry (submission time via `formatDateTime`, question/answer pairs) or a clear "No registration answers recorded yet." empty state. Multi-select answers (`string[]`) join into a comma-separated display string. Pathologically long answers are cut to 500 characters with a trailing ellipsis for display only — the underlying data is never truncated in storage.
+- This is the first EMS surface rendering text authored directly by an anonymous public form submitter (spec FR-007) — rendered with JSX `{text}` only, never `dangerouslySetInnerHTML` or any other HTML-interpreting sink. A dedicated hostile-string Vitest guard (`<script>alert(1)</script>`, `<img src=x onerror=alert(1)>`) is a hard pass/fail gate confirming literal-text rendering with no script/img DOM node produced, not folded into general polish.
+- `types.ts`: new `RegistrationAnswerHistoryEntry`; `AttendeeDetail` gains `registrationAnswerHistory`. `normalizeApi.ts`'s `normalizeAttendeeDetailResponse` maps the new field (defaults absent/malformed input to `[]`, normalizes multi-select values, defaults an unrecognized `source` to `registration`) — no new `dataService` method, rides the existing `fetchAttendeeDetail` call.
+- Tests: new `RegistrationHistoryPanel.test.tsx` (entries + submission time, empty state, hostile-string guard, truncation); extended `AttendeeDetailModal.test.tsx` (panel mounts with history present, empty state when absent), `normalizeApi.test.ts` (populated/empty/multi-select/unrecognized-source cases), and `AttendeesView.test.tsx`'s attendee-detail fixtures (now include the field the type requires). Full suite green: 517/517 tests, 61 files; `tsc --noEmit` + `vite build` clean.
+- Backend counterpart (`BE-REGFORM-001`/`002`) shipped the same day — see `../Backend/CHANGELOG.md`. Not done by this change: quickstart.md §C operator security sign-off on UAT, and the HubSpot ops slot build (`HS-001`/`HS-013`/`HS-014`) this feature's US1/US4 depend on. `TODO.md`: `FE-REGFORM-001` moved to `TODO-DONE.md`; `X-REGFORM-001` → `done-pending-QA`.
+
+### Live event conversation notes — gap review (5 gaps found and resolved)
+
+- Refined [ADR-019](docs/decisions/019-live-event-conversation-notes.md) after a follow-on gap review: (1) viewing notes is now its own dedicated, audited fetch (mirroring `fetchAttendeeCommunications`) rather than riding unaudited inside the base attendee-detail response; (2) notes can now be soft-deleted, not just edited, for recovering from a misattributed note; (3) an edit/delete after a note's already been pushed to a Lead does not propagate back to HubSpot — accepted as a documented limitation; (4) editing/deleting is now open to any admin (tracked by editor identity), not locked to the original author, since author-only would have been the first per-user ownership restriction anywhere in this app and would leave a departed author's notes uncorrectable; (5) notes default to the current event only, with the same fetch supporting an opt-in expand to every event, mirroring ADR-014/ADR-018's precedent. `CONTEXT.md` and both `TODO.md` files updated to match.
+
+### Live event conversation notes — design (`X-NOTES-001`, grill-with-docs)
+
+- New [ADR-019](docs/decisions/019-live-event-conversation-notes.md): a new "Conversations" nav item lets staff find a checked-in attendee (list or QR scan, reusing Check-in's mechanics but not its check-in write) and add timestamped, staff-attributed notes about their conversation, surfaced as a new "Notes" section on the existing Attendee Detail modal. Notes are editable by their author with before/after tracked — deliberately not append-only/immutable like `013`'s registration-answer history, since staff-authored content realistically needs correction. Notes sync to HubSpot only when a Lead is generated/regenerated (never a live push at capture time), each becoming its own separate Note on the Lead's timeline distinct from `014`'s interest-summary Note, with EMS tracking which notes have already been pushed to avoid duplicating them on a later regeneration. **AI transcription was explicitly deferred to its own later phase** — consent, third-party audio data-flow, and retention questions need real privacy/legal input this session couldn't supply, not an engineering default.
+- **Retroactive gap found in [ADR-018](docs/decisions/018-hubspot-lead-generation.md):** creating a HubSpot Note/engagement needs its own OAuth scope, distinct from the Leads scopes already tracked — wasn't separately called out when `014` was designed. New `HS-018`, cross-referenced from both ADRs.
+- `CONTEXT.md`: new glossary term **Conversation note**, sharpened against **Registration answer** and **Lead interest summary** to avoid overloading either.
+- `docs/hubspot-ops-todo.md`: new `HS-018`.
+- `TODO.md` / `Backend/TODO.md`: new **Live event conversation notes** sections — `FE-NOTES-001` (the screen + modal section), `BE-NOTES-001`/`002`/`003` (storage, the new read-only lookup endpoint, and the Lead-sync push), and `X-NOTES-002` (AI transcription, parked). `BE-LEAD-001`'s note updated to reflect its extended scope. Not yet built — design only.
+
+### HubSpot Lead generation — gap review (5 gaps found and resolved)
+
+- Refined [ADR-018](docs/decisions/018-hubspot-lead-generation.md) after a follow-on gap review: (1) EMS only updates a Lead it can verify it created (via the `ems_lead_interest_summary` property's presence as a provenance marker) — a Lead without that marker is left alone and a new, separate Lead is created instead, so EMS never overwrites a salesperson's own unrelated work; (2) `ems_lead_interest_summary` is now set once at first creation only and never modified — every update instead logs a HubSpot Note, avoiding an ever-growing concatenated property; (3) the "expand to full cross-event history" read is now its own audited action, reusing ADR-014's precedent for reads beyond the currently-open event; (4) lead temperature/type stays fixed for all EMS-generated leads, no signal-strength differentiation; (5) `admin`-only RBAC confirmed for now, explicitly flagged as a watch item to revisit later, not a closed question. `hubspot-schema.md`, `CONTEXT.md`, and both `TODO.md` files updated to match.
+
+### HubSpot Lead generation from event attendees — design (`X-LEAD-001`, grill-with-docs)
+
+- New [ADR-018](docs/decisions/018-hubspot-lead-generation.md): gives staff the ability to generate/update a HubSpot Lead from an event attendee, carrying that attendee's **Registration answer history** ([ADR-017](docs/decisions/017-registration-slots-and-answer-history.md)) onto the Lead as a new `ems_lead_interest_summary` custom property, so a salesperson sees *why* someone is a lead, not just that they attended. Native HubSpot Leads confirmed enabled on this portal; researched its live API mechanics (`POST /crm/v3/objects/leads`, required Contact association, two new OAuth scopes not yet granted) before designing rather than guessing. Two slices: single-attendee (Attendee Detail modal) and bulk (Attendee list multi-select, reusing email dispatch's existing 50+ confirmation pattern) — same confirmation flow, no skip for either. Duplicate handling updates an existing Lead rather than creating a second, consistent with ADR-017's append-don't-overwrite philosophy. Company association and an EMS-side cached "has-a-lead" reference are both deliberately deferred, not overlooked.
+- `docs/hubspot-schema.md`: new § HubSpot Leads (lead generation) documenting the confirmed API mechanics and the three feasibility gates blocking any write.
+- `CONTEXT.md`: new glossary terms **Lead / Lead generation** and **Lead interest summary**.
+- `docs/hubspot-ops-todo.md`: new `HS-015` (scope grant), `HS-016` (association type ID), `HS-017` (lead type/label values).
+- `TODO.md` / `Backend/TODO.md`: new **Lead generation** sections — `FE-LEAD-001`/`002` (the two slices), `BE-LEAD-001`/`002` (the adapter + bulk endpoint), and two deliberately parked items (`X-LEAD-002` Company association, `BE-LEAD-003` cached existing-lead reference). Not yet built — design only, blocked on the three HubSpot-side feasibility gates.
+
+## 2026-07-20
+
+### Registration form bridge — multi-event slots + registration-answer history design (`X-REGFORM-001`, grill-with-docs)
+
+- New [ADR-017](docs/decisions/017-registration-slots-and-answer-history.md): bridges the live multi-page, multi-event public registration form onto ADR-007's association model. Ten fixed "registration slots" (independent match-key/workflow pairs) let one submission register a Contact for several Events at once, without a HubSpot Workflow loop primitive that doesn't exist on this portal. Registration answers (meeting topic, guest names, etc.) get a durable, appended (never overwritten) history in Record Storage keyed `contactId+eventId`, captured via a JSON bundle per slot built by a small form-side script rather than ~100+ individually-provisioned hidden fields. Why: two currently-known event types need 4–5 follow-up questions each, and rejected alternatives (native workflow list-looping, a paid Custom Code workflow action, or EMS itself writing registrations) each cost more in tier lock-in, developer dependency, or reopening ADR-007's "registration writes stay HubSpot-workflow-side" decision than the chosen design.
+- `docs/hubspot-schema.md`: new § Registration slots (multi-event) + § Registration answers webhook documenting the ten slot properties, the answer-bundle field, and the extended `OnAttendeeRegistrationWebhook` contract (one combined call per slot, not two).
+- `CONTEXT.md`: new glossary terms **Registration slot** and **Registration answer / Registration answer history**; updated the existing **Registration wave** entry to note this design fixes the data-loss half of that pain (history is never destroyed) but not the ergonomic half (amendments still require a full-form resubmission, re-ticking every prior Event).
+- `docs/hubspot-ops-todo.md`: `HS-001` updated from "not yet designed" to reference the settled design and remaining build work; new `HS-013` for the answer-bundling script's feasibility gates (form embed type, script ownership, live DOM/label validation).
+- `TODO.md` / `Backend/TODO.md`: new **Registration form bridge** sections — `FE-REGFORM-001` (Attendee Detail "Registration history" panel), `BE-REGFORM-001`/`002` (the answers store + extended webhook contract), and three deliberately parked items (`X-REGFORM-002` general Record Storage viewer, `X-REGFORM-003` self-service withdrawal — out of scope, `BE-REGFORM-003`/`004` reconciliation sweep + automated recovery tool). Not yet built — design only.
+
+### Data caching layer — US4 request-shape/degradation specs + docs/QA sweep (`FE-PERF-001`, slice `012-data-caching-layer`, T034–T037, T039)
+
+- `EventsView.test.tsx` / `OverviewView.test.tsx`: extended each view's request-shape spec so it also asserts zero `fetchEventCapacityStatus` calls (both mock services now expose the function so a regression to the old per-event fan-out would fail loudly, not silently no-op); `CheckInView.test.tsx` gained an explicit "keeps using the per-event capacity route, never the bulk capacity-summary route" spec (T034 — CheckInView's own mock service gained a `fetchCapacitySummary` stub for the same reason).
+- New `EventsView.test.tsx` spec: `fetchCapacitySummary` rejecting on the *first* load (not just a later background refetch, already covered) still paints the catalog with fallback capacity values (`0/100`, the `enrichPortfolioWithCapacity` per-row fallback) behind the existing non-blocking retry banner — never a blank error screen (T035, spec acceptance US4-2).
+- `Frontend/TODO.md`: `FE-PERF-001` → **done-pending-QA**, pointing at this slice's `tasks.md`/`quickstart.md`; noted that `OverviewView`'s T019 migration onto the bulk route supersedes the archived `FE-REDESIGN-021` keep-the-fan-out decision; `FE-ARCH-006` re-scoped — the `loading/error/reloadKey` ladder it tracked is now subsumed by `src/data/hooks`, leaving only the unrelated pagination-hook remainder in scope. `FE-PERF-002` (optimistic updates) confirmed still parked with its design notes, unchanged.
+- `Backend/TODO.md`: `BE-PERF-001` → **done-pending-QA**, cross-referenced against `FE-PERF-001`.
+- `quickstart.md`: sign-off table updated — §A ✅ (this session, both repos: FE 60 files/510 tests + build clean, BE 42 suites/439 tests + lint clean); §B marked partial with a new local-coverage table mapping each manual scenario to the automated spec that proves its mechanism, since this sandbox has no reachable UAT listener (`src/config.ts`'s `API_BASE_URL` has no local proxy target here, and the app has no mock-data path) — the manual DevTools/OAuth/storage steps themselves still need a live UAT pass. §C untouched (operator-run).
+- Full suite: 60 files / 510 tests green; `npm run build` (`tsc --noEmit` + `vite build`) clean. Backend: 42 suites / 439 tests green; `lint:fix` clean (pre-existing unused-var warnings only, no errors).
+- **Not done this session**: T038 (Backend SFTP upload to the QA environment + re-verifying §B2 against the deployed listener) — no SFTP access from this environment; the upload list (the full `Backend/scripts/` tree, 84 files, per `Backend/README.md`'s stated deploy step) was prepared and handed to the user rather than executed. T039's UAT run of §A/§B and T040's operator-run §C remain open — see `tasks.md`.
+
+### Master pre-event/QA docs synced with Slice 012 (data caching layer)
+
+- `../PRE-EVENT-ACTION-PLAN.md`: added §1.6 — deploy (SFTP, `T038`) + full UAT/operator QA (`T039`/`T040`) for the data caching layer, mirroring §1.5's "built and tested but never run live" treatment, since the slice's sign-out/no-speculative-PII-read guarantees are ship-blockers, not polish; added a cache-clear-on-account-switch step to the §2 end-to-end rehearsal; added `FE-PERF-002` (optimistic updates, parked) to the §5 explicitly-deferred list.
+- `../FULL-QA-TEST-PLAN.md`: added Slice 012 checks throughout — cache-clear-on-sign-out and cross-account paint (§2.1), warming fires only catalog/capacity never attendees/audit (§2.2), Programs & Events single catalog + single `capacity-summary` request plus instant-repaint/degraded-fallback checks (§2.3), always-fresh attendee reads (§2.5), unchanged per-event capacity route on Check-in (§2.6), no speculative PII audit entries (§2.9), `events/capacity-summary` RBAC (§3, §4), and the full "speed layer never lies and never leaks" security block (§4) mirroring quickstart.md §C7.1–C7.4; added two accepted-limitation notes to §6 (multi-tab cache is out of scope; within-freshness-window staleness is by design); linked ADR-015/016 and the slice's quickstart/contract docs in the Appendix.
+
+### Data caching layer — session lifecycle, prefetch, and invalidation wiring (`FE-PERF-001`, slice `012-data-caching-layer`, T026–T033)
+
+- New `src/data/sessionLifecycle.ts` (`useSessionLifecycle`), mounted from a small bridge component in `App.tsx` beside `QueryClientProvider`: on any `session?.token` change (sign-out, sign-in, or a swap), `queryClient.cancelQueries()` runs before `queryClient.clear()` — unconditional, so an in-flight response from the old token can never be written back into the cleared cache (data-model.md §4). The effect is keyed on the token alone (read via a ref for `data`, not a dependency) so it can never be retriggered by an unrelated re-render if `useDataService()`'s own memoization ever changes — the same class of bug already fixed once in `OverviewView.test.tsx` (FE-TEST-008, 2026-07-19), caught here before it shipped by a spurious extra prefetch call in a new test.
+- New `src/data/prefetch.ts` (ADR-016 structural gate) — exposes exactly `prefetchCatalog(queryClient, dataService)` and `prefetchCapacitySummary(queryClient, dataService)`, no PII-adjacent function exists to call. Wired into `useSessionLifecycle`: when the new token is truthy (a session became available, live auth or `USE_MOCK_AUTH`), both fire once to warm Programs & Events ahead of navigation.
+- New `src/data/invalidation.ts` — `invalidateAfterCatalogChange`, `invalidateAfterAttendeeMutation(eventId)`, `invalidateAfterCapacityAdjust(eventId)`, `invalidateAfterCampaignChange(eventId)` per data-model.md §3; the only module allowed to call `invalidateQueries` (FR-010). Added two narrow prefix-only key helpers to `queryKeys.ts` (`capacityAll`, `attendeesForEvent`, `dispatchesForEvent`) so invalidation can target a whole family/event without the params object baked into a `useQuery` key.
+- Wired invalidation at every mutation success site: `EventsView.tsx`'s `refreshCatalog()` (program/event create/edit/archive) now calls `invalidateAfterCatalogChange` instead of manually refetching two hooks; `AttendeesView.tsx`'s `refreshAfterMutation()` (remove/undo check-in) now calls `invalidateAfterAttendeeMutation`; `CheckInView.tsx`'s confirm/undo check-in now call the same helper, and its −1 capacity-adjust handler additionally invalidates the capacity *summary* only (the per-event key is already fresher via the existing `setQueryData` write from the adjust response — re-invalidating it would just race that write with a stale-mocked refetch, confirmed by a real test failure while wiring this up); `useEmailDispatchWorkflow.ts` (compose/schedule/edit/cancel) takes a new `queryClient` dependency and calls `invalidateAfterCampaignChange` alongside its existing local-state reloads, so `AttendeesView`'s dispatch filter and the Overview scheduled-summary tile now also refresh after a campaign mutation — previously only the compose view's own list did.
+- `EmailDispatchView.tsx` and its test now use `useQueryClient()`/`QueryClientProvider` for the same reason; `useEmailDispatchWorkflow.test.ts`'s harness gained a default `QueryClient`. No other view or existing assertion changed.
+- New specs: `src/data/__tests__/sessionLifecycle.test.tsx`, `prefetch.test.tsx`, `invalidation.test.tsx`.
+- Full suite: 60 files / 507 tests green; lint clean; `tsc --noEmit` + `vite build` clean.
+
+### Data caching layer — remaining five views migrated to `src/data/hooks` (`FE-PERF-001`, slice `012-data-caching-layer`, T019–T024)
+
+- `OverviewView.tsx`: replaced the combined `Promise.all` + `reloadKey` effect with `useCatalog`/`useCapacitySummary`/`useAuditLog`/`useScheduledDispatchSummary`. The per-event capacity fan-out is gone — stats/upcoming-events now build from the bulk `events/capacity-summary` response via `enrichPortfolioWithCapacity`, superseding the FE-REDESIGN-021 keep-the-fan-out decision now that the bulk route exists (TODO note to follow at T036). Catalog/audit/scheduled-summary gate first paint; the capacity summary is enrichment-only (soft-fails to the existing per-row fallback), matching EventsView's pattern.
+- `EventHubView.tsx`: migrated to `useCatalog`/`useEventCapacity`/`useAttendees` (attendee preview), dropping its local `loading`/`error`/`reloadKey` ladder in favor of a small combined-query gate plus a `RefetchFailureBanner` for background-refetch failures.
+- `AttendeesView.tsx`: the roster table now reads via `useAttendees` (page/filters in the query key, so filter swaps never bleed rows); the "whole event" stat tiles read via a second `useAttendees` (page 1/size 1) + `useEventCapacity`; the dispatch-filter dropdown reads via `useDispatches`. Added `placeholderData: keepPreviousData` to `useAttendees` (`src/data/hooks/useAttendees.ts`) so page changes keep the previous rows on screen behind the existing "Updating…" overlay instead of blanking. Imperative remove/undo-check-in mutations are unchanged; they now call `.refetch()` on the affected queries directly (invalidation helpers land in US3/T031).
+- `CheckInView.tsx`: capacity reads move to `useEventCapacity`; the existing reload-after-mutation cadence is preserved via `capacityQuery.refetch()` (confirm/undo) and a direct `queryClient.setQueryData` write (the −1 "record departure" adjust, which already returns the new snapshot). Server search, QR scan lookups, and walk-in stay direct `dataService` calls per the slice notes — the parked `FE-ARCH-004` refactor scope is untouched.
+- `AuditView.tsx`: reads via `useAuditLog` with page/filters in the key; added an `enabled` option to `useAuditLog` (`src/data/hooks/useAuditLog.ts`) so the query never fires for a non-admin session (matches the prior effect's early-return behavior exactly).
+- Test suites for all five views (plus `EventsView.test.tsx`) now render through `renderWithQueryClient`. Several tests that synchronized on a heading/meta string also present during the loading skeleton (identical text in both states) were changed to wait on loaded-only content first — a race made visible by the react-query migration, not a functional regression; every pre-existing assertion still holds (SC-006).
+- Added a representative stale-while-revalidate spec to `EventsView.test.tsx` (background refetch keeps the previous rows on screen, then swaps in the new rows once it resolves) alongside the existing refetch-failure-keeps-snapshot spec.
+- Full suite: 57 files / 493 tests green; lint clean; `tsc --noEmit` + `vite build` clean.
+
+### Data caching layer — TanStack Query foundation + EventsView migration (`FE-PERF-001`, slice `012-data-caching-layer`, T001/T006–T018/T025)
+
+- Added `@tanstack/react-query` v5 (no devtools package, per research R1) — bundled via npm like Chart.js, no CSP/`vite.config.ts` change needed.
+- `dataService.ts`/`normalizeApi.ts`/`types.ts`: added `fetchCapacitySummary()` + `normalizeCapacitySummaryResponse` + `CapacitySummaryRow`/`CapacitySummaryResponse` types, consuming the new `GET events/capacity-summary` backend route (already live from the prior session's T002–T005).
+- New `src/data/` module — the only place query keys/cache config/prefetch may live (FR-010, not yet including invalidation/prefetch, which are US3/US5): `queryKeys.ts` (central key factory with param normalization so `{page:1}` ≡ `{}`), `queryClient.ts` (module-scoped `QueryClient` — global `staleTime: 0` + `refetchOnWindowFocus: false` fail-safe defaults; never retries a 401/403; a 401 anywhere routes to the existing sign-out flow via a registered listener), `queryStatus.ts` (`describeQueryStatus` — maps a query to first-load loading/error vs. ready-with-a-failed-background-refetch), and five domain hooks (`useCatalog`, `useCapacitySummary`/`useEventCapacity`, `useAttendees`, `useAuditLog`, `useDispatches`/`useScheduledDispatchSummary`) composing `useQuery` over the existing `useDataService()` seam — `dataService.ts`/`client.ts`/`useDataService.ts` keep their exact roles, unchanged.
+- `App.tsx`: mounted `QueryClientProvider`; added a small bridge component that registers `clearSession` as the query client's 401 listener. (The session-token → `cache.clear()` invariant itself is US2/T026 — not part of this change.)
+- New shared `RefetchFailureBanner` component (`src/components/`) — the T017 non-blocking "Couldn't refresh — Retry" affordance (research R6): a background-refetch failure keeps the last-loaded data on screen behind this banner instead of blanking to a full error state; a first-load failure still shows the existing full `loading → error` ladder.
+- New `src/testing/renderWithQueryClient.tsx` test util — fresh, isolated `QueryClient` per test (retry off, `gcTime: 0`).
+- Migrated `EventsView.tsx` off its hand-rolled `loading`/`error`/`reloadKey` ladder onto `useCatalog` + `useCapacitySummary`. `enrichPortfolioWithCapacity` (`catalogEventPresentation.ts`) is now a synchronous function keyed by `eventId` against the bulk summary instead of an async per-event `fetchCapacity` fan-out — Programs & Events now issues exactly one `fetchCatalog` + one `fetchCapacitySummary` call regardless of event count (was `1 + N`). `OverviewView.tsx`'s call site got a minimal, behavior-preserving adaptation to the new signature (still its own per-event fan-out for now — the bulk-route switch there is `T019`, a later session).
+- Seam review (T025, ADR-015 stop signal): **passed** — see `specs/012-data-caching-layer/tasks.md` T025 for the full accounting of every touched file and why each is in-scope or a minor/expected addition. `T019`–`T024` (the other five views + full six-view test-suite update) intentionally not started this session.
+- Full suite: 57 files / 492 tests green; lint clean; `tsc --noEmit` + `vite build` clean.
+
+## 2026-07-19
+
+### Data caching layer — design settled via grill-with-docs (`FE-PERF-001`, slice `012-data-caching-layer`)
+
+- Ran the grilling session seeded by `specs/data-loading-and-caching-grilling-brief.md` (the brief had never been linked from `TODO.md` — now tracked as `FE-PERF-001`). All seven decision branches settled; no code shipped yet — speckit `specify → plan → tasks` is the next step.
+- **[ADR-015](docs/decisions/015-client-data-caching-layer.md):** adopt **TanStack Query** behind the existing `useDataService` seam (rejected: hand-rolled cache, status quo). Freshness: catalog 5 min / capacity 30 s / attendees + audit `staleTime: 0` (always refetch on view — preserves PII read-audit truthfulness). One app-scoped `QueryClient` cleared on any session-token change (logout/swap/sign-in); memory-only, no persistence. Central query-key factory + mutation→invalidation map (replaces the deleted `bumpCatalog` signal from zero). **Big-bang** migration of all six data views, per user direction. Optimistic updates deferred (`FE-PERF-002`).
+- **[ADR-016](docs/decisions/016-no-prefetch-of-audited-pii.md):** prefetch only non-PII catalog/capacity — **never** audited `attendees.list`/audit reads, since a speculative fetch would write a false "operator viewed PII" audit entry. Enforced structurally via a `prefetch.ts` module that exposes no PII functions.
+- Backend pairing: new `events/capacity-summary` bulk route planned as `BE-PERF-001` (see `Backend/TODO.md` + `Backend/CHANGELOG.md`), replacing Programs & Events' per-event capacity fan-out.
+- `CONTEXT.md`: added **Cache**, **Stale-while-revalidate**, **Prefetch**, **Query key / cache invalidation** glossary terms; the seeding brief marked as settled.
+- Ran `/speckit-specify`: wrote [specs/012-data-caching-layer/spec.md](specs/012-data-caching-layer/spec.md) (5 prioritized user stories, FR-001–014, SC-001–006, edge cases) + quality checklist, treating ADR-015/016 as settled inputs rather than reopening them. `.specify/feature.json` now points at slice 012.
+- Ran `/speckit-plan`: wrote `plan.md` (constitution gates all pass; new-dependency justification recorded), `research.md` (R1–R9 — integration shape: typed domain hooks in new `src/data/`; mutations stay imperative + central invalidation helpers; conservative `staleTime: 0` global default; sign-in-only prefetch triggers), `data-model.md` (query-key scheme, freshness/retention, invalidation map, session boundary), `contracts/events-capacity-summary.md` (admin-only; route-order caveat vs `events/:eventId/*`; minimal `{eventId, programId, capacity, checkedInCount}` rows), and `quickstart.md` incl. §C operator security checks (C7.1–C7.4: cache-clear/no-persistence, no speculative PII audit entries, viewer 403 on the bulk route, no stale cross-role paint). Also corrected `Backend/TODO.md` `BE-PERF-001` — the bulk route is **admin-only** (an earlier note wrongly said admin+viewer).
+- Ran `/speckit-tasks`: wrote `specs/012-data-caching-layer/tasks.md` — 40 tasks across 8 phases (Setup → Foundational incl. the backend route → US1 instant navigation (MVP) → US2 session lifecycle → US5 audit truth → US3 invalidation → US4 request-shape verification → Polish/QA gates). Notable encoded decisions: `refetchOnWindowFocus: false` globally (a focus refetch of attendees would write un-viewed PII read-audit entries), the T025 seam-review stop signal from ADR-015, and Overview's capacity fan-out switching to the bulk summary (supersedes FE-REDESIGN-021 once the route exists). Next: `/speckit-implement` (or `/speckit-analyze` first).
+
+### Fixed a real flaky test (`FE-TEST-008`)
+
+- Root-caused an intermittent full-suite failure that had shown up a few times today across different, seemingly unrelated files (`OverviewView.test.tsx` itself, and once in `AttendeesView.test.tsx`). Cause: `OverviewView.test.tsx`'s mocked `useDataService()` built a brand-new object literal (with fresh inline `vi.fn()`s) on every call, instead of returning a stable object like every other test file in the repo does. `OverviewView`'s data-loading effect lists `data` (the hook's return value) in its dependency array — the real hook memoizes it, but this unstable mock made the effect re-fire on every re-render it caused, occasionally re-fetching and clobbering `stats` with a later (default) value after an assertion had already observed the correct one.
+- Fixed by hoisting the mock's `fetchCatalog`/`fetchEventCapacityStatus`/`fetchAuditLog`/`fetchScheduledEmailSummary` functions to module scope and returning one stable `mockDataService` object, matching the pattern already used in `EventsView.test.tsx`/`AuditView.test.tsx`/`CheckInView.test.tsx`/etc.
+- Verified with 15 consecutive full-suite runs, all clean (previously ~2 failures per 9 runs). `AttendeesView.test.tsx` never reproduced the failure in isolation and has no bug of its own — the working theory is the runaway re-fetching briefly starved the shared test-runner event loop enough to destabilize a concurrently-running file's own timing-sensitive assertions.
+
+### Removed dead code found via the coverage report
+
+- Deleted `src/state/catalogContext.tsx` (`CatalogProvider`/`useCatalogSelection`) — leftover CatalogPicker-era scoped-selection state from before the event-first redesign moved to URL-driven routing; confirmed zero imports anywhere in `src/` before removing. Caught because the new coverage report (`FE-TEST-007`) flagged it at 0%.
+- While verifying (`tsc --noEmit` / `npm run build`, which `npm test` alone doesn't run), found and fixed two pre-existing type errors surfaced by the deletion's verification pass, unrelated to the deletion itself: (1) `vite.config.ts`'s `test.coverage.reporter` array had an `as const` that produced a readonly tuple TypeScript won't accept where Vitest expects a mutable array — removed it; (2) `WorkingEventPicker.test.tsx`'s event fixtures were missing the required `archived` field on `CatalogEventSummary` — added `archived: false`. Neither broke `npm test` (Vitest doesn't fully type-check config/test files the way `tsc --noEmit` does), but both would have broken CI's `npm run build` step.
+- Full suite: 54 files / 475 tests green; lint and `tsc --noEmit`/`npm run build` clean; coverage 81.65% statements.
+
+### Closed two more real coverage gaps flagged by the new coverage report
+
+- `services/authService.test.ts` — the real (unmocked) implementation of Google token exchange, logout, and GIS button setup: live-mode POST to `/auth/exchange`/`/auth/logout` with the right body/headers, error propagation, mock-mode credential decoding (unauthorized domain, missing email, malformed token), GIS `initialize`/`renderButton` wiring, the `onCredential` callback firing with the raw ID token, and the 15s "GIS never loaded" timeout (via fake timers). This file previously had **0% coverage** — every other test that touches login mocks it, so its own logic had never actually been executed by a test.
+- `constants/hubspot.test.ts` — `suggestAttendanceProperty` (VIP/partner/customer precedence, case-insensitivity), `parseFormIdsInput`/`formatFormIdsInput` (comma/newline splitting, blank-entry handling), and the `ATTENDANCE_PROPERTY_PRESETS` constant. Also previously **0% covered**.
+- Identified but intentionally left alone: `state/catalogContext.tsx` (0% covered) is not a testing gap — nothing in `src/` imports it; it's dead code, a candidate for deletion rather than tests. `App.tsx` (0% covered) is low-value to test in isolation — pure provider/router wiring already exercised indirectly through every view's own tests.
+- Full suite: 54 files / 475 tests green; lint clean. Coverage: 81.15% statements (up from a 77.46% pre-session baseline).
+
+### Test coverage reporting (`vite.config.ts`)
+
+- Added `@vitest/coverage-v8` devDependency and configured `test.coverage` (v8 provider, `enabled: true` so it runs on every `npm test`, html/lcov/text-summary output, excludes test files/`src/test/**`/`src/main.tsx`). Unlike Backend (see Backend changelog `BE-TEST-007`), this worked cleanly first try — no ESM/source-map caveat. No enforced threshold yet, visibility only. Baseline: 77.46% statements before this session's new tests; 79.45% after the first pass, 81.15% after closing the `authService`/`hubspot` gaps above.
+- Added `coverage/` to `.gitignore`.
+
+### Closed the 6 remaining untested views/components (`FE-TEST-005`)
+
+- `LoginView.test.tsx` — render + notice text, error path when the Google Sign-In script fails to load, session pushed into context on a successful credential exchange, and an XSS guard on a hostile exchange-failure message. Mocks `authService` rather than driving real Google Sign-In — closes the gap that was previously blocked on "we use Google auth to test" by testing the UI's reaction to auth outcomes, not the auth mechanism itself (the real mechanism — RS256 JWKS signature verification — is already exercised for real in `Backend/node/tests/AuthPipeline.test.ts`).
+- `ViewRouter.test.tsx` — logical route → view mapping (overview/events/catalog/audit/event-hub/attendees/check-in/email) against the real route tree (mirrors `App.tsx`), plus the attendees/check-in/email route gates redirecting to `/events` when the URL has no `eventId`, and the email gate redirecting a non-admin session even with a valid `eventId`. Seeds the session before the route tree mounts (matching how `AuthGate` in `App.tsx` never mounts the router until `isAuthenticated`) to avoid a transient-null-session race against `EmailRouteGate`'s render-time `<Navigate>`.
+- `ConfirmModal.test.tsx` — dialog open/closed state, default and custom button labels, `confirm()` resolving true/false on Confirm/Cancel/backdrop click, staying open on a click inside the dialog body, and an XSS guard on hostile title/message text.
+- `EmptyState.test.tsx` — message render, `viewId` as the section id, optional action button + navigate call, and an XSS guard on a hostile message.
+- `StatusBadge.test.tsx` — capitalized text + correct badge class per known status (`active`/`draft`/`cancelled`/`completed`/`Registered`/`Checked In`/`Cancelled`), fallback class for an unrecognized status, and an XSS guard.
+- `WorkingEventPicker.test.tsx` — loading state while the catalog fetch is in flight, populated/empty list, search filtering, navigate + menu-close on selecting a match, graceful degrade (not a throw) when the fetch fails, and an XSS guard on a hostile event name. Mocks `useDataService`/`fetchCatalog` per the existing `EventsView.test.tsx` convention.
+- Full suite: 52 files / 448 tests green (up from 46/402); lint clean.
+
+## 2026-07-17
+
+### Attendee Detail Modal — Polish: QA sign-off + TODO archive (010-attendee-detail-modal, T031/T034)
+
+- Confirmed `specs/010-attendee-detail-modal/quickstart.md` §C (Operator security comfort checks) is already slice-specific — filled per this feature (RBAC, audit, PII-display, HubSpot-contact-ID, cross-Event bounding, rate-limiting checks all reference the real routes/UI), not generic template placeholders; only the runtime-only fields (PR link, operator sign-off, actual test-account emails) remain blank, same as every other shipped slice's quickstart.
+- Ran full automated suites (§A): Backend `npm test` — 433/433 tests, 41 suites green; Frontend `npm test` — 402/402 tests, 46 files green. Both `lint` clean.
+- `TODO.md`: moved `FE-ATTENDEE-DETAIL-001`/`002` to **[Done (archive)](TODO-DONE.md)** (US1 + US2 both shipped); updated the `X-ATTENDEE-DETAIL-001` cross-cutting summary to reflect that code is shipped while flagging what's still genuinely open — `HS-010`/`HS-011` (HubSpot ops) and `BE-ATTENDEE-DETAIL-002`/`003` (registration timestamp/source, email-open tracking), which this feature does not fix and which stay `parked` in `Backend/TODO.md`.
+
+### Attendee Detail Modal — US2: "Show all communications" toggle (010-attendee-detail-modal, T029)
+
+- Extended `AttendeeDetailModal.tsx` with the "Show all communications" toggle next to the Attendee Journey heading: fetches once via `fetchAttendeeCommunications` on first expand and caches the result (re-toggling doesn't re-fetch), flips its own label ("Show all communications" ↔ "Hide all communications"), shows an inline loading state while in flight, and — on fetch failure — keeps the base this-Event timeline fully visible with an inline error + "Try again" retry rather than blanking the modal. Non-`this_event` timeline items render an inline badge: the other Event's name (`other_event`) or the generic "OTHER DISPATCH" label (`external`), per `CONTEXT.md` § **Attendee communications view**.
+- The Backend route this calls (`GET attendees/{contactId}/communications`) is real now (see Backend changelog), but its real HubSpot engagement data is gated on `HS-011` (still `open`) — every call today resolves as a `502` `ApiError`, which this toggle already treats like any other fetch failure (base timeline stays visible, retry offered), so no special-case handling was needed for the degrade path.
+- Tests: extended `AttendeeDetailModal.test.tsx` — toggle expand/collapse + label flip + single-fetch caching, loading state, fetch-failure-keeps-base-timeline-with-retry, silent no-op when the expansion adds nothing new, and tag rendering for both `other_event` (named) and `external` (generic) kinds.
+
+### Attendee Detail Modal — US1: Basic Information + event-only Attendee Journey (010-attendee-detail-modal, T005–T007/T010/T011/T015/T016)
+
+- Added `AttendeeDetailModal.tsx` (+ `.module.css`): read-only modal opened from a Registered Attendees row — Basic Information card (email, company, and phone/job title/dietary requirement/registration source only when present — omitted, never a fabricated placeholder, per spec.md's Edge Cases) plus the event-only Attendee Journey timeline (registered/dispatch sent/dispatch opened/checked in), rendering `null` timestamps as "Not yet" rather than fabricating a date. No edit/send/delete control and no raw HubSpot contact ID anywhere in the view (FR-003/FR-004).
+- Wired `AttendeesView.tsx`: clicking a row (outside the Remove/Undo action cell) opens the modal via the existing `fetchAttendeeDetail` dataService method; the name cell is a real `<button>` for keyboard access, and the rest of the row is a pointer-convenience click target (`stopPropagation` keeps the action cell's Remove/Undo buttons from also triggering it).
+- "Show all communications" (US2) is intentionally not included in this change — stays scoped to `AttendeeDetailModal`'s later extension (T019–T030).
+- `HS-010` (dietary requirement property / phone/jobTitle population confirmation) is still **open** per `docs/hubspot-ops-todo.md` — this UI already degrades gracefully to omitted fields regardless, so T017 doesn't block this change. The Backend route (`BE-ATTENDEE-DETAIL-001`, T012/T013) is still a `501 not_implemented` stub — this is Frontend-only work per this repo's Frontend/Backend edit boundary; the modal will resolve to a real read once that lands.
+- Tests: new `AttendeeDetailModal.test.tsx` (fetch + render, no-edit/no-contact-ID guard, field omission, XSS guard on company/job title/dietary requirement, fetch-error retry, Close) and `AttendeesView.test.tsx` extension (row click opens the modal; Remove/Undo do not). Full suite: 397 tests / 46 files green; lint/typecheck clean.
+
+### Attendee Detail Modal — Setup phase: dataService + docs synced with the 2 new Backend routes (010-attendee-detail-modal, T001/T003)
+
+- Added `AttendeeDetail`, `AttendeeJourneyStep`, `CommunicationItem`, `AttendeeTimelineItem`, `AttendeeCommunicationsResponse` types (`src/types.ts`), per `specs/010-attendee-detail-modal/data-model.md`.
+- Added `fetchAttendeeDetail`/`fetchAttendeeCommunications` to `dataService.ts` (+ `createDataService` wiring) and matching `normalizeAttendeeDetailResponse`/`normalizeAttendeeCommunicationsResponse` in `normalizeApi.ts` — pending fields (`phone`, `jobTitle`, `dietaryRequirement`, `registrationSource`, and `dispatch_opened`/`registered` timestamps) normalize to `null`, never a fabricated placeholder, per spec.md's Edge Cases.
+- Documented both routes in `docs/api-contract.md` and added `admin`-only rows in `docs/rbac.md`, flagged as Setup-phase stubs (Backend currently returns `501 not_implemented` for both — see Backend changelog) so the contract is discoverable without implying the real read is live yet.
+- No UI change yet — `AttendeesView.tsx`/`AttendeeDetailModal.tsx` (Foundational phase, T004–T007) are a separate, later change.
+- Tests: new `normalizeApi.test.ts` coverage for both normalizers (pending-field defaulting, unrecognized journey-step-type fallback, this-Event-step vs. tagged-`CommunicationItem` disambiguation) and new `dataService.test.ts` coverage for both fetch functions' route/query construction. Full suite: 388 tests / 45 files green; lint/typecheck clean.
+
+### Docs — Backend cross-reference and architecture alignment
+
+- Updated ADR-005/006/007, HubSpot schema, security briefing, domain-agent guidance, testing validation, blueprint, and redesign/audit status text to match the shipped custom-object adapters, current Platform stores, `route` query transport, Slice 1.5B Cloudflare placement, and 38-suite/420-test Backend snapshot.
+- Re-synced cross-folder TODO ownership and Slice 009 status: Backend now owns the `BE-ATTENDEE-DETAIL-*` rows, both folders mirror the attendee-webhook external gate, and audit paging/filters are recorded as shipped while resource labels remain required for full sign-off.
+
+### Docs — Remaining drift cleanup (006 banners, glossary, links)
+
+- Bannered unmarked Slice 006 spec/quickstart/contract/data-model as design-only / do-not-execute; restructured `CONTEXT.md` Plan C vs current event-first glossary (removed stale `(target)` labels; clarified Campaign rename is partial).
+- Corrected `docs/api-contract.md` config path (`src/config.ts`), Programs & Events labels, and ADR-009 link; fixed broken Backend/docs relative links across setup, agents, ADRs, PR template, and rules.
+- Updated agent UX laws / operator-security QA prerequisites (WorkingEventPicker; no `USE_MOCK_API`); aligned TODO audit-slice naming, capacity QA notes, and Slice 003–005/009 quickstart+spec UI wording with modal / event-first UX.
+- Marked ADR-005 partially superseded by ADR-007; noted redesign plan file tree as historical; fixed `api/client.ts` JSDoc route transport and hubspot-schema walk-in link.
+
+### Docs — Current architecture and coverage drift corrected
+
+- Updated `docs/api-contract.md` to identify shipped Slice 1 routes as final, removed obsolete operator/communications UI-gating rows from `docs/rbac.md`, marked the pre-cutover combined Slice 1.5/2 QA runbook as superseded now that the frontend has no mock-data path, and corrected `TODO.md`'s recorded frontend suite size to the latest full run (45 files / 374 tests).
+
+### Docs — Repository-wide shipped-architecture alignment
+
+- Rewrote the current operator/architecture surfaces (`ui-routes`, `setup`, `product-flows`, blueprint, glossary/schema, component catalog, testing playbook, security-QA template) to match the shipped event-first, all-admin, mock-free Slice 1/2 application and `route` query-parameter transport.
+- Updated agent guidance (`AGENTS.md`, `CLAUDE.md`, `CONTEXT-MAP.md`, and Frontend rules) so future work uses `WorkingEventPicker`, Event-scoped routes, Programs & Events, the unified campaign list/modal, and the live ScriptRunner data path.
+- Corrected active Slice 003/004/005/007–011 validation docs and contracts; added missing Slice 004/005 operator security checks; marked obsolete Program-scoped/mock/tabbed implementation artifacts as historical or superseded so they cannot be mistaken for live instructions.
+- Marked the unbuilt Slice 006 plan/tasks as requiring re-planning because their deleted Settings/CatalogPickers/mockData surfaces no longer exist, and corrected Slice 009 status to distinguish shipped paging/filters from the still-planned resource label.
+
+### Docs — Attendee-index backend complete; Live setup actions remain
+
+- Updated the `011-attendee-index-perf` spec/plan/task status for the completed write-through, webhook, and reconciliation implementation, including deadline-safe idempotent replay and archive-time purge coverage. No Frontend API/UI behavior changed.
+- Kept the HubSpot registration Workflow action explicit in `docs/hubspot-ops-todo.md`: a HubSpot admin must still configure the listener URL, `X-Attendee-Webhook-Secret` header, and token→body-field mapping, coordinated with the separately tracked ScriptRunner Parameter setup before Live.
+
+### Docs — Spec status audit across `specs/003` through `010`
+
+Six spec `**Status**` headers were stale (some claiming "Draft"/"ready for implement" for features that had actually shipped weeks ago). Verified each against real code + `TODO.md`/`CHANGELOG.md`/ADRs before correcting — see per-spec detail below. Also caught and fixed two stale functional claims inside spec bodies (not just headers), and one leftover shipped-item row in `TODO.md`'s roadmap table.
+
+- **003-check-in**: Status → Shipped/code-complete (only `HS-002`/`X-008` external HubSpot verification remains). Corrected FR-012/FR-013 — the spec described a segmented-control "Check-in | Walk-in" mode switch that was superseded by the actual shipped UI (two buttons, "Start scanner"/"+ Add walk-in", each opening its own modal, per `FE-REDESIGN-016`).
+- **004-capacity-management**: Status → Implemented and tested (T001–T042); only live-environment QA sign-off (`X-009`) is pending, not code.
+- **005-email-dispatch**: Status → Implemented (US1–US4); live send gated behind `EMAIL_SEND_ENABLED` pending its own verification, not missing code. Flagged (not rewritten, since it's a historical Q&A) that the spec's "tabs" navigation description was superseded by `FE-REDESIGN-014`'s unified list + "+ New campaign" modal.
+- **006-public-registration**: Status → **Not started** — corrected an Assumptions-section claim that a "Settings hub module" was already shipped; no such view exists in `Frontend/src` today, so this slice has nowhere to mount `RegistrationPanel.tsx` yet.
+- **007-redesign-initiative**: Status → Phase A shipped, Phase B substantially shipped (~8 of ~20 tracked items remain, all polish/ops). Also corrected [ADR-007](docs/decisions/007-hubspot-custom-objects-registration.md) and [ADR-008](docs/decisions/008-standalone-events-event-first-nav.md), both still reading "pending"/"depends on gates" despite the gates clearing 2026-07-14 and the adapter shipping 2026-07-16.
+- **008-qr-ticket-emails**: Status → Implemented (shipped 2026-07-16); remaining `tasks.md` items are QA/governance gates (live send test, operator sign-off, `/review-security`), not missing code. Removed a stale `TODO.md` roadmap-table row still listing this as upcoming work after it had already shipped and moved to `TODO-DONE.md`.
+- **009-audit-log-ux** / **010-attendee-detail-modal**: both already accurately "Draft" — added a short qualifier to each (design-settled-but-unbuilt for 009; spec/plan/tasks-complete-but-0/36-tasks-done for 010) for consistency with the other specs' new level of detail.
+
+### Docs — Attendee-index + audit-index design settled (grill-with-docs session, mirrors Backend)
+
+Backend production logs showed `OnGetAttendees`/`OnGetAuditRecent` sync requests taking 18-21s, close to ScriptRunner Connect's 25s timeout. A `grill-with-docs` session settled the fix design (see `Backend/CHANGELOG.md` same date for full detail) — planning/documentation only, no implementation yet.
+
+- New ADRs: [011-attendee-index-freshness.md](docs/decisions/011-attendee-index-freshness.md), [012-attendee-index-write-conflict-resolution.md](docs/decisions/012-attendee-index-write-conflict-resolution.md), [013-audit-index-scope.md](docs/decisions/013-audit-index-scope.md).
+- **`CONTEXT.md`** gained the **Attendee index** glossary term (the Record Storage cache backing the **Attendee list** UI, kept distinct from it).
+- **`TODO.md`**: `FE-SLICE1-005` un-parked, points to the new step table under `BE-SLICE1-006` in `Backend/TODO.md` — no Frontend code changes expected, response shape is unchanged. `X-SLICE007-001` notes updated to reference ADR-013.
+
+### Docs — Attendee Detail modal design settled (grill-with-docs session, mirrors Backend)
+
+New read-only "Attendee Detail" modal (opens from a Registered Attendees row): Basic Information card + an "Attendee Journey" timeline defaulting to the current Event only, with a "Show all communications" expansion. Planning/documentation only — no implementation yet.
+
+- New **[ADR-014](docs/decisions/014-attendee-communications-hubspot-engagement-pull.md)**: the expansion pulls the Contact's full HubSpot marketing-email engagement history (not just EMS's own dispatch records), merged with EMS's own cross-Event dispatch log for "part of this Event" tagging — the first EMS read that spans PII beyond the currently-open Event, so it's the first **audited** GET in Slice 1/2.
+- **`CONTEXT.md`** gained **Attendee journey** and **Attendee communications view** glossary terms; reaffirmed "dispatch" (not "Campaign") as the current shipped vocabulary until the target-model rename actually lands.
+- **`TODO.md`**: new `X-ATTENDEE-DETAIL-001` (Cross-cutting) plus a new "Attendee Detail modal" section (`FE-ATTENDEE-DETAIL-001/002`, `BE-ATTENDEE-DETAIL-001/002/003`) — flags two real backend gaps found during grilling: no stored registration timestamp or walk-in-vs-form signal exists anywhere today, and no email-open tracking exists anywhere.
+- **`docs/hubspot-ops-todo.md`**: new `HS-010` (net-new "dietary requirement" Contact property) and `HS-011` (HubSpot scope grant for Contact engagement/timeline reads — portal confirmed Enterprise tier).
+- Deliberately dropped from v1 scope: a "Returning attendee" indicator (would need the same cross-Event lookup, but wasn't asked for) and showing the raw HubSpot contact ID in the UI (existing allowlist rule — `Include in UI: No` — kept, not reversed).
+
+### Docs — `/speckit-specify` for the Attendee Detail modal
+
+Ran `/speckit-specify` against the grilling-session decisions above, seeded so nothing needed rediscovering — zero `[NEEDS CLARIFICATION]` markers, all quality-checklist items pass on first draft.
+
+- New **[specs/010-attendee-detail-modal/spec.md](specs/010-attendee-detail-modal/spec.md)** — 2 prioritized user stories (P1 basic info + event-scoped journey, P2 "Show all communications" expansion), 12 functional requirements, 4 success criteria, edge cases, and assumptions carrying forward the two known backend data gaps (`BE-ATTENDEE-DETAIL-002`/`003`).
+- New **[specs/010-attendee-detail-modal/checklists/requirements.md](specs/010-attendee-detail-modal/checklists/requirements.md)** — all items pass.
+- New **`specs/010-attendee-detail-modal/assets/`** — placeholder folder + `README.md` for the two reference screenshots shared during grilling; could not be extracted from the chat directly, so they're tracked as a pending manual step rather than silently dropped.
+- `.specify/feature.json` now points at `specs/010-attendee-detail-modal`.
+
+### Docs — `/speckit-plan` for the Attendee Detail modal
+
+Ran `/speckit-plan` against `spec.md`. Constitution Check passes against every linked rule source with no violations (Complexity Tracking not needed).
+
+- New **[plan.md](specs/010-attendee-detail-modal/plan.md)** — Technical Context, Constitution Check table, and a concrete Project Structure (2 new Backend handlers + 1 new Frontend modal component, reusing the existing two-repo layout and `On*.ts`/modal-component conventions — no new project/library).
+- New **[research.md](specs/010-attendee-detail-modal/research.md)** — 4 implementation-level research items (exact HubSpot engagement-API scope still pending as `HS-011`; dedup strategy; audit metadata shape; where the communications cutoff timestamp is computed). None block Phase 1.
+- New **[data-model.md](specs/010-attendee-detail-modal/data-model.md)** — `AttendeeDetail`, `AttendeeJourneyStep`, `CommunicationItem`, `AttendeeCommunicationsResponse` entities, each field marked with its real availability status (today / pending `HS-010` / pending `BE-ATTENDEE-DETAIL-002`/`003`).
+- New **`contracts/get-attendee-detail.md`** and **`contracts/get-attendee-communications.md`** — draft request/response/error shapes for the two new routes, explicitly marked as design-only until copied into `api-contract.md`/`rbac.md` alongside the real Backend implementation.
+- New **[quickstart.md](specs/010-attendee-detail-modal/quickstart.md)** — §A automated test plan, §B manual UAT steps for both user stories, and a full **§C Operator security comfort checks** (filled per `docs/slice-operator-security-qa-template.md`) covering the new cross-Event PII surface specifically (bounded-exposure check, audit-row check, contact-ID-never-exposed check).
+
+### Docs — `/speckit-tasks` for the Attendee Detail modal
+
+Ran `/speckit-tasks` against `plan.md`/`spec.md`. Tests are marked **required, not optional** in the generated `tasks.md` — this repo's testing discipline overrides spec-kit's generic "tests are optional" default.
+
+- New **[tasks.md](specs/010-attendee-detail-modal/tasks.md)** — 36 tasks across Setup (3), Foundational (4), User Story 1/MVP (11, incl. 4 test tasks), User Story 2 (12, incl. 4 test tasks), and Polish (6). US1 is independently shippable as the MVP; US2 reuses US1's this-Event journey logic and modal component, so it is implementation-dependent on US1 even though it's independently testable once shipped.
+- Explicitly scoped **out** of this task list (per plan.md's Constitution Check): `BE-ATTENDEE-DETAIL-002`/`003` (registration timestamp/source, email-open tracking) — both stories are built to degrade gracefully rather than block on these.
+
+### `009-audit-log-ux` — audit log filter bar + Apply/Clear (`FE-SLICE007-001`)
+
+Implements the frontend half of the fix settled by ADR-013 above (Backend half: `BE-SLICE007-001`, see `Backend/CHANGELOG.md` same date). `AuditView.tsx` now loads against the Backend's new bucketed-index read path (transparent to the frontend — no response-shape change beyond `total` becoming bounded/approximate for large logs, see `docs/api-contract.md`).
+
+- **`AuditView.tsx`:** new filter bar (`Action`/`Resource type` as `SelectPicker` dropdowns from a static known-values list — no reactive search; `Actor`/`Resource ID` as plain text inputs for exact match) with explicit **Apply**/**Clear** buttons. Filter changes are held in local draft state and only sent to the Backend when Apply is clicked (not live-as-you-type, per FR-004) — Apply also resets to page 1. Clear resets both the draft and the last-applied filters and re-fetches unfiltered. A zero-match applied filter shows a distinct "No entries match the selected filters." message, never the generic error state.
+- **`utils/auditDisplay.ts`:** new `KNOWN_AUDIT_ACTIONS`/`KNOWN_AUDIT_RESOURCE_TYPES` exported constants backing the two dropdowns.
+- **`services/dataService.ts`:** `fetchAuditLog`/`AuditLogQueryOptions` accept the four filter options and forward them as query params.
+- Tests: extended `AuditView.test.tsx` (filters don't fetch until Apply, zero-match empty state, Clear resets to unfiltered) and `dataService.test.ts` (filter options mapped through to query params, including URL-encoding of an `actor` email).
+- `resourceLabel` display (`FE-SLICE007-002`) is a separate, not-yet-built follow-on — out of scope for this change; the Resource column still shows `resourceType`/`resourceId` as it does today.
+
+## 2026-07-16
+
+### Docs — QA coverage for the QR ticket bloat fixes + Scheduled Trigger setup
+
+`specs/008-qr-ticket-emails/quickstart.md` and `specs/005-email-dispatch/quickstart.md` updated to cover the same-day Backend fixes (unregister/undo-check-in ticket cleanup, 24h post-Event-finish purge) and the previously-undocumented Scheduled Trigger — none of this had a QA path before.
+
+- New security checks **C7.6** (ticket dies when attendee is removed), **C7.7** (undo-check-in preserves the ticket, doesn't delete it), **C7.8** (ticket dies ~24h after Event finish with no archive) added to 008's quickstart, plus matching rows in the §C10 sign-off table and a new "No orphaned HubSpot Files" property in §C0.
+- Prerequisites/§C1 in 008's quickstart now list the Scheduled Trigger as a concrete, checkable item (script `QueueProcessor`, default export, no payload, every 15 minutes) rather than assuming it's already set up.
+- §A1's automated-test table/command extended to cover the new/extended suites (`CustomObjectAdapter`, `EventTicketPurge`, `HubSpotApiClient`, `SingleSendAdapter`, `EmailSendGuard`).
+- 005-email-dispatch's quickstart §D checklist line for the Scheduled Trigger de-vagued into concrete setup steps + a cross-reference to `Backend/README.md`'s new section, plus a note that the same trigger now also runs 008's ticket-purge sweep.
+
+### Docs — QR ticket emails: US2/US3 verification pass, TODO close-out (008-qr-ticket-emails, Phase 4 + Phase 5 + Phase 6/T038-T040)
+
+Verification-only pass over `specs/008-qr-ticket-emails/tasks.md` T034–T040 (Backend-side test/code-read work in `Backend/CHANGELOG.md`) — no Frontend code changed.
+
+- `specs/008-qr-ticket-emails/quickstart.md` §B2/§B3 annotated with 2026-07-16 status notes: §B2 (US2 live UAT) needs a human with real HubSpot access and is not runnable from an implementation session (tracked as T036); §B3 (US3 Campaign-reporting) is explicitly marked **skipped** — no channel to reach the HubSpot Team for a live Campaign-association confirmation existed this session, which is the task's own documented, non-blocking fallback (T037).
+- `TODO.md`: `FE-QR-GEN-001` moved to `TODO-DONE.md` (done 2026-07-16) — see that entry for shipped scope and the explicit list of what's still open (`BE-EMAIL-SEND-001`, T036 live UAT, T041 operator sign-off, T042 security review). `FE-QR-GEN-002` (send-on-registration) and `X-QR-GEN-001` (HubSpot Team governance) left parked, unchanged.
+- Re-ran `npm test`/`npm run lint` after the Backend-side T034 test addition — no Frontend-visible change, **374/374** still passing, lint clean.
+
+### Feature — QR ticket emails: Dispatch-log "Tickets" indicator (008-qr-ticket-emails, Phase 2 + Phase 3/US1)
+
+Frontend half of `specs/008-qr-ticket-emails/tasks.md` T007–T033 (Backend half in `Backend/CHANGELOG.md`) — no new route or view, per the plan's "additive extension of Slice 2" structure decision.
+
+- `types.ts` — `CreateEmailDispatchResponse` and `EmailDispatchListItem` gained a required `ticketsEnabled: boolean`, detected server-side from the chosen template and never client-supplied.
+- `utils/normalizeApi.ts` — `normalizeCreateEmailDispatchResponse` and `normalizeEmailDispatchListItem` (used by both the list and detail responses) map `ticketsEnabled` through, defaulting to `false` when the field is absent (e.g. pre-feature stored jobs).
+- `views/EmailDispatchView.tsx` — the Dispatch-log row shows a small "Tickets" badge (shared `.badge`/`.badge--registered` primitive, not a one-off style) next to the dispatch name when `ticketsEnabled` is true. Renders as static text regardless of the raw field's value — even a hostile non-boolean value from the API can only ever produce the literal word "Tickets", never interpolated markup (NFR-002).
+- **Tests:** extended `normalizeApi.test.ts` (ticketsEnabled pass-through + default-false case) and `EmailDispatchView.test.tsx` (badge shown/hidden per dispatch, badge renders as plain text against a hostile raw value). `npm test` 374/374 passing, `npm run lint` clean, `tsc --noEmit` clean.
+- **Not built (out of scope for this change):** US2/US3 verification, `/review-security`, quickstart §C sign-off — see `TODO.md`'s `FE-QR-GEN-001`.
+
+### Docs — `specs/008-qr-ticket-emails/plan.md` + Phase 1 artifacts (`/speckit-plan`)
+
+- Generated the implementation plan and design artifacts: `research.md` (4 implementation-level unknowns not resolved by the ADR-010 spike — QR encoder inside ScriptRunner's sandbox, `subcategory` PATCH mechanism, HubSpot Files scope, `SingleSendAdapter` interface shape), `data-model.md` (extends existing `EmailDispatchJob` with `ticketsEnabled` and `RegistrationCacheRecord` with `checkInTicket`/`checkInTicketImageFileId` — no new store), `contracts/qr-ticket-dispatch-delta.md` (one new response field on two existing routes, no new routes), and `quickstart.md` (including the mandatory §C operator security comfort checks, filled for this slice — recipient isolation, consent honored, no durable PII write, ticket dies with the Event, audit trail).
+- Key finding surfaced during planning: this feature and `BE-EMAIL-SEND-001` (Backend `TODO.md`) both need real work on the same file, `Utils/HubSpot/SingleSendAdapter.ts` — flagged as a build-order dependency, not something to build twice.
+- No code shipped — planning artifacts only. Next: `/speckit-tasks`.
+
+### Docs — `specs/008-qr-ticket-emails/spec.md` created (`/speckit-specify`)
+
+- Formalized the QR ticket-email feature as a slice spec, matching how Slice 2 (`005-email-dispatch`) was delivered. Encodes ADR-010's settled architecture as testable user stories/requirements without re-deriving it — 3 user stories (P1: send tickets through the ordinary Compose flow; P2: consent-driven fallback to manual check-in; P3: HubSpot Campaign reporting rollup), 12 functional requirements, 3 non-functional/security requirements, and a `Clarifications` section capturing the grill/spike Q&A provenance. No `[NEEDS CLARIFICATION]` markers — all underlying decisions were already resolved before drafting. Quality checklist at `specs/008-qr-ticket-emails/checklists/requirements.md` passes in full.
+- `TODO.md`'s `FE-QR-GEN-001` updated to point at the new spec directory. Next step is `/speckit-plan`.
+
+### Docs — ADR-010: QR ticket-email send mechanism confirmed via live HubSpot UAT spike
+
+- Ran a `/grilling` (`grill-with-docs`) session on `docs/design-notes/qr-ticket-email-campaigns.md`, resolving the send-mechanism uncertainty that doc research alone couldn't close. Live-tested against our own HubSpot portal: (1) `POST /marketing/v4/email/single-send` with a per-recipient image URL passed inline via `contactProperties` — **pass**, no durable Contact write needed; (2) associating the email to a HubSpot Marketing Campaign so the send rolls up into Campaign analytics — **pass**, despite this rollup being undocumented in HubSpot's public API docs.
+- New finding not in any public doc: the target email needs **`subcategory: "single_send_api"`** set (not just `type: AUTOMATED_EMAIL`) — this field isn't exposed in the drag-and-drop editor UI and must be set via the Marketing Emails API. Without it, HubSpot rejects the send with `400 MISSING_REQUIRED_PARAMETER`.
+- Wrote **[ADR-010](docs/decisions/010-qr-ticket-email-single-send.md)** capturing the settled architecture (JWT identity + lazy-mint-at-send + v4 single-send + Campaign association + consent/late-registrant trade-offs). `docs/design-notes/qr-ticket-email-campaigns.md`, `CONTEXT.md` § QR check-in, `TODO.md` (`X-QR-GEN-001`/`FE-QR-GEN-001`), and `docs/hubspot-ops-todo.md` (`HS-003`) all updated to point at it. `HS-003`/`X-QR-GEN-001` narrowed to a governance-only conversation (naming/consent ownership) — no technical spike remains open.
+- No code shipped — this is architecture confirmation ahead of scheduling `FE-QR-GEN-001`/`BE-QR-GEN-001` for build.
+
+### Docs — QR ticket-email design note: HubSpot API research + decisions ahead of grill session
+
+- `docs/design-notes/qr-ticket-email-campaigns.md`: researched HubSpot's public API docs for the 3 open UAT-spike questions from the 2026-07-15 discussion. Key correction: **there is no API to trigger a batch/list send of a standard Marketing Email at all** (UI/workflow-only) — the note's "dual send path" table assumed this was an option and it never was; QR (and non-QR) sends both need the v4 marketing single-send API (`POST /marketing/v4/email/single-send`, needs Marketing Hub Enterprise), not a list send. Per-Contact dynamic image injection via a contact-property token confirmed viable from docs. Marketing Campaign association across send types remains genuinely undocumented — flagged as still needing a live UAT spike, not just doc research.
+- User decided 4 of the open items: detect the HubSpot template snippet (not an EMS toggle) to know a template needs QR; host the transient QR PNG in HubSpot Files with purge-on-archive; accept the late-registrant gap as out of scope for now (parked as a possible future "send on registration" Campaign trigger — see `TODO.md` `FE-QR-GEN-002`); revoke/reissue tickets after the event. Mint timing given as a recommendation (lazy-mint at send time) pending confirmation, not locked in. Governance (consent/ownership) left explicitly open.
+- `TODO.md`: narrowed `X-QR-GEN-001`'s remaining live-UAT-spike scope; added `FE-QR-GEN-002`/`BE-QR-GEN-002` (parked) for the future on-registration Campaign trigger. `docs/hubspot-ops-todo.md`'s `HS-003` narrowed to match — cross-referenced against `HS-009`'s existing portal-tier question (same Marketing Hub Enterprise/Pro gate).
+- No code change — documentation only, ahead of a `/grilling` session on the remaining open items.
+
+### Feature — Check-in list redesign: avatars, status indicators, checked-in timestamp; search-first gate removed
+
+- `CheckInView.tsx`: restyled the roster rows to match the redesign mockup — a circular initials avatar per row (`attendeeInitials`, matching the existing `.confirmInitials` pattern), a light-tinted row background for checked-in attendees, and a green "In · HH:MM" indicator (replacing the plain outline "Undo check-in" button — clicking it still opens the same undo-confirm flow). Unchecked rows keep the orange `Check in` button.
+- Removed the 2-character search-first gate (`CHECK_IN_MIN_SEARCH_LENGTH`) — the full roster now loads on open (`pageSize` 200, no `q`), matching the mockup. This gate existed purely as a workaround for a slow full-HubSpot-join attendee fetch, tracked as `FE-SLICE1-005`/`BE-SLICE1-006` (still parked/unresolved) — removing it is an accepted performance risk on large rosters, not a fix to the underlying issue. See `TODO.md` for the updated note.
+- Wired up the check-in timestamp end-to-end: the backend has returned a real `checkedInAt` since `BE-REDESIGN-001` (2026-07-14), but `normalizeApi.ts` was hardcoding it to `null` and `SliceAttendee`/`ConfirmCheckInResponse` typed it as literal `null`. Fixed the types (`string | null`) and normalization (`normalizeSliceAttendeesResponse`, `normalizeConfirmCheckInResponse`) to pass the real value through, and `CheckInView` now updates `checkedInAt` locally on confirm/undo so the indicator reflects the new state without a refetch.
+- `format.ts`: new `formatCheckInTime()` — 24-hour `HH:MM` for the list indicator.
+- Docs: `docs/ui-routes.md`, `specs/003-check-in/quickstart.md`, `docs/api-contract.md` updated to describe the new default-loaded roster and the `checkedInAt` display.
+- Tests: `CheckInView.test.tsx` updated for default-load behavior (roster fetches on mount, not gated behind typing) and the new status-indicator button; `normalizeApi.test.ts` and `format.test.ts` extended for `checkedInAt` pass-through and `formatCheckInTime`. Full suite green (45 files / 370 tests).
+- Not verified in a live browser — Google sign-in is required and no test credentials were available in this session (same constraint as the `SelectPicker` entry above); verified via the full Vitest suite instead.
+
+### Feature — `SelectPicker` dropdowns are now searchable (typeahead filter)
+
+- `SelectPicker.tsx`: opening the popover now focuses a text input (pattern borrowed from `WorkingEventPicker`) that filters the option list by label substring as the user types. Keyboard nav (arrow keys, Home/End, Enter, Escape, Tab) moved from the listbox onto this search input, since focus now lands there on open. Filtering out the active option's index clamps `activeIndex` back into range.
+- Applies to every current usage automatically: `CatalogProgramModal`, `CatalogEventModal` (program/status/publish-state), `TimePicker` (wraps `SelectPicker`), `EmailDispatchView` (template/segment/edit-template pickers), `AttendeesView` (email dispatch filter).
+- `Pickers.module.css`: split `.menu` into a bordered wrapper `div` plus a scrollable `.optionsList`; added `.search` (44px min-height, `--input-bg`, 16px font at ≤900px to avoid iOS auto-zoom) and `.empty` ("No options found." message when the filter matches nothing).
+- Tests: `SelectPicker.test.tsx` updated to dispatch keyboard events on the new search input instead of the listbox, plus new cases for focus-on-open, substring filtering, the empty-results message, and search clearing on reopen. `TimePicker.test.tsx` updated the same way plus a new typeahead case (filtering by formatted time label, e.g. "9:00 AM").
+- Not verified in a live browser — the app requires Google sign-in (`USE_MOCK_AUTH` is hardcoded `false`) and no test credentials were available in this session; verified via the full Vitest suite for all affected files instead (88/88 passing).
+
+### Fix — compose modal no longer fails entirely when one reference-data field errors
+
+- `useEmailDispatchWorkflow.loadComposeData` previously fetched limits/templates/segments via a single `Promise.all` — one field failing (e.g. Templates 403ing on the HS-009 scope gap) rejected the whole load, so none of the three populated even though the other two had actually succeeded over the wire.
+- Switched to `Promise.allSettled`: each field now sets its own state (`limits`/`templates`/`segments`) on success and its own error (`limitsError`/`templatesError`/`segmentsError`) on failure, independently.
+- `EmailDispatchView`: replaced the single blanket error banner with a per-field inline error (message + "Try again" button) shown in place of the Template picker or the Segment picker specifically, so a failure in one doesn't hide a working picker in the other.
+- Tests: 3 new cases in `useEmailDispatchWorkflow.test.ts` (one field failing doesn't block the other two) + 2 new cases in `EmailDispatchView.test.tsx` (Templates failing still shows a working Segment picker, and vice versa).
+
+### Fix (Backend-only) — compose modal's Template and Segment dropdowns were empty
+
+- Root cause was entirely server-side (see `Backend/CHANGELOG.md`) — Templates were a deliberate stub pending the `005-email-dispatch` T002 HubSpot spike; Segments had a real bug where the adapter parsed a field name (`listType`) that doesn't exist on HubSpot's actual API response, silently discarding every result. Both are fixed now that the user confirmed HubSpot API access. No Frontend code changes were needed — `EmailDispatchView`/`useEmailDispatchWorkflow` already called `fetchEmailTemplates`/`fetchEmailSegments` correctly.
+
+### Test fix — `EventsView.test.tsx` "Create Program" heading assertion updated to match actual modal text
+
+- The "opens create Program / Event modals from the header actions" test asserted `heading: 'Create Program'`, but `CatalogProgramModal.tsx`'s create-mode heading is `'New program'` (sentence case) — set during today's Program modal header redesign (see the `New program`/`Edit program` header entry above). Confirmed the modal's rendered text is the intended/current behaviour, not a bug; updated the test's expected heading to `'New program'` to match.
+- Verified: `npx vitest run src/views/EventsView.test.tsx` (13/13 passed) and full `npx vitest run` (45 files / 357 tests passed) — no regressions.
+
+### Feature — Overview "emails scheduled this week" now one API call, not one per event (FE-REDESIGN-020)
+
+- `OverviewView.loadStats` no longer fans out `fetchEmailDispatches({ view: 'scheduled' })` once per active event — it makes a single `fetchScheduledEmailSummary()` call against the new Backend aggregate route (`GET events/scheduled-email-summary`), which sums the same numbers server-side.
+- `dataService.ts`: new `fetchScheduledEmailSummary()` + `normalizeScheduledEmailSummaryResponse()`; `types.ts`: new `ScheduledEmailSummary`.
+- The capacity fan-out (one `fetchEventCapacityStatus` call per portfolio event) is unchanged — that's the standing `FE-REDESIGN-021` decision, out of scope for this change per user direction.
+- Tests: `OverviewView.test.tsx` updated to mock `fetchScheduledEmailSummary`; added a case asserting the stat tile renders the aggregate's actual numbers (not just that the call happened).
+- Docs: `docs/api-contract.md` + `docs/rbac.md` updated with the new route.
+- **Found in passing, not fixed here:** `EventsView.test.tsx`'s "Create Program" heading assertion is stale against the Program modal's actual (lowercase) heading text from an earlier change today — flagged as a separate spawned task, out of scope for this change.
+
+### Architecture — legacy `programs/{programId}/events/{eventId}/…` routes retired (X-REDESIGN-003)
+
+- Confirmed via a full read of `dataService.ts` that no Frontend call site has built a `programs/…` URL for a while — both routes' "legacy" wrapper functions already ignored their `programId` argument. The Backend deleted the legacy route table entries this session (see `Backend/CHANGELOG.md`); no Frontend code changes were needed.
+- Docs: `docs/api-contract.md` (dropped legacy-alias mentions from every affected route) + `docs/rbac.md` updated.
+
+### Fix — standalone-event storage-key drift closed (X-REDESIGN-010)
+
+- Verified the actual risk (see `Backend/CHANGELOG.md` for the fix): `eventId` alone was already globally unique, so there was never a cross-event collision — but standalone Events' storage keys were template-coercing `programId: null` into the literal string `"null"`, which is a real drift risk if an Event's Program association ever changes later. Backend now normalizes to a `'_standalone'` sentinel; covered by new tests.
+
+### Docs — new `docs/hubspot-ops-todo.md` for ongoing HubSpot-portal work
+
+- Added [docs/hubspot-ops-todo.md](docs/hubspot-ops-todo.md) — a running checklist for work that has to happen inside the HubSpot portal itself (forms, workflows, schema, owners) as distinct from EMS repo code tracked in `TODO.md`. Seeded with 8 items pulled from existing `X-*` cross-cutting rows: registration form match-key wiring (`HS-001`/`X-REDESIGN-009`), walk-in form verification (`HS-002`/`X-008`), QR ticket-email spikes (`HS-003`/`X-QR-GEN-001`), Event Items timezone property (`HS-004`/`FE-REDESIGN-026`), HubSpot Owners access (`HS-005`/`X-REDESIGN-011`), registration-submit audit gap (`HS-006`/`BE-SLICE15-010`), attendance migration/backfill (`HS-007`/`X-REDESIGN-005`), and per-environment ID re-verification before Prod cutover (`HS-008`/`X-REDESIGN-007`).
+- `TODO.md` (both folders): added a pointer to the new doc; cross-referenced each relevant `X-*` row with its `HS-*` counterpart.
+- `hubspot-schema.md` § *Registration match-key mechanism*: corrected a stale line claiming `registration_slug` is set "manually today" — confirmed `HubSpotCatalogAdapter.createEvent` already auto-generates it (shipped with `BE-REDESIGN-001`); the only open gap is the HubSpot-side form/workflow piece, now tracked as `HS-001`.
+
+### Ops — UAT infrastructure confirmed live
+
+- `TODO.md`: **`FE-INFRA-002`** (UAT GitHub Pages site) and **`FE-INFRA-003`** (ScriptRunner UAT environment) marked done — user confirmed both are live. Flagged that this may unblock **`X-009`**/**`FE-CAP-001`** capacity live QA, which was blocked specifically on this infra; needs user confirmation before treating it as unblocked (data readiness in the UAT HubSpot instance is a separate question).
+
+### Ops — `BE-CORS-001` verified; Cloudflare proxy confirmed unnecessary
+
+- User inspected live authenticated response headers from the deployed Pages origin: `access-control-allow-origin: https://bobbybaileysr.github.io` (specific, not `*`), correct `allow-methods`/`allow-headers`. Confirms the AWS gateway's `*` wildcard seen on its OPTIONS preflight does not leak onto real data responses.
+- `TODO.md`: **`FE-OPS-002`** and **`FE-INFRA-001`** (Cloudflare Worker/Pages Function proxy) marked **not needed** — the `route` query-param workaround (2026-07-13) plus this CORS verification means direct browser calls to ScriptRunner Connect work end-to-end from the deployed origin with no proxy in front. See `Backend/TODO.md` / `TODO-DONE.md` for `BE-CORS-001`.
+
+### Docs — verified `X-REDESIGN-002`/`X-REDESIGN-007` already complete; corrected stale TODO status
+
+- Asked to implement the `CustomObjectAdapter` (`X-REDESIGN-002`) and its stable HubSpot-ID constants (`X-REDESIGN-007`); found both already fully implemented, wired into every attendee/check-in/capacity/email handler, and covered by passing tests (273/273 across 23 suites) — no code change needed.
+- `TODO.md`: corrected both rows and the "Remaining roadmap" summary from "next: implementation" / "remaining: add constants" to done; only Prod Parameter values (an ops task, not code) remain open.
+
+### Fix — Program modal required-asterisk wrapping to a new line; oversized modal subtitle spacing (all modals)
+
+- **Program modal**: the "Program name" label text and its required `*` were separate children of a column-flex `<label>`, so the asterisk became its own flex item and dropped below the label text. Wrapped both in a single `<span>` so they lay out as one line.
+- **Program + Event modals**: the header subtitle's `margin-bottom: 0` was losing to the global `.modal p { margin-bottom: 20px }` rule (`css/components.css`) on CSS specificity, making the header noticeably taller than intended. Fixed by scoping `.subtitle` under the module's local `.modal` class (`.modal .subtitle`), which now wins without `!important`.
+
+### UX — Program create/edit modal refined to match design_handoff 2
+
+- **Header**: title is now "New program" (create) / "Edit program" (edit) with a descriptive subtitle ("Group related events under a single program"), wired to the dialog via `aria-describedby`, plus a close (×) button — mirrors `CatalogEventModal`'s header pattern.
+- **Fields**: added placeholders ("e.g. Summit Series 2026", "What is this program about?") and the tinted `--input-bg` field fill so inputs match the pickers.
+- **Program owner**: added the owner dropdown from the design as a **disabled / UI-only** control — `hubspot_owner_id` is a real Program property but there is no owners-list API yet; backend wiring parked as `X-REDESIGN-011` (Backend `BE-REDESIGN-011`).
+- **Footer**: primary action relabelled "Create program" / "Save program", Archive relabelled sentence-case, actions moved into a tinted footer bar that bleeds to the modal edges.
+- Tests updated for the new labels + coverage for subtitle wiring, close button, and the disabled owner field.
+
+### UX — Overview restyled to match design_handoff 2
+
+- **Stat tiles**: left-aligned cards with accent square, value → label → delta (no centred `hub-stat`).
+- **Split**: Upcoming events / Recent activity use `2fr 1fr`; upcoming card has orange top border.
+- **Event rows**: 44×44 date badge (month + day), name/location stack, capacity count + % above bar, status pill — fixes the overlapping date/title layout.
+- **Activity**: timestamp on its own line under the action (no `list16 Jul` concatenation). Cobalt dots per design.
+
+### UX — page loads: spinner + Did you know only (no skeleton), larger tip
+
+- **All page loads** (Overview, Programs & Events, Event Details, Attendees, Audit, and any other `LoadingState` page/panel use): removed table/card skeleton shimmer. Loading UI is the centred Did you know tip, spinner, and message.
+- **Did you know tip box** ~50% larger (max-width, padding, type). Tip renders above the spinner. Attendees/Audit loading no longer wrap the spinner in a card.
+- Docs: `docs/loading-did-you-know-tips.md` updated to match.
+
+### Fix — Overview "emails scheduled this week" used a missing API route
+
+- **`OverviewView`**: "Emails scheduled this week" now fans out `fetchEmailDispatches(eventId, { view: 'scheduled' })` (live Slice 2 route) instead of deprecated `fetchScheduledEmails` → `GET …/email/scheduled`, which has no backend handler and broke `#/overview` on the live API (`No handler for events/…/email/scheduled`).
+- Removed unused `fetchScheduledEmails` from `dataService` (nothing else called it). Updated `docs/ui-routes.md`, `TODO.md` `FE-REDESIGN-020`, and Overview tests.
+
+### Docs — attendees list rate limit (120/60s)
+
+- **`docs/api-contract.md`** / **`docs/rbac.md`**: document `GET …/attendees` per-actor limit **120 / 60s** (was implied default 10/60s). Backend change in `OnGetAttendees`.
+
 ## 2026-07-15
+
+### Architecture — unify check-in / attendee mutation error messages (review candidate 4, part 1)
+
+- Added `src/utils/attendeeMutationErrors.ts` (`attendeeMutationErrorMessage`, + tests) and adopted it in `CheckInView` (confirm + undo) and `AttendeesView` (remove + undo). **Fixes the documented drift** the review flagged: `AttendeesView` translated the `contact_not_registered` code to a friendly message while `CheckInView`'s undo path showed a generic string; both now share one mapping. Also stops `CheckInView` from surfacing a raw backend `err.message` on check-in failure (plain-language fallback instead, per the UX rule).
+- Parked the larger candidate 4 work (extract a `useCheckInWorkflow` hook; split the scanner/walk-in/confirm dialogs into sibling components) as `FE-ARCH-004` — a 642-line view with heavy tests; design-sensitive, better via the `/grilling` loop.
+
+### Architecture — collapse `CatalogPickerSelect` into `SelectPicker` (review candidate 7)
+
+- Deleted `CatalogPickerSelect.tsx` (+ its orphaned `CatalogPickers.module.css`) and pointed its four call sites (`AttendeesView` dispatch filter; `EmailDispatchView` template/segment/edit-template selects) at `SelectPicker`. The two components had the same prop shape, but `CatalogPickerSelect` lacked keyboard arrow/Home/End navigation, used a focus outline (`--color-link`) that fails WCAG 1.4.11 in Dark Aurora, and had no visible keyboard-active-option indicator. **This is an accessibility fix**, not just dedup — the weaker picker was the one shipping in views. `SelectPicker`'s existing a11y tests now cover these surfaces.
+- Parked the shared-popover-shell extraction (`usePopoverShell` across `SelectPicker`/`CalendarPicker`/`WorkingEventPicker`) as `FE-ARCH-007` — larger, and each picker's popover needs differ.
+
+### Architecture — shared `useDebouncedValue` hook (review candidate 6, part 1)
+
+- Added `src/hooks/useDebouncedValue.ts` (+ tests) and adopted it in `AttendeesView`, `CheckInView`, and `useEmailDispatchWorkflow`, replacing three byte-identical hand-rolled `setTimeout`/`clearTimeout` debounce blocks. The event-switch reset effects now just clear `searchQuery` (the debounced value derives from it).
+- Parked the remainder of candidate 6 (the `loading/error/empty/reloadKey` async-resource ladder + paginator abstraction across 5 views) as `FE-ARCH-006` — design-sensitive and higher-churn, flagged for the `/grilling` loop first.
+
+### Architecture — attendee-presentation adapter (review candidate 8)
+
+- Added `src/utils/attendeePresentation.ts` (`attendeeName`, `attendeeInitials`, `initialsFromName`) — one home for turning a `SliceAttendee`'s name into display strings. Replaced four re-authored copies across `CheckInView`, `AttendeesView`, `EmailDispatchView`, `EventHubView` that used three subtly different algorithms (notably `AttendeesView` lacked the `?` initials fallback and skipped whitespace-trimming). New unit tests cover all three helpers.
+- Added `walkInFormUrlError` to `src/utils/hubspotFormUrl.ts` and pointed both the byte-identical copies at it (`CheckInView` render path + `CatalogEventModal` field validation), so the validation message can't drift.
+
+### Architecture — drop mock data; collapse the data seam (supersedes review candidate 5)
+
+- Deleted `src/data/mockData.ts` (~1,331 lines). Testing is now against HubSpot Staging via the live ScriptRunner API; the mock-data mode was already inert (`USE_MOCK_API: false`). **Mock auth (`USE_MOCK_AUTH`) is kept** for local sign-in.
+- Removed `withMockFallback` + `mockDelay` from `dataService.ts`; every method now calls `apiRequest` directly and normalizes via `normalizeApi.ts`. This collapses the shallow data seam the architecture review flagged as candidate 5 — with no mocks, there is no mock-vs-live shape to reconcile, so candidate 5 is satisfied by removal rather than rework.
+- Dropped the mock error mappers (`mapMockCatalogError`/`mapMockCapacityError`/`mapMockEmailError`/`mapMockThemePreferenceError`) — dead once the mock arms were gone.
+- Removed the mock-only `email` parameter from `getThemePreference`/`setThemePreference` (the live route derives the user from the session); updated `useTheme.ts` call sites.
+- Deleted `src/utils/celebrationTheme.ts` (+ test) and the `CELEBRATION_THEME_EMAIL`/`CELEBRATION_TOAST_EMAIL`/`CELEBRATION_TOAST_MESSAGE` + `USE_MOCK_API`/`MOCK_API_DELAY_MS` config fields — all mock-mode stand-ins whose only consumer was `mockData.ts`. Live celebration gating stays via the backend `user/prefs` response.
+- Rewired `PocBanner`/`LoginView` to stop labelling the removed `USE_MOCK_API` mode.
+- Rewrote `dataService.test.ts` as a live-path suite (route/method/body/token + normalization). Typecheck + lint clean; suite green (338 tests).
+- Docs: updated `CLAUDE.md`, `.cursor/rules/frontend-patterns.mdc`, and `README.md` (removed the "keep `USE_MOCK_API` path" rule and the mock-UI setup step).
+
+### Architecture — delete dead data-seam code (review candidate 1)
+
+- Removed unused `dataService` methods `previewEmail`, `sendEmail`, and `fetchTemplates` (superseded by `previewEmailDispatch`/`createEmailDispatch`/`fetchEmailTemplates`) plus their factory bindings and now-unused imports. Why: zero consumers across views/hooks.
+- Removed the orphaned `normalizeApi` functions `normalizeEvent`, `normalizeAttendee`, `normalizeEventsResponse`, `normalizeEventResponse`, `normalizeAttendeesResponse` and the `isUiEventShape`/`isUiAttendeeShape` mock-vs-live guards they depended on — exported and unit-tested but imported by nothing. Deleted their tests from `normalizeApi.test.ts`. Why: tested code disconnected from every live path (locality inversion).
+- Typecheck + lint clean; suite green (356 tests).
+
+### Docs — cleanup pass (Tier A + B)
+
+- Fixed stale `Frontend/js/config.js` references → `src/config.ts` in blueprint; corrected `AGENTS.md` annex wording.
+- Archived completed React migration plan under [docs/archive/react-migration-plan.md](docs/archive/react-migration-plan.md); shipped specs **001** / **002** → [specs/_shipped/](specs/_shipped/); spent custom-objects grilling brief → [specs/_archive/](specs/_archive/).
+- Slimmed [CHANGELOG.md](CHANGELOG.md): older entries (2026-07-02–07) → [CHANGELOG-archive-2026-07-02-to-07.md](CHANGELOG-archive-2026-07-02-to-07.md).
+- Extracted TODO Done rows → [TODO-DONE.md](TODO-DONE.md).
+- Root skills: `.claude/skills` is now a symlink to `.cursor/skills` (single tree).
+
+### Docs — QR ticket email Campaign direction (parked)
+
+- New [docs/design-notes/qr-ticket-email-campaigns.md](docs/design-notes/qr-ticket-email-campaigns.md): working direction for event+contact JWT in Record Storage, HubSpot template QR snippet, EMS inject at Campaign send (any schedule), dual send path (Marketing Email vs Single-Send), lean HubSpot, open UAT spikes. **Not an ADR; not scheduled for build.**
+- Linked from `CONTEXT.md`, `docs/hubspot-schema.md` § QR JWT, `TODO.md` (`FE-QR-GEN-001`, `X-QR-GEN-001`).
 
 ### Fix — UAT login 405: wire absolute API base URL for deployed builds
 
@@ -580,7 +1224,7 @@ Phase A was paused for a scoped design-fidelity pass rather than deferring these
 
 ### Planning — grilling brief for custom objects + standalone Events
 
-- **`specs/custom-objects-and-standalone-events-grilling-brief.md`**: Added a pre-grilling brief framing the HubSpot custom-objects migration (Program/Event objects, Contact↔Event association, attendee status, per-registration JWT storage) together with making Programs optional for standalone Events. Includes a "Design vocabulary" section directing the grilling to use the `codebase-design` skill's terms (module/interface/seam/adapter/depth) and its design-it-twice pattern.
+- **`specs/_archive/custom-objects-and-standalone-events-grilling-brief.md`**: Added a pre-grilling brief framing the HubSpot custom-objects migration (Program/Event objects, Contact↔Event association, attendee status, per-registration JWT storage) together with making Programs optional for standalone Events. Includes a "Design vocabulary" section directing the grilling to use the `codebase-design` skill's terms (module/interface/seam/adapter/depth) and its design-it-twice pattern.
 
 ## 2026-07-09
 
@@ -710,445 +1354,6 @@ Phase A was paused for a scoped design-fidelity pass rather than deferring these
 - **`specs/003-check-in/quickstart.md`**: B7 points to Tier A sign-off + template for new slices.
 - **`.cursor/rules/ems-testing-discipline.mdc`**, **`speckit-plan` skill**: cross-links to §C requirement.
 
-## 2026-07-07
-
-### Slice 1.5 Tier A — step A9: sign-off checklist
-
-- **`specs/slice-1.5-tier-a/signoff-checklist.md`**: Tier A complete (A1–A9) — gate table, deploy evidence (UAT + Live PR #7), CI/test counts, security review summary, optional smoke checks, approvals.
-- **`TODO.md`**: **X-SLICE15-001** done; Tier A table A1–A9 all ✅; **X-001** Foundation gates complete.
-
-### Slice 1.5 Tier A — step A6: PR security review (Bugbot fallback)
-
-- **`.github/pull_request_template.md`**: EMS security checklist on every PR.
-- **`docs/security-review-process.md`**: author/reviewer workflow — local checks, **`/review-security`**, human approval, CI gates. Bugbot not approved on company GitHub.
-- **`docs/CONTRIBUTING.md`**: linked security review process from PR checklist.
-- **`TODO.md`**: **FE-SEC-002** / step A6 done.
-
-### Slice 1.5 Tier A — admin audit viewer (A8 frontend)
-
-- **`AuditView.tsx`** (`#/audit`): paginated table of recent audit entries via existing `dataService.fetchAuditLog()` → `GET audit/recent`; admin-only redirect and sidebar link.
-- **`src/types.ts`**: `AuditLogEntry` / `AuditLogListResult` for Slice 1.5 API shape (distinct from legacy email-dispatch `AuditEntry` used by Analytics mock).
-- **`src/utils/auditDisplay.ts`**: metadata formatting with PII key denylist — actor email only in the list.
-- **`mockData.ts`**: `MOCK_SLICE_AUDIT_LOG` sample entries for mock mode.
-- **`dataService.ts`**: `fetchAuditLog` overloads — global list returns paginated `AuditLogListResult`; event-scoped call unchanged for Analytics mock.
-- **`docs/ui-routes.md`**, **`Sidebar.tsx`**, routing — register `#/audit`.
-- **Tests:** `AuditView.test.tsx`, `Sidebar.test.tsx` audit link coverage.
-
-### Slice 1.5 Tier A — audit log API contract (A8 backend)
-
-- **`docs/api-contract.md`**: document `GET audit/recent` and `GET events/{id}/audit` — paginated Record Storage audit log, admin-only, known action names.
-- **`docs/rbac.md`**: audit routes restricted to **admin** (Slice 1.5).
-
-### Slice 1.5 Tier A — disable production source maps (A7)
-
-- **`vite.config.ts`**: set `build.sourcemap: false` so production GitHub Pages bundles do not ship `.map` files that expose application source (**FE-SLICE15-001**). Dev HMR and Vitest are unchanged — only `vite build` output is affected.
-
-### CI — `listFilters.test.ts` type error
-
-- **`listFilters.test.ts`**: add required `description` field to event fixtures so `tsc --noEmit` passes — `Event` gained `description` during catalog metadata work but this test file was missed by the prior CI fix.
-
-### Optional polish — pre–Slice 1.5 clean slate
-
-- **`src/utils/listFilters.ts`**: moved attendee/event filter and search helpers out of `mockData.ts` (**FE-TECH-002**).
-- **`src/api/client.ts` / `authService.ts`**: removed dead `USE_MOCK_API` short-circuit and `skipMock` flag — `dataService.withMockFallback` owns mock routing (**FE-TECH-004**).
-- **`src/hooks/useModalFocusTrap.ts`**: Tab cycle, Escape dismiss, and return-focus on catalog Program/Event modals (**FE-TECH-006**).
-- **`TODO.md`**: archived **FE-TECH-002/004/006**; test count **160** (28 files).
-
-### Slice 1 housekeeping — pre–Slice 1.5 clean slate
-
-- **`TODO.md`**: Slice 1 close-out table (two external blockers only); archived **FE-SLICE1-002/003/004/007**, **FE-PROD-001**, **FE-CAP-IMPL**; reorganized Product section; test count **153** (27 files).
-- **`specs/003-check-in/tasks.md`**: close-out status — T072 B5c + 004 live QA remain; T060/B4b marked done.
-- **`specs/004-capacity-management/tasks.md`**: T001–T042 marked complete; status section for blocked T043–T044.
-- **`specs/004-capacity-management/quickstart.md`**: Manual QA log table added.
-- **`CONTEXT.md`**: last-updated note.
-
-### Toast — larger on desktop
-
-- **`Toast.module.css`**: double desktop toast dimensions (min-width, max-width, padding, font size) from 901px up; mobile and tablet unchanged.
-
-### Catalog — walk-in form URL not shown after save
-
-- **`normalizeApi.ts`**: include `walkInFormUrl` when normalizing catalog Event nodes from `GET /catalog` — the field was saved on the backend but stripped on reload, so the Event modal appeared blank on reopen and Check-in **Walk-in** mode showed “No walk-in form URL configured” despite a valid catalog value.
-- **`mockData.ts`**: persist `walkInFormUrl` on mock create/update for parity with live catalog.
-
-### Check-in QR — desktop scanner viewport clipping
-
-- **`CheckInQrPanel`**: size the scan region from the reader container (ResizeObserver + viewfinder-aware `qrbox` function) instead of `window.innerWidth`, so the shaded scan box fits inside the camera feed on desktop two-column layout.
-- **`CheckInQrPanel.module.css`**: keep the reader square with `aspect-ratio: 1` only — removed `max-height` / viewport `min-height` rules that squashed the feed on wide columns; video uses `object-fit: cover` within the square frame.
-
-### Check-in QR — long JWT payload documentation
-
-- **`docs/hubspot-schema.md`**: § QR payload size — RS256 JWT ~550–800+ chars; generation must encode full token; ~400-char web QR cap causes `invalid_checkin_signature` on scan.
-- **`specs/003-check-in/quickstart.md`**: B4b test QR generation (`qrcode` / `qrencode`); troubleshooting rows for truncated QR and malformed JWT paste.
-- **`CONTEXT.md`**: QR capacity note for future email/ticket generation.
-- **`TODO.md`**: **FE-QR-GEN-001** (pairs **BE-QR-GEN-001**) — planned work before shipping registrant QR minting.
-
-### 004-capacity-management — Check-in live attendance indicator
-
-- **`CapacityBar`**: extended with optional live variant, 75%/90% tier styling, and paired ±1 controls; Event Hub registered fill unchanged.
-- **`CapacityBar` (live)**: desk-focused layout — large on-site count, prominent percentage, thicker bar, tier badge, and touch-sized ±1 controls with Left/Correction hints.
-- **`CheckInView`**: loads capacity snapshot on mount and after confirm check-in; indicator above Check-in/Walk-in mode switch; count-only hint when Event capacity unset (FR-006); surfaces capacity API errors with Retry instead of hiding the section silently.
-- **`CheckInView.module.css`**: desk toolbar groups capacity card + full-width mode switch; responsive spacing and walk-in iframe heights for tablet/phone; divider and larger separated Check-in/Walk-in controls below capacity adjustments.
-- **`catalogContext` / `CatalogPickers`**: `CatalogSelection.capacity` from selected Event.
-- **`dataService`**: `fetchCapacityStatus`, `adjustCapacity` with mock parity in `mockData.ts`.
-- **`utils/capacityTier.ts`**: tier and percentage helpers.
-- **Docs**: capacity routes in `docs/api-contract.md` and `docs/rbac.md`.
-- **Tests**: `capacityTier`, `CapacityBar`, `CheckInView` capacity integration, `dataService` mock adjust, `normalizeCapacityStatusResponse`.
-- **CI**: fixed TypeScript errors in test harnesses after `CatalogSelection.capacity` — Vitest passes without typecheck; `npm run build` (`tsc --noEmit`) was failing in GitHub Actions.
-
-### US3 walk-in — CSP + contract sync (Phase D)
-
-- **`vite.config.ts`**: production CSP `frame-src` extended with `https://*.hubspot.com`, `https://*.hsforms.com`, `https://share.hsforms.com` for Walk-in iframe embed (NFR-004).
-- **`docs/api-contract.md`**: merged Event `walkInFormUrl` from `specs/003-check-in/contracts/catalog-event-walkin.md`; removed provisional `POST …/walkin` — US3 walk-in is HubSpot iframe only.
-
-### US3 walk-in — Check-in mode switch (Phase C)
-
-- **`catalogContext.tsx`** + **`CatalogPickers.tsx`**: `walkInFormUrl` carried in catalog selection from the selected Event.
-- **`CheckInView.tsx`**: **Check-in | Walk-in** segmented control; walk-in shows staff hint + HubSpot iframe (or empty/invalid states); QR and search unmounted in walk-in mode; mode resets on Program/Event change.
-- **`CheckInView.test.tsx`**: Vitest for mode toggle, iframe src, empty state, invalid URL guard, QR unmount, and catalog reset.
-
-### US3 walk-in — Event catalog field (Phase B)
-
-- **`CatalogEventModal.tsx`**: optional **Walk-in form URL (HubSpot)** field with client-side allowlist validation (`isAllowedHubSpotFormUrl`); included on create/patch and clear-on-save via PATCH `null`.
-- **`CatalogEventModal.test.tsx`**: Vitest coverage for valid URL save, optional empty field, HTTPS/host validation errors, and edit clear.
-
-## 2026-07-06
-
-### Attendees pagination loading feedback
-
-- **`AttendeesView`**: table overlay spinner + dimmed rows, pagination **Loading page…** label, and disabled Prev/Next while a page fetch is in flight — fixes missing feedback when changing pages on multi-page lists.
-
-### Slice 1 polish
-
-- **`Sidebar.test.tsx`**: admin + catalog gating for Attendees / Check-in slice links; navigation to `sliceModulePath`.
-- **`src/test/setup.ts`**: `html5-qrcode` mock uses prototype class so `CheckInQrPanel` spies work in full suite.
-
-### Slice 1 — Attendees & Check-in (003)
-
-- **`AttendeesView.tsx`**: catalog-scoped registered list (`#/events/attendees`); columns, debounced search, checked-in filter, server-side pagination, admin redirect, `LoadingState` skeleton/spinner.
-- **`CheckInView.tsx`**: name search (≥2 chars, server `q`), summary + idempotent confirm, debounced non-blocking refresh (`#/events/check-in`).
-- **`CheckInQrPanel.tsx`**: self-hosted `html5-qrcode` scanner; mock simulate path; StrictMode lifecycle cleanup.
-- **`dataService.ts`**, **`normalizeApi.ts`**, **`types.ts`**, **`mockData.ts`**: `fetchSliceAttendees`, `checkInScan`, `confirmCheckIn` + normalizers.
-- **`navigation.ts`**: `sliceModulePath()` for catalog-scoped slice routes.
-- **Tests**: AttendeesView (incl. non-admin redirect, pagination, XSS); CheckInView + CheckInQrPanel; `normalizeSliceAttendeesResponse`; dataService slice paths.
-
-### Slice 1 QA — live QR deferred
-
-- **`specs/003-check-in/quickstart.md`**: §8 sign-off no longer requires live QR; new **§10** end-of-Slice 1 checklist for camera + Event JWT validation. Manual QA log updated (§3–§4, §8–§9 pass; §10 pending).
-- **`TODO.md`**: **FE-SLICE1-007** for end-of-Slice 1 QR QA. **`tasks.md`**: T060 added; T055–T057 marked done.
-
-### AI token optimization
-
-- **Slimmed [AGENTS.md](AGENTS.md)** to index + essentials (~80 lines); detail moved to `docs/setup.md` pointer and `.cursor/rules/`.
-- **Shared EMS rules** consolidated to repo root [`.cursor/rules/`](../.cursor/rules/) — removed duplicate Frontend copies; process rules (changelog, testing, TODO, API contract, code quality) now glob-scoped.
-- **Trimmed `frontend-ems-core.mdc`** reading list; security rule links to root process rules.
-- **Archived** one-time `setup-matt-pocock-skills` to `.cursor/skills/_archive/`.
-- Updated spec/constitution links to root rule paths.
-
-### Architecture
-
-- **[docs/decisions/006-portable-backend-boundary.md](docs/decisions/006-portable-backend-boundary.md)**: Platform adapter boundary for ScriptRunner → future Lambda migration; cross-links Backend `Utils/Platform/`.
-
-## 2026-07-04
-
-### UAT / Live environments and multi-machine setup
-
-- **`VITE_EMS_ENV`** build injection (`uat` \| `live`) in [`src/config.ts`](src/config.ts); local dev defaults to UAT via [`.env.development`](.env.development).
-- **`PocBanner`**: orange UAT banner when `EMS_ENV === 'uat'`; Vitest coverage in `PocBanner.test.tsx`.
-- **CI:** [`ci.yml`](.github/workflows/ci.yml) sets `VITE_EMS_ENV=live` for Live Pages; new [`deploy-uat.yml`](.github/workflows/deploy-uat.yml) deploys `uat` branch to `event-management-app-uat`.
-- **Docs:** [`docs/environments.md`](docs/environments.md), [`docs/multi-machine.md`](docs/multi-machine.md); OAuth and config tables updated in [`docs/setup.md`](docs/setup.md).
-- **Backend:** [`../Backend/.vscode/sftp.json.example`](../Backend/.vscode/sftp.json.example) and UAT/Live section in [`../Backend/README.md`](../Backend/README.md).
-
-### Catalog metadata & modal forms (002-catalog-metadata-modal)
-
-- **Bug fix — mobile Program dropdown mispositioned:** `CatalogEventModal`'s native `<select>` for Program rendered its options popup detached (top-left of viewport) on mobile, because the modal sits inside nested scroll/overflow containers (`AppLayout` `.content`/`.main`) that break native `<select>` popup positioning on mobile browsers — the same issue already fixed for `CatalogPickers`. Replaced with an in-place custom dropdown (button + `role="listbox"`), matching the `CatalogPickerSelect` pattern; added regression tests (`CatalogEventModal.test.tsx`) asserting no native `<select>` is rendered and the menu opens in place.
-- **`CatalogProgramModal.tsx`**, **`CatalogEventModal.tsx`**: create + edit modals replace inline catalog admin forms; active tab only for Create/Edit; archived tab read-only metadata.
-- **`CatalogAdminView.tsx`**, **`utils/catalogMetadata.ts`**: metadata summary as `label: value` lines; clear-on-save via PATCH `null`.
-- **`types.ts`**, **`normalizeApi.ts`**, **`mockData.ts`**, **`dataService.ts`**: optional metadata passthrough on catalog API/mock layer.
-- **Tests**: modal render/XSS/a11y/responsive smoke; admin edit/clear/archived gating; normalizer legacy + metadata cases.
-- **Docs**: `docs/api-contract.md`, `docs/ui-routes.md` — 002 catalog metadata contract and modal UX.
-
-### Catalog admin — custom picker menus (responsive)
-
-- Replaced native `<select>` in `CatalogPickers` with `CatalogPickerSelect` — menus render in-place below the trigger (fixes detached popup on mobile / DevTools emulation).
-
-### Catalog admin — responsive picker dock
-
-- **`AppLayout`**: catalog pickers sit outside the main scroll region so native `<select>` menus anchor correctly on mobile/tablet.
-- **`CatalogPickers.module.css`**: full-width 44px touch targets; 16px font on narrow viewports (iOS zoom guard).
-
-### Catalog admin — Phase 7 bug fixes (001-catalog-admin)
-
-- **`api/client.ts`**: `X-EMS-Route` is path-only; query string forwarded on listener URL — fixes Archived tab `No handler for catalog?includearchived=true` on live API.
-- **`Catalog.ts` / `mockData.ts` / `CatalogAdminView.tsx`**: archived admin view lists archived Events only; active Programs appear as section labels without Program archive controls.
-- **`CatalogPickers.tsx` / `catalogContext.tsx`**: “Select Program” / “Select Event” placeholders; pickers refetch and clear stale selection after admin catalog mutations via `bumpCatalog()`.
-- **Tests**: `client.test.ts`, extended picker/admin/catalog tests.
-
-## 2026-07-03
-
-### Slice 1 — Catalog admin (001-catalog-admin)
-
-- **Catalog navigation**: `CatalogPickers` in `AppLayout` — all roles select active Program + Event; context in `catalogContext.tsx`.
-- **Catalog admin UI**: `#/catalog` → `CatalogAdminView` (admin-only) — create/edit Programs and Events, active + archived tabs.
-- **`dataService.ts`**: `fetchCatalog`, `createProgram`, `updateProgram`, `createEvent`, `updateEvent` with mock/live switch; `normalizeCatalogResponse` in `normalizeApi.ts`.
-- **`mockData.ts`**: mutable mock catalog store for PoC.
-- **Tests**: `CatalogPickers.test.tsx`, `CatalogAdminView.test.tsx`, catalog normalizer tests.
-- **`docs/rbac.md`**, **`docs/api-contract.md`**: `GET catalog` all roles; `includeArchived` admin-only.
-
-### Catalog simplified to two levels (Program → Event)
-
-- Removed the **iteration** layer from the EMS catalog. Each calendar run (e.g. "Atlassian Event 2025", "Atlassian Event 2026") is now its **own Program**; hierarchy is **Program → Event** only.
-- HubSpot registration **form ID** now lives on the **Program** (was iteration); **Parts Attended** option stays on the **Event**.
-- Updated `CONTEXT.md`, `docs/decisions/003-phase1-attendees-checkin.md`, `docs/api-contract.md` (routes now `programs/{programId}/events/{evId}/…`), `docs/rbac.md`, `docs/product-flows.md`, `docs/hubspot-schema.md`, `project-blueprint.md`, `TODO.md`, and `MY-WORKFLOW.md`.
-
-### Foundation gates — steps 4, 8, 10
-
-- **`vite.config.ts`**: narrowed production CSP `img-src` from bare `https:` to `'self' data:` plus Google OAuth image hosts (`*.googleusercontent.com`, `*.gstatic.com`, `accounts.google.com`). Comment notes HubSpot CDN hosts to add when Slice 1 renders real assets (**Foundation step 4**, `FE-SEC-004`).
-- **`.cursor/rules/ems-api-contract-discipline.mdc`**: always-on rule — any new/changed route must update `docs/api-contract.md`, `docs/rbac.md`, `RouteGuard`, and `dataService.ts` in the same change (**Foundation step 8**). Updated `frontend-ems-core.mdc`, `frontend-security.mdc`.
-- **`docs/testing-validation.md`**: test validation playbook signed off 2026-07-03 — Tier 1 negative spot-checks, Backend + Frontend CI red/green proof (**Foundation step 10**, `FE-TEST-006`).
-
-### Delivery model — vertical slices (ADR-004)
-
-- Added **`docs/decisions/004-vertical-slice-delivery.md`**: EMS ships one complete, production-ready feature at a time; **security-governed write gate** (schema verified + RBAC + audit + validation/rate-limit + handler order) replaces "read-only until Phase 5". Supersedes sequencing in **ADR-001** (marked superseded; risk gate retained).
-- **ADR-003** reframed as **Slice 1** (catalog + attendees + check-in) with a **blocking security acceptance checklist** (write gate, alg-pinned JWT verify + Event-id match, defence-in-depth admin session, idempotency, least-privilege scopes, PII/CSP/QR-lib discipline, audit).
-- **`project-blueprint.md`** §1/§2.3/§7/§8/§10/§12 reframed from Phase 0–6 to **Foundation + Slices**; Slice 1 routes and scripts added; legacy flat `events/*` marked later slice.
-- **`docs/rbac.md`** + **`docs/api-contract.md`**: added Slice 1 catalog + attendee + check-in routes (`admin`, provisional); Phase column → Foundation/Slice; legacy routes relabelled later.
-- **`TODO.md`**: "Phase 1 Process" → **Foundation gates (before Slice 1)**; added `FE-SLICE1-001..004` build items.
-- **`docs/product-flows.md`** (stakeholder): leads with the first feature (catalog + attendees + on-the-day check-in) and Program → run → event navigation.
-
-### Engineering skills — Matt Pocock setup
-
-- Added **`docs/agents/`** configuration for engineering skills: GitHub issue tracker (no external-PR triage), default triage labels, and multi-context domain doc rules.
-- Added **`CONTEXT-MAP.md`** — Frontend + Backend contexts with relationship notes.
-- Updated **`AGENTS.md`** with `## Agent skills` section pointing at the config files.
-
-### AI / contributor guidance — responsive UI
-
-- Added **`.cursor/rules/frontend-responsive.mdc`**: new views and UI changes must support mobile, tablet, and desktop (mobile-first CSS, `900px` shell breakpoint, touch targets, table/chart patterns).
-- Updated **`AGENTS.md`** product principles and agent checklist; cross-linked from **`frontend-patterns.mdc`**.
-
-### Backend deploy — Phase 0 scripts live (Phase 1 Process step 6)
-
-- Backend **BE-DEPLOY-001** complete: latest ScriptRunner `scripts/` uploaded via SFTP; auth exchange + logout verified against local Vite proxy.
-
-### Process — TODO audit (pre–Phase 1 checklist)
-
-- Reconciled **TODO.md** with repo state: marked Phase 1 Process steps **1, 5, 9** done; moved completed items to **Done (archive)**.
-- **X-001** set to **in progress** (git + ESLint XSS + test CI done; Bugbot remains). **FE-OPS-001/002** marked **blocked**.
-
-### Security — dependency audit CI (Phase 1 Process step 3)
-
-- Added **`npm audit --audit-level=high`** to `.github/workflows/ci.yml` after `npm ci`.
-
-### Architecture — React migration R4 (cleanup, branch `react-migration`)
-
-- **Deleted legacy vanilla app:** `js/` tree, `dev-server.mjs`, `index.vanilla.html`.
-- **ESLint** retargeted to `src/` with **`dangerouslySetInnerHTML` ban** (closes **FE-SEC-007** for React). Removed `dev:legacy` npm script.
-- **CI** runs `npm test` (37 specs) in addition to lint + build.
-- Updated **AGENTS.md**, **README.md**, **docs/setup.md**, **docs/ui-routes.md**, **docs/CONTRIBUTING.md**, **frontend-patterns.mdc**, **frontend-security.mdc**, **react-migration-plan.md**, **TODO.md**.
-
-### Architecture — React migration R3e + R3f (Settings + Email, branch `react-migration`)
-
-- Ported **`SettingsView`** — read-only event details, registration/access panel, danger zone (PoC placeholders).
-- Ported **`EmailView`** — audience overview, compose send (template/segment/timing), scheduled sends table, mock dispatch with large-send **`ConfirmModal`**.
-- Added **`ConfirmProvider`** / **`useConfirm()`** in `src/components/ConfirmModal.tsx`; wired into `App.tsx`.
-- Wired both into **`ViewRouter`**. Added **5 Vitest specs** (render + XSS guards). **37 tests** passing; production bundle ~449 KB.
-
-### Architecture — React migration R3d (Agenda + Check-in, branch `react-migration`)
-
-- Ported **`AgendaView`** — session schedule table, Export PDF placeholder (disabled when empty), HubSpot sync hint.
-- Ported **`CheckInView`** — registered-only search list (max 8 rows), per-row Check in toast (PoC), QR scan placeholder panel.
-- Wired both into **`ViewRouter`** (`agenda`, `check-in` routes). Added **4 Vitest specs** (render + XSS guards). `npm test` green (32 tests).
-
-### Architecture — React migration R3c (Analytics + Chart.js npm, branch `react-migration`)
-
-- Ported **`AnalyticsView`** — registration summary stats, campaign metrics list, recent sends audit feed, empty states.
-- Added **`ConversionChart`** (`chart.js` + `react-chartjs-2`) — doughnut funnel chart using brand CSS tokens; **self-hosted in the Vite bundle** (no CDN). Closes **FE-SEC-005** for the React app.
-- Wired into **`ViewRouter`** for the `analytics` route. Added **2 Vitest specs** (render + XSS guard). `npm test` green (28 tests). Production bundle ~433 KB (Chart.js included).
-
-### Architecture — React migration R3b (Attendees, branch `react-migration`)
-
-- Ported **`AttendeesView`** — segment filters (All/Registered/Checked In/Cancelled), search, selectable rows, detail panel, Export CSV toast, Send email / Update status actions (PoC placeholders).
-- Wired into **`ViewRouter`** for the `attendees` route.
-- Added **3 Vitest specs** including XSS render guard and row-selection detail panel test. `npm test` green (26 tests).
-
-### Architecture — React migration R3a (Events + Event Hub, branch `react-migration`)
-
-- Ported **`EventsView`** and **`EventHubView`** — portfolio table (filters, search, stats) and event hub (capacity bar, module cards, activity feed) wired to `useDataService()`.
-- Added shared view shell components: **`TopBar`**, **`StatusBadge`**, **`EmptyState`**, **`CapacityBar`**; **`format.ts`** (`statusBadgeClass`, `formatDateTime`).
-- **`ViewRouter`** dispatches by logical route — ported views replace `RoutePlaceholder`; unported modules still show the placeholder.
-- Imported global **`layout.css`** + **`components.css`** for PoC view styling; **`AppLayout`** loads event name for the sidebar.
-- **R3 split into R3a–R3f** in [docs/react-migration-plan.md](docs/react-migration-plan.md) (each ~R2 intensity). Added **6 Vitest specs** (EventsView, EventHubView XSS guards, format utils). `npm test` green.
-
-### Architecture — React migration R2 (data layer, branch `react-migration`)
-
-- Ported **`dataService.ts`**, **`normalizeApi.ts`**, and **`mockData.ts`** to TypeScript under `src/` — same mock/live switch as the vanilla app; session token passed explicitly via `DataServiceOptions` / `createDataService()`.
-- Added **`useDataService()`** hook (`src/hooks/useDataService.ts`) — binds `useSession()` token to all fetch methods for R3 views.
-- Extended **`types.ts`** with domain types (Event, Attendee, analytics, email payloads, etc.).
-- Added **12 Vitest specs** — `normalizeApi.test.ts` (API → UI mapping) and `dataService.test.ts` (mock path + live path with token). `npm test` green (17 tests total).
-
-### Architecture — React migration R1 (shell + routing + auth, branch `react-migration`)
-
-- Ported the **app shell** to React: `AppLayout` (banner + sidebar + routed main), `Sidebar`, `PocBanner`, `Toast` (context/hook) — each with a CSS Module using brand tokens.
-- **Hash routing** via `react-router` with `:eventId`/`:module` params; `eventId` now derives from the URL, removing the old `setSelectedEventId` double-render workaround. Added `router/navigation.ts` helpers.
-- **Session context** (`state/appState.tsx`) replaces `appState.js` — session in memory, `useSession()` hook.
-- **Auth brought forward from R2** (a login gate needs it): ported `authService.ts` (Google Identity Services button + `/auth/exchange` live/mock) and `api/client.ts` (token passed explicitly, no global state). Added GIS script + minimal GIS typings; `LoginView` mounts the button.
-- **Testing set up** (`FE-TEST-001` done): Vitest + React Testing Library + jsdom via `vite.config.ts` `test` block; first specs `navigation.test.ts` and `RoutePlaceholder.test.tsx` (includes an XSS render guard). `npm test` green (5 tests).
-- Views remain `RoutePlaceholder` stand-ins until R3. Build, tests, lint, and dev server all verified.
-
-### Architecture — React migration R0 (scaffold, branch `react-migration`)
-
-- Scaffolded **Vite 8 + React 19 + TypeScript** with `react-router` hash routing; placeholder route renders and the production build passes (`npm run build` = `tsc --noEmit && vite build`).
-- **CSS Modules** adopted (`PlaceholderView.module.css`) using brand tokens from `css/tokens.css`.
-- **Build-only CSP:** strict Content-Security-Policy injected into `index.html` at build time via a Vite plugin (dev server stays HMR-friendly; production bundle keeps `script-src 'self'`). Dropped `cdn.jsdelivr.net` (Chart.js will be self-hosted when Analytics is ported).
-- Preserved the vanilla app as `index.vanilla.html` for reference during porting; `dist/` gitignored.
-- `vite.config.ts` `/api/ems` dev proxy mirrors `dev-server.mjs` (reads `dev-server.config.js` when present).
-- **CI rewritten** (`.github/workflows/ci.yml`): Node 22, `npm run lint` + `npm run build` on every push/PR; deploys `dist/` to GitHub Pages via Actions on `main`. Requires repo Pages source = GitHub Actions (one-time manual setting).
-
-## 2026-07-02
-
-### Architecture — React migration (planning only)
-
-- Removed the "no React/Vue" line from `.cursor/rules/frontend-patterns.mdc` (was included by mistake).
-- Added [docs/react-migration-plan.md](docs/react-migration-plan.md) — decision + phased plan to adopt **React + TypeScript + Vite** (build step, CSP notes, phased R0–R4, docs/rules to update). No code migrated yet.
-- Added `TODO.md` **Architecture** section (`FE-ARCH-001`–`005`); noted this reshapes `FE-SEC-005/007`, `FE-TEST-001` (→ Vitest + RTL), and `FE-TECH-001/005`. Cross-folder `X-006` added in `../Backend/TODO.md` (CI build step; Backend runtime unaffected).
-
-### Testing — discipline + parked setup
-
-- Added **Testing** section to `TODO.md` (`FE-TEST-001` runner setup, `FE-TEST-002` pure-logic unit tests, `FE-TEST-003` XSS render tests, `FE-TEST-004` test CI, `FE-TEST-005` per-view standing requirement) and Phase 1 Process **step 9** (automated test CI).
-- Added cross-cutting `X-004` (Playwright E2E) and `X-005` (standing test discipline).
-- Added `.cursor/rules/ems-testing-discipline.mdc` and an `AGENTS.md` checklist item: new views/services ship with tests once a runner exists; deferrals parked in `TODO.md`.
-- Added [docs/testing-validation.md](docs/testing-validation.md) — how to validate tests (Tier 1 negative spot-checks, CI proof, deploy smoke) without infinite meta-testing; **`FE-TEST-006`** + Phase 1 Process **step 10**.
-
-## 2026-07-02
-
-### TODO — Phase 1 Process + remaining cleanup parked
-
-- Added **Phase 1 Process** pre-flight checklist (8 gates before HubSpot read APIs).
-- Parked optional polish: `FE-TECH-001`–`005`, `FE-PROD-003` (UI role gating), `FE-SEC-007` (ESLint innerHTML ban).
-- Added `X-003` contract sync discipline; moved `FE-SEC-004` to Pre–Phase 1 (Phase 1 Process step 4).
-
-### Small quick wins (with caveats)
-
-- **`APP_NAME` / `APP_SHORT_NAME` wired:** Login card and `document.title` use `APP_NAME`; sidebar header uses `APP_SHORT_NAME`. Added `js/utils/branding.js`.
-- **Chart.js brand colors:** Analytics funnel reads `--color-cobalt`, `--color-orange`, `--color-black` from CSS tokens via `getBrandColor()`.
-- **Removed unused `escapeHtml`** from `dom.js` (`htmlToElement` kept for documented trusted-static use).
-- **CSP / ScriptRunner host:** Documented `connect-src` pinning and proxy vs direct-listener setup in `docs/setup.md`.
-
-### Nice-to-have quick wins
-
-- **withMockFallback:** Removed unreachable `ApiError` status-0 catch (mock path never calls `apiRequest` when `USE_MOCK_API` is true).
-- **config.example.js:** Clarified `CONFIG_EXAMPLE` vs `CONFIG`; added `APP_SHORT_NAME` to the example.
-- **Docs:** Mermaid route diagram includes Check-in, Agenda, Settings; product flows “Recent sends” wording aligned with Analytics UI.
-
-### Navigation & contract polish
-
-- **F3 — Double render fix:** `setSelectedEventId` no longer notifies app subscribers; hashchange is the single view-update driver.
-- **F4 — Single nav source:** `js/config/eventModules.js` feeds sidebar and Event Hub module cards.
-- **F6 — api-contract:** Documented activity, agenda, campaign metrics, scheduled emails, and audit routes; `fetchTemplates(eventId)` now uses `/events/{id}/email/templates`.
-
-### Before Phase 1 — API alignment & live-data prep
-
-- **Email naming (F1):** Renamed `previewDispatch` → `previewEmail`, `dispatchEmail` → `sendEmail`; live paths now use `/events/{id}/email/preview` and `/events/{id}/email/dispatch`. Config key `DISPATCH_CONFIRM_THRESHOLD` → `EMAIL_SEND_CONFIRM_THRESHOLD`. CSS `.dispatch-panel` → `.email-panel`.
-- **API normalizer (F5):** Added `js/utils/normalizeApi.js` — maps contract shapes (`startDate`, `firstName`/`lastName`, `checked_in`) to UI shapes used by views. Applied in `dataService.js` on live API responses.
-- **api-contract.md:** Phase 0 auth error codes, opaque session token wording, logout errors, 429 on exchange.
-
-### Phase 0 cleanup (quick wins)
-
-- Aligned PoC messaging: login notice now says **sample data** (matches app banner) when `USE_MOCK_API` is true.
-- Updated `docs/ui-routes.md`, `docs/rbac.md`, and `TODO.md` — removed stale “empty mock data” wording; rbac role inheritance now references live `expandRole` / `roleCanAccessRoute` in backend.
-
-### Fully populated EMS PoC
-
-- Restored rich **sample mock data**: 6 events (active, draft, completed, cancelled), attendees with email/ticket/source, templates, campaign metrics, scheduled sends, agenda sessions, activity feed, audit log.
-- **New module shells:** Check-in (`checkInView.js`), Agenda (`agendaView.js`), Settings (`settingsView.js`).
-- Enhanced All Events (portfolio stats, status filters, search), Event Hub (capacity bar, activity, 6 modules, quick actions), Attendees (search, detail panel, export), Email (scheduled sends table, preview), Analytics (live mock metrics + event-scoped audit).
-- Extended router, sidebar, and `dataService.js` for new routes and mock endpoints.
-
-### Security briefings (internal, gitignored)
-
-- Added `docs/security-briefing-stakeholders.md` — non-technical FAQ for managers/events team pushback on public URLs and PII.
-- Added `docs/security-briefing-technical.md` — architecture, threat model, Phase 0 controls, production checklist for security reviewers.
-- Explicit `.gitignore` entries for both briefing files (entire `docs/` folder was already excluded from GitHub Pages publish).
-
-### Project tracking
-
-- Added `TODO.md` — parked/deferred optional work (git/CI security scanning, CSP follow-ups, hosting); seeded from Phase 0 security assessment.
-- Added `.cursor/rules/ems-todo-discipline.mdc` — agents must park skipped/deferred items in `TODO.md`.
-- Updated `frontend-ems-core.mdc`, `ems-ask-before-acting.mdc`, and `AGENTS.md` to reference `TODO.md`.
-
-### EMS PoC refactor (event-centric shell)
-
-- Replaced email-blast PoC with **Event Management System** navigation: All Events → Event Hub → Attendees / Email / Analytics.
-- Hash routes now use `#/events/{id}` and `#/events/{id}/{module}` (removed legacy `#/dispatch/{id}`).
-- Added `eventHubView.js`, `attendeesView.js`, and `emailView.js`; removed `dispatchView.js`.
-- Mock data cleared to **empty arrays** — views show purposeful empty states until HubSpot read APIs connect (Phase 2+).
-- Updated branding from "Event Command Center" to "Adaptavist EMS" / "Event Management System".
-- Event-scoped sidebar with module nav; global "All Events" always visible.
-
-### Security hardening
-
-- Tightened CSP `connect-src` from broad `https:` to `self` + required Google/ScriptRunner hosts (narrows XSS exfiltration).
-- Added Subresource Integrity (SRI `sha384`) hash to the pinned `chart.js` CDN script (supply-chain protection).
-- Documented XSS-prevention rules (render dynamic data via `textContent` / `el({ text })`, never `innerHTML`) across `frontend-security.mdc`, `frontend-patterns.mdc`, `AGENTS.md`, `docs/CONTRIBUTING.md`, blueprint §3.6, and a `dom.js` `htmlToElement()` warning — session token is in memory, so XSS = session compromise.
-
-### Local dev proxy (Phase 0 auth)
-
-- Added `dev-server.mjs` + `dev-server.config.example.js` — serves UI and proxies `/api/ems` → ScriptRunner (avoids OPTIONS/CORS).
-- `API_BASE_URL` is now `/api/ems` (same origin); ScriptRunner URL lives in gitignored `dev-server.config.js`.
-- `npm run dev` replaces `python3 -m http.server` when testing live auth.
-
-### Phase 0 — Authentication (frontend)
-
-- Fixed logout remounting login twice (duplicate `bootstrap()` + duplicate GIS `initialize()`); Google button 403 warnings after sign-out.
-- Single-flight GIS `initialize()` at app startup; disabled FedCM for local dev; login mount guard prevents duplicate button renders on refresh.
-- Login shell and Google button render once per page load; logout only toggles visibility (fixes gsi/button 403 after sign-out).
-- Reverted OAuth redirect/PKCE experiment — GIS popup button is sufficient for Phase 0; optional gsi/button 403 in Network tab is harmless noise.
-- `authService.js` calls `auth/exchange` and `auth/logout` with `skipMock` when `USE_MOCK_AUTH` is false.
-- `api/client.js` posts to full `API_BASE_URL` with `X-EMS-Route` header (ScriptRunner flat listener paths).
-
-### Documentation (hosting and budget)
-
-- **`project-blueprint.md` §4:** $0 default (GitHub Pages), Phase 0 session auth mandatory, Cloudflare Access deferred to Phase 6.
-- **`docs/setup.md`:** Cloudflare Access timing; Phase 0 auth checklist.
-- **`docs/decisions/002-zero-budget-hosting.md`:** ADR for GitHub Pages primary, Phase 6 edge auth.
-- **`README.md` / `AGENTS.md`:** Public UI vs protected API until Cloudflare Access.
-
-### Repository
-- `.gitignore` now excludes `docs/`, `project-blueprint.md`, and `node_modules/` so internal specs and deps are not published via GitHub Pages.
-
-### Tooling
-
-- Added ESLint (flat config, `eslint.config.js`) with browser/ES-module globals and `Chart`/`google` CDN globals; scripts `lint` and `lint:fix`.
-- Added GitHub Actions workflow `.github/workflows/ci.yml` to run lint on push/PR.
-- Baseline lint: 0 errors, 3 warnings (unused `ApiError` import and two unused `root` vars) — non-blocking.
-
-### Cursor rules
-
-- Migrated from `Frontend/.cursorrules` to `.cursor/rules/*.mdc` (scoped, always-on vs file-specific rules).
-- Added rules: clarify before acting when requests are unclear; modular/readable code priority; changelog discipline.
-
-### Documentation
-
-- Added `docs/product-flows.md` — non-technical user journeys for events team stakeholder.
-- Added `docs/CONTRIBUTING.md` — roles, PR checklist, AI guardrails.
-- Rewrote `project-blueprint.md` — EMS vision, event-centric model, read-first HubSpot phases, documentation index.
-- Added `AGENTS.md` — frontend development guide for AI and developers.
-- Added supporting docs: `hubspot-schema.md`, `api-contract.md`, `rbac.md`, `ui-routes.md`, `setup.md`, `decisions/001-read-first-hubspot.md`.
-
-### Application (PoC shell)
-
-- Replaced monolithic `index.html` with modular ES module structure (`js/views/`, `js/services/`, `css/`).
-- Implemented Google Sign-In via programmatic `renderButton` (dynamic login mount).
-- Hash routing for events, dispatch, and analytics views with mock data layer.
-- Brand tokens in `css/tokens.css` aligned to Adaptavist palette.
-
-### Fixes
-
-- Fixed `js/router.js` import path for `appState.js` (404 on `/state/appState.js`).
-
----
-
 ## How to add entries
 
-When making changes, add bullets under today's date. If the date section exists, append to it; otherwise create a new `## YYYY-MM-DD` section at the top (below this instructions block).
+When making changes, add bullets under today's date. If the date section exists, append to it; otherwise create a new `## YYYY-MM-DD` section at the top (below the intro). Entries before 2026-07-08 live in [CHANGELOG-archive-2026-07-02-to-07.md](CHANGELOG-archive-2026-07-02-to-07.md).

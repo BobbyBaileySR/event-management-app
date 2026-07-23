@@ -31,14 +31,16 @@ ScriptRunner cannot handle browser `OPTIONS` preflight. Vite proxies `/api/ems` 
 
 1. Copy `dev-server.config.example.js` → `dev-server.config.js`
 2. Set `srcListenerUrl` to your ScriptRunner listener URL
-3. In `src/config.ts`: `USE_MOCK_AUTH: false` (and `USE_MOCK_API` as needed)
+3. In `src/config.ts`: `USE_MOCK_AUTH: false`
 4. Run `npm run dev`
 
 Sign-in requires Google OAuth client ID and `http://localhost:8765` as an authorised JavaScript origin.
 
-### Mock-only UI
+All EMS data flows through the live ScriptRunner API against HubSpot Staging — there is no mock-data mode (removed 2026-07-15).
 
-Set `USE_MOCK_AUTH: true` and `USE_MOCK_API: true` in `src/config.ts`.
+### Mock auth (skip Google sign-in)
+
+Set `USE_MOCK_AUTH: true` in `src/config.ts` to use the local mock auth exchange (still talks to the live API for data).
 
 ---
 

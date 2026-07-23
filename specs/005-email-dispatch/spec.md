@@ -4,11 +4,11 @@
 
 **Created**: 2026-07-07
 
-**Status**: Tasks generated (ready for implement)
+**Status**: Implemented — US1–US4 code-complete (`EmailDispatchView.tsx`, `useEmailDispatchWorkflow.ts`, real Backend handlers + `HubSpotSingleSendAdapter`, per `master-qa-slice-1.5-and-slice-2.md`'s status table). Live HubSpot send is wired but gated behind `EMAIL_SEND_ENABLED` (default `false`) pending its own live-send verification (`T002.4`) and manual UAT sign-off (§B); `tasks.md` T068–T072 remain unchecked for that reason, not for missing code. *(Verified 2026-07-17.)*
 
-**Input**: User description: "Slice 2 — staff email dispatch for a Program + Event: send HubSpot marketing templates immediately or on a schedule; audience from registered attendees (EMS filters/selection) or HubSpot CRM segments; dispatch log with per-contact sent records; admin-only."
+**Input**: Slice 2 — staff email dispatch for an Event: send HubSpot marketing templates immediately or on a schedule; audience from registered attendees or HubSpot CRM segments; dispatch log with per-contact sent records; admin-only.
 
-**Depends on**: [001-catalog-admin](../001-catalog-admin/spec.md), [002-catalog-metadata-modal](../002-catalog-metadata-modal/spec.md), and [003-check-in](../003-check-in/spec.md) — Program + Event catalog context, registered **Attendee list**, admin RBAC, and Slice 1 navigation patterns remain in force.
+**Depends on**: [003-check-in](../003-check-in/spec.md) — working-Event context, registered **Attendee list**, and admin RBAC. Program grouping is optional.
 
 **Product context**: [CONTEXT.md](../../CONTEXT.md) (Slice 2, Email dispatch, Dispatch audience, Scheduled dispatch, Dispatch log, HubSpot contact segment, HubSpot marketing email template)
 
@@ -22,9 +22,9 @@
 
 - Q: When staff combine attendee filters/search with manual multi-select, how is the send list determined? → A: **Fixed selection** — filters and search only narrow the picker table; manually selected Contacts remain in the send list when filters change or clear.
 - Q: After **Send now**, must the admin wait on screen until every recipient is handed off? → A: **Accepted immediately** — success when the dispatch is queued/accepted; HubSpot handoff runs in the background; dispatch log updates as **sent** records are written.
-- Q: How should staff navigate Compose, Scheduled, and Dispatch log within Email? → A: **Tabs on Email page** — Compose, Scheduled, and Dispatch log as tabs (or equivalent segmented nav) within one Email view for the selected Program + Event.
+- Q: How should staff navigate Compose, Scheduled, and Dispatch log within Email? → A: **Tabs on Email page** — Compose, Scheduled, and Dispatch log as tabs (or equivalent segmented nav) within one Email view for the selected Program + Event. *(Superseded 2026-07-17 — `FE-REDESIGN-014` replaced the 3-tab layout with a single unified "Email schedule" list plus a "+ New campaign" button that opens the compose modal; verify against `EmailDispatchView.tsx` before treating this Q&A as current.)*
 - Q: Should dispatch actions be rate-limited per admin per hour? → A: **Yes — per-admin hourly cap** on dispatch actions (send now + new schedules), with clear error when exceeded; **show the current limit in the UI** (e.g. on Compose tab) so staff know the boundary before attempting a send.
-- Q: How should staff open the Email module? → A: **Catalog pickers + dedicated Email route** — same navigation model as Attendees/Check-in (e.g. `#/events/email`); legacy `#/events/{id}/email` retired for Slice 2; empty state when Program + Event not selected.
+- Q: How should staff open the Email module? → A: **Superseded 2026-07-14** — current route is `#/events/{eventId}/email`, reached after choosing a working Event. The old catalog-scoped `#/events/email` route redirects to Programs & Events.
 
 ---
 
@@ -32,15 +32,15 @@
 
 ### User Story 1 — Send an email now to registered attendees (Priority: P1) 🎯 MVP
 
-An **admin** selects a **Program** and **Event**, opens the **Email** module, and sends a **HubSpot marketing email template** immediately to a **dispatch audience** drawn from **Registered attendees** for that Event. They enter a **dispatch name** (free text), choose a template **by name**, define the audience using first-class EMS controls (all registered, checked-in / not checked-in, search, or manual multi-select on the attendee list). **Manual multi-select uses fixed selection:** filters and search narrow the picker only; selected Contacts stay selected if filters change. Staff review the recipient count and press **Send now**. The system **accepts the dispatch immediately** (queued for processing — staff are not blocked while HubSpot handoff runs) and records it in the **Dispatch log**, updating per-Contact **sent** outcomes as processing completes.
+An **admin** selects a working **Event**, opens the **Email** module, and sends a **HubSpot marketing email template** immediately to a **dispatch audience** drawn from **Registered attendees** for that Event. They enter a **dispatch name** (free text), choose a template **by name**, define the audience using first-class EMS controls (all registered, checked-in / not checked-in, search, or manual multi-select on the attendee list). **Manual multi-select uses fixed selection:** filters and search narrow the picker only; selected Contacts stay selected if filters change. Staff review the recipient count and press **Send now**. The system **accepts the dispatch immediately** (queued for processing — staff are not blocked while HubSpot handoff runs) and records it in the **Dispatch log**, updating per-Contact **sent** outcomes as processing completes.
 
 **Why this priority**: Immediate sends are the core operational need (reminders, last-minute updates) and prove the HubSpot template + audience pipeline before scheduling and logging depth.
 
-**Independent Test**: Admin with catalog context → Email module → pick template by name → enter dispatch name → select “all registered” → confirm if over threshold → success message → dispatch appears in log with recipient count and sent records for attendees.
+**Independent Test**: Admin with a working Event → Email module → **+ New campaign** → pick template by name → enter dispatch name → select “all registered” → confirm if over threshold → success message → dispatch appears in the unified campaign list / log with recipient count and sent records for attendees.
 
 **Acceptance Scenarios**:
 
-1. **Given** an admin with Program + Event selected via catalog pickers, **When** they open Email from the sidebar, **Then** they land on the catalog-scoped Email module and can choose a HubSpot marketing template **by display name** (not raw HubSpot id).
+1. **Given** an admin with a working Event, **When** they open Email from the Sidebar, **Then** they land on `#/events/{eventId}/email` and can choose a HubSpot marketing template **by display name** (not raw HubSpot id).
 2. **Given** the compose send flow, **When** the admin enters a dispatch name and selects registered-attendee audience (e.g. all registered, or checked-in only, or manual multi-select), **Then** the UI shows an accurate recipient count before send.
 3. **Given** a valid send with at least one recipient, **When** the admin confirms **Send now**, **Then** the dispatch is **accepted immediately** (queued for processing), the admin sees a non-blocking success message, and the **Dispatch log** shows the dispatch with **sent** records appearing as background processing completes.
 4. **Given** zero recipients for the chosen audience, **When** the admin attempts send, **Then** send is blocked with a clear message.
@@ -87,7 +87,7 @@ When the audience must go **beyond Registered attendees** for the Event, an **ad
 
 ### User Story 4 — Review dispatch history and filter attendees (Priority: P2)
 
-An **admin** opens **Dispatch log** for the selected Program + Event to see all **Email dispatches** (immediate and completed scheduled): dispatch name, system id, template name, actor, time, audience summary, and status. They can open a dispatch to see **per-Contact sent** records. From the **Attendee list**, they filter Contacts by whether they **received** or **did not receive** a chosen past dispatch — supporting follow-up targeting (e.g. reminder only to those who missed the invitation).
+An **admin** opens the unified **Email schedule** list for the working Event to see all **Email dispatches** (immediate and completed scheduled): dispatch name, system id, template name, actor, time, audience summary, and status. They can open a dispatch to see **per-Contact sent** records. From the **Attendee list**, they filter Contacts by whether they **received** or **did not receive** a chosen past dispatch — supporting follow-up targeting (e.g. reminder only to those who missed the invitation).
 
 **Why this priority**: Accountability and follow-up segmentation were explicit stakeholder requirements; depends on sends existing (US1/US2).
 
@@ -95,7 +95,7 @@ An **admin** opens **Dispatch log** for the selected Program + Event to see all 
 
 **Acceptance Scenarios**:
 
-1. **Given** completed dispatches for an Event, **When** the admin opens the **Dispatch log** tab, **Then** entries are ordered with newest first and include dispatch name, template, actor, time, audience summary, and recipient count.
+1. **Given** completed dispatches for an Event, **When** the admin opens the **Email schedule** list, **Then** entries are ordered with newest first and include dispatch name, template, actor, time, audience summary, and recipient count.
 2. **Given** a dispatch in the log, **When** the admin views detail, **Then** they see per-Contact records with outcome **sent** (successfully handed off for that Contact).
 3. **Given** the Attendee list for the same Event, **When** the admin filters by **received dispatch [name]** or **did not receive dispatch [name]**, **Then** the list shows only matching Registered attendees.
 4. **Given** a segment-based dispatch that included non-attendees, **When** viewing Attendee list filters, **Then** filter applies only to Registered attendees on the list (non-attendees appear only in dispatch detail, not on the attendee roster filter).
@@ -104,18 +104,18 @@ An **admin** opens **Dispatch log** for the selected Program + Event to see all 
 
 ### Edge Cases
 
-- **Catalog context missing** → Email module shows guidance to select Program + Event first (same pattern as Attendees / Check-in); sidebar Email link may be visible but module does not load send data until context is set.
+- **Working Event missing** → event-scoped Email link is muted/disabled until staff pick a working Event (WorkingEventPicker / Programs & Events); module does not load send data without an Event id.
 - **HubSpot template or segment removed/renamed after dispatch created** → Dispatch log retains **names recorded at send time**; pending schedules show current picker names with stale-id error on send if HubSpot object missing.
 - **White glove Program** → EMS does **not** block sends; staff voluntarily skip bulk outreach per team practice (CONTEXT.md).
 - **Duplicate rapid send clicks** → second action must not double-send the same dispatch request (idempotent behaviour from user perspective).
 - **Send now processing** → dispatch accepted immediately; admin is not blocked on screen; log and **sent** records update as background processing completes.
 - **Scheduled time in the past** → rejected with clear validation before save.
 - **HubSpot handoff failure for a Contact** → that Contact does not receive a **sent** record; dispatch summary reflects partial completion where applicable.
-- **Rate limit reached** → dispatch action blocked with clear message; Compose tab already shows configured hourly limit.
+- **Rate limit reached** → dispatch action blocked with clear message; compose modal already shows configured hourly limit.
 - **Segment membership changes between schedule create and run** → recipients resolved at **processing time**, not frozen at schedule creation (Active segments); staff informed in UI copy for segment schedules.
 - **Manual multi-select + filters** → **fixed selection**: filters/search narrow the picker table only; manually selected Contacts remain in the send list when filters change or clear; recipient count reflects explicit selections (or filter-based “all matching” when no manual picks).
 - **Hostile strings** in dispatch names, template names, segment names → displayed as plain text only.
-- **Mock vs live** → mock layer supports full Email UX flows for local dev until live HubSpot send is enabled.
+- **Automated vs live** → Vitest uses test-local mocks; operator QA uses HubSpot Staging through ScriptRunner.
 
 ---
 
@@ -123,7 +123,7 @@ An **admin** opens **Dispatch log** for the selected Program + Event to see all 
 
 ### Functional Requirements
 
-- **FR-001**: System MUST expose an **Email** module at a **catalog-scoped route** (same navigation model as Attendees and Check-in — e.g. `#/events/email` with Program + Event from catalog pickers). Legacy `#/events/{id}/email` MUST NOT be used for Slice 2. Module is **admin only**. It MUST provide **three tabs**: **Compose**, **Scheduled**, and **Dispatch log**. If Program or Event is not selected, show catalog-context guidance (empty state).
+- **FR-001** *(superseded by event-first routing and `FE-REDESIGN-014`)*: The **admin-only Email** module lives at `#/events/{eventId}/email`. It presents one unified campaign/dispatch list and a **+ New campaign** compose modal; no working Event means the event-scoped link is disabled.
 - **FR-002**: System MUST list **HubSpot marketing email templates** for staff selection **by display name**; HubSpot template ids MUST be retained for send operations but not shown in routine UI.
 - **FR-003**: Every **Email dispatch** MUST require a **staff-entered dispatch name** (no format rules) and MUST assign a **system-generated dispatch id** for search, log correlation, and attendee filtering.
 - **FR-004**: For **Registered attendee** audiences, system MUST support: all registered for the Event; filter by checked-in / not checked-in; search on the attendee list; **manual multi-select** of attendees — without requiring a HubSpot segment. Manual selections MUST use **fixed selection** (filters/search narrow the picker only; selected Contacts persist when filters change or clear).
@@ -185,4 +185,4 @@ An **admin** opens **Dispatch log** for the selected Program + Event to see all 
 - **`communications` role** for Email (deferred; admin-only for Slice 2).
 - **HubSpot workflows** as a substitute for EMS scheduling UI.
 - Free-text HubSpot list ids or ad-hoc Contact queries outside **CRM segments**.
-- Legacy **`#/events/{id}/email`** route and flat mock event id for Email — replaced by catalog-scoped Email route (Session 2026-07-07).
+- Global/catalog-scoped Email route — Email remains under one working Event at `#/events/{eventId}/email`.

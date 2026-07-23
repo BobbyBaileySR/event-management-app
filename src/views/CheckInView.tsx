@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { CheckInQrPanel } from '../components/CheckInQrPanel';
 import { CapacityBar } from '../components/CapacityBar';
@@ -7,108 +8,62 @@ import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { TopBar } from '../components/TopBar';
 import { useToast } from '../components/Toast';
+import { useEventCapacity } from '../data/hooks/useCapacity';
+import { invalidateAfterAttendeeMutation, invalidateAfterCapacityAdjust } from '../data/invalidation';
+import { queryKeys } from '../data/queryKeys';
+import { describeQueryStatus } from '../data/queryStatus';
 import { useDataService } from '../hooks/useDataService';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useUndoCheckIn } from '../hooks/useUndoCheckIn';
 import { useWorkingEventMeta } from '../hooks/useWorkingEventMeta';
 import { useActiveRoute } from '../router/navigation';
 import { useSession } from '../state/appState';
-import type { AdjustCapacityDirection, CapacityStatus, CheckInContactSummary, SliceAttendee } from '../types';
-import { isAllowedHubSpotFormUrl } from '../utils/hubspotFormUrl';
+import type { AdjustCapacityDirection, CheckInContactSummary, SliceAttendee } from '../types';
+import { attendeeMutationErrorMessage } from '../utils/attendeeMutationErrors';
+import { attendeeInitials, attendeeName } from '../utils/attendeePresentation';
+import { formatCheckInTime } from '../utils/format';
+import { walkInFormUrlError } from '../utils/hubspotFormUrl';
 import styles from './CheckInView.module.css';
 
 type SelectedAttendee = SliceAttendee | CheckInContactSummary;
 type ActiveModal = 'scanner' | 'walkin' | 'confirm' | null;
 
-function initials(person: { firstName: string; lastName: string }): string {
-	const first = person.firstName.trim().charAt(0);
-	const last = person.lastName.trim().charAt(0);
-	return `${first}${last}`.toUpperCase() || '?';
-}
-
-/** Server-side search runs across all registrants; require typing before fetch. */
-const CHECK_IN_MIN_SEARCH_LENGTH = 2;
-/** Backend caps pageSize at 200 — enough for typical name/company matches at the desk. */
+/** Backend caps pageSize at 200 — enough for a typical event roster at the desk. */
 const CHECK_IN_SEARCH_PAGE_SIZE = 200;
-
-function attendeeName(person: { firstName: string; lastName: string }): string {
-	return `${person.firstName} ${person.lastName}`.trim();
-}
-
-function walkInUrlRenderError(url: string): string | null {
-	const trimmed = url.trim();
-	if (!trimmed) {
-		return null;
-	}
-	if (isAllowedHubSpotFormUrl(trimmed)) {
-		return null;
-	}
-
-	try {
-		const parsed = new URL(trimmed);
-		if (parsed.protocol !== 'https:') {
-			return 'Walk-in form URL must use HTTPS';
-		}
-	} catch {
-		return 'Walk-in form URL must use HTTPS';
-	}
-
-	return 'Walk-in form URL must be a HubSpot form URL';
-}
 
 export function CheckInView() {
 	const { session } = useSession();
 	const { showToast } = useToast();
 	const { confirm } = useConfirm();
 	const data = useDataService();
+	const queryClient = useQueryClient();
 	const { eventId } = useActiveRoute();
-	const { walkInFormUrl } = useWorkingEventMeta(eventId);
+	const { eventName, walkInFormUrl } = useWorkingEventMeta(eventId);
 	const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 	const modalTitleId = useId();
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const [attendees, setAttendees] = useState<SliceAttendee[]>([]);
 	const [searchQuery, setSearchQuery] = useState('');
-	const [debouncedSearch, setDebouncedSearch] = useState('');
+	const debouncedSearch = useDebouncedValue(searchQuery);
 	const [matchTotal, setMatchTotal] = useState(0);
 	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [selected, setSelected] = useState<SelectedAttendee | null>(null);
 	const [confirming, setConfirming] = useState(false);
-	const [undoing, setUndoing] = useState(false);
-	const [undoingId, setUndoingId] = useState<string | null>(null);
+	const { undoingId, runUndoCheckIn } = useUndoCheckIn(eventId ?? null);
+	const undoing = undoingId !== null;
 	const [scanning, setScanning] = useState(false);
-	const [capacityStatus, setCapacityStatus] = useState<CapacityStatus | null>(null);
-	const [capacityLoading, setCapacityLoading] = useState(false);
-	const [capacityError, setCapacityError] = useState<string | null>(null);
 	const [capacityAdjusting, setCapacityAdjusting] = useState(false);
 	const [searchReloadKey, setSearchReloadKey] = useState(0);
 
-	const loadCapacityStatus = useCallback(async () => {
-		if (!eventId) {
-			setCapacityStatus(null);
-			setCapacityError(null);
-			return;
-		}
-
-		setCapacityLoading(true);
-		setCapacityError(null);
-		try {
-			const status = await data.fetchEventCapacityStatus(eventId);
-			setCapacityStatus(status);
-		} catch (err: unknown) {
-			setCapacityStatus(null);
-			setCapacityError(err instanceof Error ? err.message : 'Failed to load capacity');
-		} finally {
-			setCapacityLoading(false);
-		}
-	}, [data, eventId]);
+	const capacityQuery = useEventCapacity(eventId ?? '', { enabled: Boolean(eventId) });
+	const capacityViewStatus = describeQueryStatus(capacityQuery, 'Failed to load capacity');
 
 	useEffect(() => {
 		setSearchQuery('');
-		setDebouncedSearch('');
 		setActiveModal(null);
 		setSelected(null);
-		setCapacityStatus(null);
-		setCapacityError(null);
 	}, [eventId]);
 
 	const closeModal = useCallback(() => {
@@ -119,30 +74,11 @@ export function CheckInView() {
 	useModalFocusTrap({ open: activeModal !== null, containerRef: dialogRef, onEscape: closeModal });
 
 	useEffect(() => {
-		void loadCapacityStatus();
-	}, [loadCapacityStatus]);
-
-	useEffect(() => {
-		const handle = window.setTimeout(() => {
-			setDebouncedSearch(searchQuery);
-		}, 300);
-
-		return () => window.clearTimeout(handle);
-	}, [searchQuery]);
-
-	useEffect(() => {
 		if (!eventId) {
 			return;
 		}
 
 		const query = debouncedSearch.trim();
-		if (query.length < CHECK_IN_MIN_SEARCH_LENGTH) {
-			setAttendees((current) => (current.length === 0 ? current : []));
-			setMatchTotal((current) => (current === 0 ? current : 0));
-			setRefreshing((current) => (current === false ? current : false));
-			setError((current) => (current === null ? current : null));
-			return;
-		}
 
 		let cancelled = false;
 		setRefreshing(true);
@@ -150,7 +86,7 @@ export function CheckInView() {
 
 		void data
 			.fetchEventAttendees(eventId, {
-				q: query,
+				...(query ? { q: query } : {}),
 				page: 1,
 				pageSize: CHECK_IN_SEARCH_PAGE_SIZE,
 			})
@@ -224,44 +160,30 @@ export function CheckInView() {
 
 			setAttendees((current) =>
 				current.map((person) =>
-					person.contactId === result.contactId ? { ...person, checkedIn: true } : person,
+					person.contactId === result.contactId
+						? { ...person, checkedIn: true, checkedInAt: result.checkedInAt }
+						: person,
 				),
 			);
 			setSelected(null);
 			setActiveModal(null);
-			await loadCapacityStatus();
+			await invalidateAfterAttendeeMutation(queryClient, eventId);
 		} catch (err: unknown) {
-			showToast(err instanceof Error ? err.message : 'Check-in failed', 'error');
+			showToast(attendeeMutationErrorMessage(err, 'Check-in failed'), 'error');
 		} finally {
 			setConfirming(false);
 		}
 	}
 
-	async function runUndoCheckIn(person: SelectedAttendee) {
-		if (!eventId) {
-			return;
-		}
-
-		const name = attendeeName(person);
-		setUndoing(true);
-		setUndoingId(person.contactId);
-		try {
-			await data.undoCheckIn(eventId, person.contactId);
-			showToast(`${name}: check-in undone.`, 'success');
-			setAttendees((current) =>
-				current.map((row) =>
-					row.contactId === person.contactId ? { ...row, checkedIn: false } : row,
-				),
-			);
-			setSelected(null);
-			setActiveModal(null);
-			await loadCapacityStatus();
-		} catch (err: unknown) {
-			showToast(err instanceof Error ? err.message : 'Failed to undo check-in', 'error');
-		} finally {
-			setUndoing(false);
-			setUndoingId(null);
-		}
+	/** Reacts to a successful shared undo — this view's own local roster patch + modal close (candidate 7). */
+	function onUndoCheckInSuccess(person: SelectedAttendee) {
+		setAttendees((current) =>
+			current.map((row) =>
+				row.contactId === person.contactId ? { ...row, checkedIn: false, checkedInAt: null } : row,
+			),
+		);
+		setSelected(null);
+		setActiveModal(null);
 	}
 
 	async function handleUndoFromList(person: SliceAttendee) {
@@ -275,14 +197,18 @@ export function CheckInView() {
 		if (!confirmed) {
 			return;
 		}
-		await runUndoCheckIn(person);
+		if (await runUndoCheckIn(person)) {
+			onUndoCheckInSuccess(person);
+		}
 	}
 
 	async function handleUndoFromConfirm() {
 		if (!selected) {
 			return;
 		}
-		await runUndoCheckIn(selected);
+		if (await runUndoCheckIn(selected)) {
+			onUndoCheckInSuccess(selected);
+		}
 	}
 
 	async function handleAdjustCapacity(direction: AdjustCapacityDirection) {
@@ -293,7 +219,8 @@ export function CheckInView() {
 		setCapacityAdjusting(true);
 		try {
 			const status = await data.adjustCapacity(eventId, direction);
-			setCapacityStatus(status);
+			queryClient.setQueryData(queryKeys.eventCapacity(eventId), status);
+			await invalidateAfterCapacityAdjust(queryClient, eventId);
 		} catch (err: unknown) {
 			showToast(err instanceof Error ? err.message : 'Capacity adjust failed', 'error');
 		} finally {
@@ -315,18 +242,19 @@ export function CheckInView() {
 		);
 	}
 
-	const searchReady = debouncedSearch.trim().length >= CHECK_IN_MIN_SEARCH_LENGTH;
-	const resultsTruncated = searchReady && matchTotal > attendees.length;
+	const isSearching = debouncedSearch.trim().length > 0;
+	const resultsTruncated = matchTotal > attendees.length;
 	const trimmedWalkInUrl = walkInFormUrl?.trim() ?? '';
-	const walkInUrlError = trimmedWalkInUrl ? walkInUrlRenderError(trimmedWalkInUrl) : null;
+	const walkInUrlError = trimmedWalkInUrl ? walkInFormUrlError(trimmedWalkInUrl) : null;
 	const walkInIframeSrc = trimmedWalkInUrl && !walkInUrlError ? trimmedWalkInUrl : null;
+	const capacityStatus = capacityViewStatus.kind === 'ready' ? (capacityQuery.data ?? null) : null;
 
 	return (
 		<section id="view-check-in" className={styles.view}>
-			<TopBar title="Check-in" meta="Scan, search or add attendees at the door" />
+			<TopBar title="Check-in" meta="Scan, search or add attendees at the door" workingEvent={eventName} />
 
 			<div className={styles.deskToolbar}>
-				{capacityLoading ? (
+				{capacityViewStatus.kind === 'loading' ? (
 					<LoadingState message="Loading capacity…" variant="inline" />
 				) : capacityStatus ? (
 					capacityStatus.capacity && capacityStatus.capacity > 0 ? (
@@ -351,10 +279,10 @@ export function CheckInView() {
 							</p>
 						</div>
 					)
-				) : capacityError ? (
+				) : capacityViewStatus.kind === 'error' ? (
 					<div className={`card ${styles.capacityCard} ${styles.capacitySection}`}>
-						<p className={styles.capacityError}>Capacity unavailable: {capacityError}</p>
-						<button type="button" className="btn btn-outline btn-sm" onClick={() => void loadCapacityStatus()}>
+						<p className={styles.capacityError}>Capacity unavailable: {capacityViewStatus.message}</p>
+						<button type="button" className="btn btn-outline btn-sm" onClick={() => void capacityQuery.refetch()}>
 							Retry
 						</button>
 					</div>
@@ -364,7 +292,14 @@ export function CheckInView() {
 			<div className={styles.layout}>
 				<div className={`card ${styles.findCard}`}>
 					<div className={styles.cardHeader}>
-						<h3>Attendees</h3>
+						<div>
+							<h3>Attendees</h3>
+							{!isSearching && capacityStatus ? (
+								<p className={styles.checkedInSummary}>
+									{capacityStatus.checkedInCount} of {matchTotal} checked in
+								</p>
+							) : null}
+						</div>
 						<label className={styles.searchField}>
 							<span className="material-symbols-outlined" aria-hidden="true">
 								search
@@ -407,19 +342,15 @@ export function CheckInView() {
 								</tr>
 							</thead>
 							<tbody>
-								{!searchReady ? (
-									<tr>
-										<td colSpan={2}>Type at least 2 characters to search registrants.</td>
-									</tr>
-								) : refreshing ? (
+								{refreshing ? (
 									<tr>
 										<td colSpan={2}>
-											<LoadingState message="Searching…" variant="inline" />
+											<LoadingState message="Loading attendees…" variant="inline" />
 										</td>
 									</tr>
 								) : sortedAttendees.length === 0 ? (
 									<tr>
-										<td colSpan={2}>No matching registrants.</td>
+										<td colSpan={2}>{isSearching ? 'No matching registrants.' : 'No registrants yet.'}</td>
 									</tr>
 								) : (
 									sortedAttendees.map((person) => {
@@ -427,26 +358,43 @@ export function CheckInView() {
 										return (
 											<tr
 												key={person.contactId}
-												className={isSelected ? styles.selectedRow : undefined}
+												className={[
+													isSelected ? styles.selectedRow : '',
+													person.checkedIn ? styles.checkedInRow : '',
+												]
+													.filter(Boolean)
+													.join(' ')}
 											>
 												<td>
-													<p className={styles.attendeeName}>{attendeeName(person)}</p>
-													<p className={styles.attendeeMeta}>
-														{person.company} · {person.attendeeType}
-													</p>
+													<div className={styles.attendeeCell}>
+														<span className={styles.attendeeAvatar} aria-hidden="true">
+															{attendeeInitials(person)}
+														</span>
+														<div>
+															<p className={styles.attendeeName}>{attendeeName(person)}</p>
+															<p className={styles.attendeeMeta}>
+																{person.company} · {person.attendeeType}
+															</p>
+														</div>
+													</div>
 												</td>
 												<td className={styles.colAction}>
 													{person.checkedIn ? (
 														<button
 															type="button"
-															className="btn btn-outline btn-sm"
+															className={styles.checkedInStatus}
 															disabled={undoingId === person.contactId}
+															title="Click to undo check-in"
 															onClick={(clickEvent) => {
 																clickEvent.stopPropagation();
 																void handleUndoFromList(person);
 															}}
 														>
-															{undoingId === person.contactId ? 'Undoing…' : 'Undo check-in'}
+															{undoingId === person.contactId
+																? 'Undoing…'
+																: person.checkedInAt
+																	? `In · ${formatCheckInTime(person.checkedInAt)}`
+																	: 'In'}
 														</button>
 													) : (
 														<button
@@ -575,7 +523,7 @@ export function CheckInView() {
 								<div className={styles.modalBody}>
 									<div className={styles.confirmHeader}>
 										<span className={styles.confirmInitials} aria-hidden="true">
-											{initials(selected)}
+											{attendeeInitials(selected)}
 										</span>
 										<div className={styles.confirmName}>
 											<p className={styles.confirmNameText}>{attendeeName(selected)}</p>

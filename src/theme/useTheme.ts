@@ -41,7 +41,7 @@ export function useTheme(): UseThemeResult {
 		setLoading(true);
 
 		data
-			.getThemePreference(session?.email)
+			.getThemePreference()
 			.then((pref) => {
 				if (cancelled) {
 					return;
@@ -75,7 +75,7 @@ export function useTheme(): UseThemeResult {
 			applyThemeAttribute(nextTheme);
 			setThemeState(nextTheme);
 			try {
-				const pref = await data.setThemePreference(nextTheme, session?.email);
+				const pref = await data.setThemePreference(nextTheme);
 				setThemeState(pref.theme);
 				setCelebrationAllowed(pref.celebrationAllowed);
 				applyThemeAttribute(pref.theme);
